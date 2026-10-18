@@ -29,7 +29,7 @@ import {
 const SPARRING_PROFILES: SparringProfile[] = [
   {
     id: 'novice',
-    name: '启蒙小棋童',
+    name: '启蒙棋童',
     avatar: '🐤',
     rank: '20K 启蒙练手',
     description: '刚学围棋的小萌新，出子偶尔有破绽，最适合孩子练习抓吃子！',
@@ -567,14 +567,14 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
                 <button
                   key={p.id}
                   onClick={() => startNewGame(boardSize, playerColor, p.id, winRule, captureTarget)}
-                  className={`flex-1 py-1 px-1 rounded-xl text-[11px] font-black transition flex items-center justify-center gap-1 ${
+                  className={`flex-1 py-1 px-1 rounded-xl text-[11px] font-black transition flex items-center justify-center gap-0.5 ${
                     isSelected
                       ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow'
                       : 'bg-amber-100/70 hover:bg-amber-200 text-amber-900 border border-amber-300'
                   }`}
                 >
                   <span>{p.avatar}</span>
-                  <span>{p.name.slice(0, 3)}</span>
+                  <span>{p.name}</span>
                 </button>
               );
             })}
@@ -582,7 +582,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
         </div>
 
         {/* Bottom Section: Action Controls (2x2 Grid) */}
-        <div className="grid grid-cols-2 gap-1.5 shrink-0 pt-0.5">
+        <div className="grid grid-cols-2 gap-1.5 shrink-0 pt-0.5 pb-8 sm:pb-10">
           <button
             onClick={handleUndo}
             disabled={boardState.moveHistory.length < 2 || isAiThinking}

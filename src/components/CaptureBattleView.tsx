@@ -241,7 +241,7 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
         </div>
 
         {/* Bottom: Action Buttons */}
-        <div className="grid grid-cols-3 gap-1.5 shrink-0 pt-0.5">
+        <div className="grid grid-cols-3 gap-1.5 shrink-0 pt-0.5 pb-8 sm:pb-10">
           <button
             onClick={handleUndo}
             disabled={boardState.moveHistory.length < 2 || isAiThinking}

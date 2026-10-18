@@ -23,7 +23,7 @@ export const AdventureMap: React.FC<AdventureMapProps> = ({
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-amber-950 font-cartoon flex items-center gap-2">
             <span>🏝️</span>
-            <span>少儿围棋启蒙岛</span>
+            <span>森森少儿围棋启蒙岛</span>
           </h1>
           <p className="text-sm sm:text-base font-bold text-amber-900 mt-1">
             一步一步闯关摘星星，掌握从吃子到做眼的围棋绝招！

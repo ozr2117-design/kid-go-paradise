@@ -43,8 +43,7 @@ export const KidNavbar: React.FC<KidNavbarProps> = ({
       {/* Brand & Stars */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-1.5 bg-amber-600/60 px-3 py-1 rounded-2xl border border-amber-400">
-          <span className="text-2xl animate-bounce">⚪</span>
-          <span className="text-xl font-black tracking-wide font-cartoon">萌弈少儿围棋</span>
+          <span className="text-lg sm:text-xl font-black tracking-wide font-cartoon">森森围棋基地</span>
         </div>
 
         {/* Stars counter */}

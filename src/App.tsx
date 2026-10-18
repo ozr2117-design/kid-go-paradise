@@ -104,7 +104,7 @@ export const App: React.FC = () => {
             />
             {/* Footer Encouragement Note */}
             <footer className="text-center py-4 text-xs font-bold text-amber-800/60 border-t border-amber-200 bg-amber-50/50 w-full mt-4">
-              棋虽小道，品德最尊 · 少儿围棋趣味启蒙乐园
+              棋虽小道，品德最尊 · 森森围棋基地
             </footer>
           </div>
         )}

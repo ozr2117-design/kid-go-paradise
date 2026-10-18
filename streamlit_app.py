@@ -3,7 +3,7 @@ import streamlit.components.v1 as components
 import os
 
 st.set_page_config(
-    page_title="萌弈少儿围棋乐园",
+    page_title="森森围棋基地",
     page_icon="⚪",
     layout="wide",
     initial_sidebar_state="collapsed",
