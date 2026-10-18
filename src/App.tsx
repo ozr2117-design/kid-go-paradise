@@ -6,6 +6,7 @@ import { SoundEngine } from './engine/sound-engine';
 import { KidNavbar } from './components/KidNavbar';
 import { AdventureMap } from './components/AdventureMap';
 import { CaptureBattleView } from './components/CaptureBattleView';
+import { FullGameSparringView } from './components/FullGameSparringView';
 import { PuzzleView } from './components/PuzzleView';
 import { FreePlayView } from './components/FreePlayView';
 
@@ -107,6 +108,10 @@ export const App: React.FC = () => {
             onWinRecord={handleBattleWin}
             showCoordinates={progress.showCoordinates}
           />
+        )}
+
+        {currentMode === 'sparring' && (
+          <FullGameSparringView showCoordinates={progress.showCoordinates} />
         )}
 
         {currentMode === 'puzzle' && (

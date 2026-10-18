@@ -1,6 +1,6 @@
 import React from 'react';
 import { GameMode } from '../types/go';
-import { Volume2, VolumeX, Sparkles, Map, Swords, Puzzle, Grid } from 'lucide-react';
+import { Volume2, VolumeX, Sparkles, Map, Swords, Puzzle, Grid, Bot } from 'lucide-react';
 
 interface KidNavbarProps {
   currentMode: GameMode;
@@ -61,6 +61,18 @@ export const KidNavbar: React.FC<KidNavbarProps> = ({
         >
           <Swords className="w-4 h-4" />
           <span>萌宠吃子战</span>
+        </button>
+
+        <button
+          onClick={() => onSelectMode('sparring')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-sm transition-all ${
+            currentMode === 'sparring'
+              ? 'bg-yellow-400 text-amber-950 shadow-md scale-105'
+              : 'hover:bg-amber-500/50 text-amber-100'
+          }`}
+        >
+          <Bot className="w-4 h-4" />
+          <span>AI全盘对弈</span>
         </button>
 
         <button

@@ -35,7 +35,17 @@ export interface BoardState {
   winReason?: string;
 }
 
-export type GameMode = 'adventure' | 'battle' | 'puzzle' | 'sandbox';
+export type GameMode = 'adventure' | 'battle' | 'sparring' | 'puzzle' | 'sandbox';
+
+export type AISparringLevel = 'novice' | 'club' | 'master';
+
+export interface SparringProfile {
+  id: AISparringLevel;
+  name: string;
+  avatar: string;
+  rank: string; // e.g. "18K (小棋童)", "10K (冲段少年)", "3K~1D (弈林宗师)"
+  description: string;
+}
 
 export interface PuzzleNode {
   comment?: string;
