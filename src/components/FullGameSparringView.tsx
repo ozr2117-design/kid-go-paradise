@@ -343,33 +343,33 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
       </div>
 
       {/* 2. RIGHT SIDEBAR: ALL STATS, CAPTURE FEEDBACK & OPTIONS */}
-      <div className="w-full md:w-80 lg:w-84 xl:w-92 h-full flex flex-col justify-between gap-2 overflow-y-auto pr-1 shrink-0">
+      <div className="w-full md:w-80 lg:w-84 xl:w-88 h-full flex flex-col justify-between gap-1.5 overflow-hidden pr-0.5 shrink-0">
         {/* Top Section: AI Avatar, Profile & Live Dialogue */}
-        <div className="bg-white/95 rounded-2xl p-2.5 sm:p-3 border-2 border-amber-300 shadow-sm flex flex-col gap-2 shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-amber-100 to-yellow-200 border-2 border-amber-400 flex items-center justify-center text-2xl shadow-inner shrink-0">
+        <div className="bg-white/95 rounded-2xl p-2 border-2 border-amber-300 shadow-xs flex flex-col gap-1.5 shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-amber-100 to-yellow-200 border-2 border-amber-400 flex items-center justify-center text-xl shadow-inner shrink-0">
               {activeProfile.avatar}
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-1">
-                <h3 className="font-black text-amber-950 text-sm font-cartoon">
+                <h3 className="font-black text-amber-950 text-xs sm:text-sm font-cartoon">
                   {activeProfile.name}
                 </h3>
-                <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full shrink-0">
+                <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded-full shrink-0">
                   {activeProfile.rank}
                 </span>
               </div>
-              <p className="text-[11px] text-gray-600 leading-snug mt-0.5">{activeProfile.description}</p>
+              <p className="text-[10px] text-gray-500 leading-tight truncate">{activeProfile.description}</p>
             </div>
           </div>
 
           {/* Dynamic AI speech bubble */}
-          <div className="bg-amber-50/90 p-2 sm:p-2.5 rounded-xl border border-amber-200 text-xs font-bold text-amber-950 relative">
-            <div className="absolute -top-1.5 left-5 w-3 h-3 bg-amber-50 border-t border-l border-amber-200 transform rotate-45"></div>
+          <div className="bg-amber-50/90 px-2 py-1.5 rounded-xl border border-amber-200 text-[11px] font-bold text-amber-950 relative">
+            <div className="absolute -top-1 left-5 w-2.5 h-2.5 bg-amber-50 border-t border-l border-amber-200 transform rotate-45"></div>
             {isAiThinking ? (
-              <div className="flex items-center gap-1.5 text-amber-600 animate-pulse">
-                <Bot className="w-3.5 h-3.5" />
-                <span>{activeProfile.name} 正在深度推演局势...</span>
+              <div className="flex items-center gap-1.5 text-amber-600 animate-pulse text-[11px]">
+                <Bot className="w-3 h-3 shrink-0" />
+                <span className="truncate">{activeProfile.name} 正在深度推演局势...</span>
               </div>
             ) : (
               <span className="line-clamp-2">“{aiDialogue}”</span>
@@ -377,9 +377,9 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
           </div>
 
           {/* Current Move Status Banner */}
-          <div className="flex items-center justify-between text-[11px] font-bold bg-amber-100/70 px-2.5 py-1 rounded-lg text-amber-900 border border-amber-200">
-            <span className="shrink-0">当前提示：</span>
-            <span className="text-amber-800 font-semibold ml-1 leading-snug">{statusMessage}</span>
+          <div className="flex items-center justify-between text-[10px] font-bold bg-amber-100/70 px-2 py-0.5 rounded-lg text-amber-900 border border-amber-200">
+            <span className="shrink-0 text-amber-700">提示：</span>
+            <span className="text-amber-900 font-semibold truncate ml-1">{statusMessage}</span>
           </div>
         </div>
 
@@ -387,7 +387,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
         <div className="shrink-0">
           {winRule === 'capture' ? (
             /* Capture Race Badge Tracker */
-            <div className="bg-gradient-to-r from-yellow-100 via-amber-100 to-orange-100 p-2.5 rounded-2xl border-2 border-amber-400 shadow-sm flex flex-col gap-1.5">
+            <div className="bg-gradient-to-r from-yellow-100 via-amber-100 to-orange-100 p-2 rounded-2xl border-2 border-amber-400 shadow-xs flex flex-col gap-1">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black text-amber-950 font-cartoon flex items-center gap-1">
                   <Swords className="w-3.5 h-3.5 text-amber-700" />
@@ -400,7 +400,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
                     setCustomTargetInput(String(captureTarget));
                     setIsTargetModalOpen(true);
                   }}
-                  className="flex items-center gap-1 bg-white hover:bg-amber-50 text-amber-950 px-2 py-0.5 rounded-lg border border-amber-400 text-[11px] font-bold shadow-xs transition"
+                  className="flex items-center gap-1 bg-white hover:bg-amber-50 text-amber-950 px-1.5 py-0.5 rounded-lg border border-amber-400 text-[10px] font-bold shadow-xs transition"
                   title="点击修改目标吃子数"
                 >
                   <span>先吃满</span>
@@ -410,25 +410,25 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
               </div>
 
               {/* Progress Duel Cards */}
-              <div className="grid grid-cols-2 gap-2 mt-0.5">
+              <div className="grid grid-cols-2 gap-1.5">
                 {/* Player Card */}
-                <div className="bg-white/90 p-2 rounded-xl border border-amber-200 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-3.5 h-3.5 rounded-full bg-black inline-block border border-gray-700 shrink-0" />
-                    <span className="text-xs font-bold text-amber-950">你已吃</span>
+                <div className="bg-white/90 px-2 py-1 rounded-xl border border-amber-200 flex items-center justify-between">
+                  <div className="flex items-center gap-1">
+                    <span className="w-3 h-3 rounded-full bg-black inline-block border border-gray-700 shrink-0" />
+                    <span className="text-[11px] font-bold text-amber-950">你已吃</span>
                   </div>
-                  <div className="text-base font-black text-emerald-700 font-cartoon">
+                  <div className="text-sm font-black text-emerald-700 font-cartoon">
                     {myCaptures} <span className="text-[10px] text-gray-500 font-normal">/ {captureTarget}</span>
                   </div>
                 </div>
 
                 {/* AI Opponent Card */}
-                <div className="bg-white/90 p-2 rounded-xl border border-amber-200 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-3.5 h-3.5 rounded-full bg-white inline-block border border-gray-300 shrink-0" />
-                    <span className="text-xs font-bold text-amber-950">AI 已吃</span>
+                <div className="bg-white/90 px-2 py-1 rounded-xl border border-amber-200 flex items-center justify-between">
+                  <div className="flex items-center gap-1">
+                    <span className="w-3 h-3 rounded-full bg-white inline-block border border-gray-300 shrink-0" />
+                    <span className="text-[11px] font-bold text-amber-950">AI已吃</span>
                   </div>
-                  <div className="text-base font-black text-orange-700 font-cartoon">
+                  <div className="text-sm font-black text-orange-700 font-cartoon">
                     {oppCaptures} <span className="text-[10px] text-gray-500 font-normal">/ {captureTarget}</span>
                   </div>
                 </div>
@@ -436,7 +436,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
 
               {/* Match point alert if close */}
               {myCaptures >= captureTarget - 1 && myCaptures < captureTarget && (
-                <div className="text-[11px] font-black text-red-600 bg-red-100 py-1 px-2 rounded-lg border border-red-300 animate-bounce flex items-center justify-center gap-1">
+                <div className="text-[10px] font-black text-red-600 bg-red-100 py-0.5 px-2 rounded-lg border border-red-300 animate-bounce flex items-center justify-center gap-1">
                   <Zap className="w-3 h-3 fill-current" />
                   <span>赛点！再吃 1 颗直接获胜！</span>
                 </div>
@@ -444,22 +444,22 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
             </div>
           ) : (
             /* Territory Live Progress */
-            <div className="bg-gradient-to-r from-amber-100 via-yellow-100 to-amber-100 p-2.5 rounded-2xl border-2 border-amber-400 shadow-sm flex flex-col gap-1.5">
-              <div className="flex items-center justify-between text-xs font-black text-amber-950 px-0.5">
+            <div className="bg-gradient-to-r from-amber-100 via-yellow-100 to-amber-100 p-2 rounded-2xl border-2 border-amber-400 shadow-xs flex flex-col gap-1">
+              <div className="flex items-center justify-between text-[11px] font-black text-amber-950 px-0.5">
                 <div className="flex items-center gap-1">
-                  <span className="w-3 h-3 rounded-full bg-black inline-block border border-gray-700" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-black inline-block border border-gray-700" />
                   <span>黑: {blackScore} 目</span>
                 </div>
-                <div className="flex items-center gap-1 text-amber-800 font-cartoon text-[11px]">
-                  <Flame className="w-3.5 h-3.5 text-orange-500 fill-orange-500 animate-pulse" />
+                <div className="flex items-center gap-1 text-amber-800 font-cartoon text-[10px]">
+                  <Flame className="w-3 h-3 text-orange-500 fill-orange-500 animate-pulse" />
                   <span>实时地盘</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <span>白: {whiteScore.toFixed(1)} 目</span>
-                  <span className="w-3 h-3 rounded-full bg-white inline-block border border-gray-300" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-white inline-block border border-gray-300" />
                 </div>
               </div>
-              <div className="w-full h-2.5 bg-gray-300 rounded-full overflow-hidden flex shadow-inner border border-amber-300">
+              <div className="w-full h-2 bg-gray-300 rounded-full overflow-hidden flex shadow-inner border border-amber-300">
                 <div
                   style={{ width: `${blackPercent}%` }}
                   className="h-full bg-gray-900 transition-all duration-500"
@@ -474,22 +474,22 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
         </div>
 
         {/* Middle Section 2: Options & Settings (选项的情况) */}
-        <div className="bg-white/95 rounded-2xl p-2.5 sm:p-3 border-2 border-amber-300 shadow-sm flex flex-col gap-2 shrink-0">
-          <div className="text-xs font-black text-amber-950 font-cartoon flex items-center gap-1 border-b border-amber-200 pb-1">
-            <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+        <div className="bg-white/95 rounded-2xl p-2 border-2 border-amber-300 shadow-xs flex flex-col gap-1.5 shrink-0">
+          <div className="text-[11px] font-black text-amber-950 font-cartoon flex items-center gap-1 border-b border-amber-200 pb-0.5">
+            <Sparkles className="w-3 h-3 text-amber-600" />
             <span>对弈设置与选项</span>
           </div>
 
           {/* Rule Mode Buttons */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             <button
               onClick={() => {
                 setCustomTargetInput(String(captureTarget));
                 setIsTargetModalOpen(true);
               }}
-              className={`flex-1 py-1 px-1.5 rounded-xl font-bold text-xs transition flex items-center justify-center gap-1 ${
+              className={`flex-1 py-1 px-1 rounded-xl font-bold text-[11px] transition flex items-center justify-center gap-1 ${
                 winRule === 'capture'
-                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-amber-950 font-black shadow border border-amber-500 scale-[1.02]'
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-amber-950 font-black shadow border border-amber-500'
                   : 'bg-amber-100/70 hover:bg-amber-200 text-amber-900 border border-amber-300'
               }`}
             >
@@ -498,9 +498,9 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
             </button>
             <button
               onClick={() => startNewGame(boardSize, playerColor, aiLevel, 'territory', captureTarget)}
-              className={`flex-1 py-1 px-1.5 rounded-xl font-bold text-xs transition flex items-center justify-center gap-1 ${
+              className={`flex-1 py-1 px-1 rounded-xl font-bold text-[11px] transition flex items-center justify-center gap-1 ${
                 winRule === 'territory'
-                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-amber-950 font-black shadow border border-amber-500 scale-[1.02]'
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-amber-950 font-black shadow border border-amber-500'
                   : 'bg-amber-100/70 hover:bg-amber-200 text-amber-900 border border-amber-300'
               }`}
             >
@@ -510,16 +510,16 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
           </div>
 
           {/* Board Size & Stone Color */}
-          <div className="grid grid-cols-2 gap-1.5 text-xs">
+          <div className="grid grid-cols-2 gap-1 text-[11px]">
             {/* Size */}
-            <div className="flex items-center gap-1 bg-amber-50 p-1 rounded-xl border border-amber-200 justify-between">
-              <span className="text-[11px] font-bold text-amber-900 ml-1">路数:</span>
+            <div className="flex items-center gap-1 bg-amber-50 px-1.5 py-0.5 rounded-lg border border-amber-200 justify-between">
+              <span className="text-[10px] font-bold text-amber-900">路数:</span>
               <div className="flex gap-0.5">
                 {([13, 19] as BoardSize[]).map((sz) => (
                   <button
                     key={sz}
                     onClick={() => startNewGame(sz, playerColor, aiLevel, winRule, captureTarget)}
-                    className={`px-1.5 py-0.5 rounded-lg font-black text-[11px] transition ${
+                    className={`px-1.5 py-0.5 rounded font-black text-[10px] transition ${
                       boardSize === sz
                         ? 'bg-amber-600 text-white shadow-xs'
                         : 'bg-white hover:bg-amber-100 text-amber-900 border border-amber-200'
@@ -532,12 +532,12 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
             </div>
 
             {/* Color */}
-            <div className="flex items-center gap-1 bg-amber-50 p-1 rounded-xl border border-amber-200 justify-between">
-              <span className="text-[11px] font-bold text-amber-900 ml-1">执子:</span>
+            <div className="flex items-center gap-1 bg-amber-50 px-1.5 py-0.5 rounded-lg border border-amber-200 justify-between">
+              <span className="text-[10px] font-bold text-amber-900">执子:</span>
               <div className="flex gap-0.5">
                 <button
                   onClick={() => startNewGame(boardSize, 'black', aiLevel, winRule, captureTarget)}
-                  className={`px-1.5 py-0.5 rounded-lg font-black text-[11px] transition ${
+                  className={`px-1.5 py-0.5 rounded font-black text-[10px] transition ${
                     playerColor === 'black'
                       ? 'bg-black text-white shadow-xs'
                       : 'bg-white text-gray-800 border border-gray-300'
@@ -547,9 +547,9 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
                 </button>
                 <button
                   onClick={() => startNewGame(boardSize, 'white', aiLevel, winRule, captureTarget)}
-                  className={`px-1.5 py-0.5 rounded-lg font-black text-[11px] transition ${
+                  className={`px-1.5 py-0.5 rounded font-black text-[10px] transition ${
                     playerColor === 'white'
-                      ? 'bg-white text-gray-900 border-2 border-amber-500 shadow-xs'
+                      ? 'bg-white text-gray-900 border border-amber-500 shadow-xs'
                       : 'bg-gray-100 text-gray-700 border border-gray-300'
                   }`}
                 >
@@ -567,7 +567,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
                 <button
                   key={p.id}
                   onClick={() => startNewGame(boardSize, playerColor, p.id, winRule, captureTarget)}
-                  className={`flex-1 py-1 px-1 rounded-xl text-[11px] font-black transition flex items-center justify-center gap-0.5 ${
+                  className={`flex-1 py-1 px-0.5 rounded-lg text-[10px] font-black transition flex items-center justify-center gap-0.5 ${
                     isSelected
                       ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow'
                       : 'bg-amber-100/70 hover:bg-amber-200 text-amber-900 border border-amber-300'
@@ -582,11 +582,11 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
         </div>
 
         {/* Bottom Section: Action Controls (2x2 Grid) */}
-        <div className="grid grid-cols-2 gap-1.5 shrink-0 pt-0.5 pb-8 sm:pb-10">
+        <div className="grid grid-cols-2 gap-1 shrink-0 pt-0.5 pb-0.5">
           <button
             onClick={handleUndo}
             disabled={boardState.moveHistory.length < 2 || isAiThinking}
-            className="flex items-center justify-center gap-1 py-2 px-2 bg-white hover:bg-amber-50 disabled:opacity-40 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs shadow-sm transition active:scale-95"
+            className="flex items-center justify-center gap-1 py-1.5 px-1 bg-white hover:bg-amber-50 disabled:opacity-40 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs shadow-xs transition active:scale-95"
           >
             <Undo2 className="w-3.5 h-3.5" />
             <span>悔棋一步</span>
@@ -595,7 +595,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
           <button
             onClick={handlePass}
             disabled={boardState.turn !== playerColor || isAiThinking}
-            className="flex items-center justify-center gap-1 py-2 px-2 bg-white hover:bg-amber-50 disabled:opacity-40 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs shadow-sm transition active:scale-95"
+            className="flex items-center justify-center gap-1 py-1.5 px-1 bg-white hover:bg-amber-50 disabled:opacity-40 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs shadow-xs transition active:scale-95"
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>停一手(Pass)</span>
@@ -603,9 +603,9 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
 
           <button
             onClick={() => setShowLiberties(!showLiberties)}
-            className={`flex items-center justify-center gap-1 py-2 px-2 font-bold rounded-xl border text-xs shadow-sm transition active:scale-95 ${
+            className={`flex items-center justify-center gap-1 py-1.5 px-1 font-bold rounded-xl border text-xs shadow-xs transition active:scale-95 ${
               showLiberties
-                ? 'bg-emerald-500 text-white border-emerald-600 shadow'
+                ? 'bg-emerald-500 text-white border-emerald-600 shadow-xs'
                 : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
             }`}
           >
@@ -615,7 +615,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
 
           <button
             onClick={() => startNewGame()}
-            className="flex items-center justify-center gap-1 py-2 px-2 bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-500 hover:to-yellow-500 text-amber-950 font-black rounded-xl border border-amber-400 text-xs shadow-sm transition active:scale-95"
+            className="flex items-center justify-center gap-1 py-1.5 px-1 bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-500 hover:to-yellow-500 text-amber-950 font-black rounded-xl border border-amber-400 text-xs shadow-xs transition active:scale-95"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>重开一盘</span>
