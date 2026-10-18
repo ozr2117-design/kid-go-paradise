@@ -10,9 +10,9 @@ interface FreePlayViewProps {
 }
 
 export const FreePlayView: React.FC<FreePlayViewProps> = ({ showCoordinates }) => {
-  const [boardSize, setBoardSize] = useState<BoardSize>(9);
+  const [boardSize, setBoardSize] = useState<BoardSize>(13);
   const [boardState, setBoardState] = useState<BoardState>(() =>
-    GoCore.createEmptyBoard(9)
+    GoCore.createEmptyBoard(13)
   );
   const [territoryEstimate, setTerritoryEstimate] = useState<{
     black: number;
@@ -108,7 +108,7 @@ export const FreePlayView: React.FC<FreePlayViewProps> = ({ showCoordinates }) =
       <div className="flex items-center justify-between bg-white/80 p-3 rounded-2xl border border-amber-300 shadow-sm flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <span className="text-sm font-black text-amber-950 font-cartoon">棋盘路数：</span>
-          {([7, 9, 13, 19] as BoardSize[]).map((sz) => (
+          {([13, 19] as BoardSize[]).map((sz) => (
             <button
               key={sz}
               onClick={() => changeSize(sz)}

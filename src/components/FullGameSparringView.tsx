@@ -56,14 +56,14 @@ interface FullGameSparringViewProps {
 
 export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ showCoordinates }) => {
   // Game Configuration State
-  const [boardSize, setBoardSize] = useState<BoardSize>(9);
+  const [boardSize, setBoardSize] = useState<BoardSize>(13);
   const [playerColor, setPlayerColor] = useState<Color>('black');
   const [aiLevel, setAiLevel] = useState<AISparringLevel>('club');
   const [winRule, setWinRule] = useState<WinRuleMode>('capture'); // Default to Kid-Friendly Capture Race!
   const [captureTarget, setCaptureTarget] = useState<number>(5); // Default: First to capture 5 stones wins!
 
   // Runtime Game State
-  const [boardState, setBoardState] = useState<BoardState>(() => GoCore.createEmptyBoard(9));
+  const [boardState, setBoardState] = useState<BoardState>(() => GoCore.createEmptyBoard(13));
   const [isAiThinking, setIsAiThinking] = useState<boolean>(false);
   const [showLiberties, setShowLiberties] = useState<boolean>(false);
   const [aiDialogue, setAiDialogue] = useState<string>('你好呀！今天我们下一盘，看谁能先达成目标！');
@@ -515,7 +515,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
             <div className="flex items-center gap-1 bg-amber-50 p-1 rounded-xl border border-amber-200 justify-between">
               <span className="text-[11px] font-bold text-amber-900 ml-1">路数:</span>
               <div className="flex gap-0.5">
-                {([9, 13, 19] as BoardSize[]).map((sz) => (
+                {([13, 19] as BoardSize[]).map((sz) => (
                   <button
                     key={sz}
                     onClick={() => startNewGame(sz, playerColor, aiLevel, winRule, captureTarget)}
@@ -525,7 +525,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
                         : 'bg-white hover:bg-amber-100 text-amber-900 border border-amber-200'
                     }`}
                   >
-                    {sz}
+                    {sz}×{sz}
                   </button>
                 ))}
               </div>
