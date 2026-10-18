@@ -1,0 +1,83 @@
+export type Color = 'black' | 'white';
+export type BoardSize = 7 | 9 | 13 | 19;
+
+export interface Point {
+  x: number;
+  y: number;
+}
+
+export interface Move {
+  x: number;
+  y: number;
+  color: Color;
+}
+
+export interface StoneGroup {
+  color: Color;
+  points: Point[];
+  liberties: Point[]; // Unique liberty points
+}
+
+export interface BoardState {
+  size: BoardSize;
+  grid: (Color | null)[][]; // grid[y][x]
+  turn: Color;
+  captures: {
+    black: number; // captured by black
+    white: number; // captured by white
+  };
+  lastMove: Move | null;
+  koPoint: Point | null; // Point that cannot be played due to simple Ko rule
+  moveHistory: Move[];
+  consecutivePasses: number;
+  isGameOver: boolean;
+  winner?: Color | 'draw' | null;
+  winReason?: string;
+}
+
+export type GameMode = 'adventure' | 'battle' | 'puzzle' | 'sandbox';
+
+export interface PuzzleNode {
+  comment?: string;
+  move?: Point; // Expected next move in this branch
+  isCorrect?: boolean;
+  children?: PuzzleNode[];
+}
+
+export interface PuzzleData {
+  id: string;
+  title: string;
+  category: 'liberties' | 'capture' | 'ko' | 'life-and-death' | 'tactics';
+  difficulty: 'easy' | 'medium' | 'hard';
+  boardSize: BoardSize;
+  initialTurn: Color;
+  description: string;
+  hint: string;
+  initialBoard: {
+    black: Point[];
+    white: Point[];
+  };
+  solutionTree: PuzzleNode; // Solution tree with variations
+}
+
+export interface StageInfo {
+  id: number;
+  title: string;
+  subtitle: string;
+  icon: string;
+  themeColor: string;
+  puzzles: PuzzleData[];
+}
+
+export interface AnimalOpponent {
+  id: string;
+  name: string;
+  avatar: string;
+  rank: string; // e.g. "25K (萌萌兔)"
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  boardSize: BoardSize;
+  captureTarget: number; // e.g. first to 1, 3, or 5 captures
+  intro: string;
+  taunts: string[];
+  praises: string[];
+}
