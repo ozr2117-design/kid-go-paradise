@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ADVENTURE_STAGES } from '../data/stages';
 import { PuzzleData, StageInfo } from '../types/go';
 import { Star, Lock, Play, Award, BookOpen } from 'lucide-react';
+import { WeeklyReportCardModal } from './WeeklyReportCardModal';
 
 interface AdventureMapProps {
   unlockedStageId: number;
@@ -18,6 +19,7 @@ export const AdventureMap: React.FC<AdventureMapProps> = ({
   mistakePuzzles = [],
   onSelectPuzzle,
 }) => {
+  const [isReportCardOpen, setIsReportCardOpen] = useState(false);
   const mistakeCount = mistakePuzzles.length;
 
   return (
@@ -56,10 +58,14 @@ export const AdventureMap: React.FC<AdventureMapProps> = ({
             </button>
           )}
 
-          <div className="hidden sm:flex flex-col items-center bg-white/70 px-4 py-2 rounded-2xl border border-amber-300">
-            <Award className="w-8 h-8 text-amber-600" />
-            <span className="text-xs font-bold text-amber-900 mt-1">启蒙成就</span>
-          </div>
+          <button
+            onClick={() => setIsReportCardOpen(true)}
+            className="flex flex-col items-center bg-white/80 hover:bg-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl border-2 border-amber-300 shadow-sm active:scale-95 transition cursor-pointer"
+            title="查看并截图本周作业打卡证书"
+          >
+            <Award className="w-6 sm:w-7 h-6 sm:h-7 text-amber-600" />
+            <span className="text-[11px] sm:text-xs font-black text-amber-900 mt-0.5">打卡证书</span>
+          </button>
         </div>
       </div>
 
@@ -169,6 +175,19 @@ export const AdventureMap: React.FC<AdventureMapProps> = ({
           );
         })}
       </div>
+
+      {/* Weekly Report Card Modal */}
+      <WeeklyReportCardModal
+        isOpen={isReportCardOpen}
+        onClose={() => setIsReportCardOpen(false)}
+        studentName="森森"
+        grade="大三班"
+        weekNumber={7}
+        totalPuzzles={6}
+        completedPuzzles={Math.min(6, completedPuzzles.length)}
+        starsCount={Math.min(18, Object.values(starsMap).reduce((a, b) => a + b, 0))}
+        maxStars={18}
+      />
     </div>
   );
 };

@@ -1,95 +1,213 @@
 import { StageInfo } from '../types/go';
 
 export const ADVENTURE_STAGES: StageInfo[] = [
+  // ==========================================
+  // 第一章：实战杀棋·数气吃子（课后作业真题）
+  // ==========================================
   {
     id: 1,
-    title: '第一章：气的秘密与吃子',
-    subtitle: '认识棋子的呼吸，学习把对手的棋子吃掉！',
+    title: '第一章：实战杀棋·数气吃子',
+    subtitle: '幼儿园大三班第7周真实作业：火眼金睛，找到被包围的气少的白棋吃掉！',
     icon: '🌱',
     themeColor: 'from-emerald-400 to-green-600',
     puzzles: [
       {
         id: '1-1',
-        title: '角上的白棋只有最后一口气',
+        title: '课后作业第1题：边角断子拔除',
         category: 'capture',
         difficulty: 'easy',
         boardSize: 13,
         initialTurn: 'black',
-        description: '白棋在角上已经被黑棋堵住了，黑棋走哪一步能直接吃掉白棋？',
-        hint: '看一看白棋上下左右哪一个交叉点还是空的！',
+        description: '作业第一题：白棋在边角被黑棋两面包抄，只剩下唯一的出路，黑棋走哪一步能直接把它提吃？',
+        hint: '仔细数数白棋的气！下在 (1, 1) 堵住最后一口气，就能把它提走！',
         initialBoard: {
-          black: [{ x: 1, y: 0 }],
-          white: [{ x: 0, y: 0 }],
+          black: [
+            { x: 1, y: 3 },
+            { x: 2, y: 3 },
+            { x: 1, y: 2 },
+            { x: 3, y: 2 },
+            { x: 3, y: 1 },
+            { x: 2, y: 0 },
+          ],
+          white: [
+            { x: 2, y: 2 },
+            { x: 2, y: 1 },
+            { x: 3, y: 3 },
+            { x: 4, y: 3 },
+          ],
         },
         solutionTree: {
-          move: { x: 0, y: 1 },
+          move: { x: 1, y: 1 },
           isCorrect: true,
-          comment: '太棒了！下在 (0,1) 紧住最后一口气，成功把角上的白棋吃掉！',
+          comment: '太棒了！下在 (1, 1) 成功拔除白棋断子，两颗白棋被提吃！',
         },
       },
       {
         id: '1-2',
-        title: '边上单子打吃提子',
+        title: '课后作业第2题：一路边线分歧提子',
         category: 'capture',
         difficulty: 'easy',
         boardSize: 13,
         initialTurn: 'black',
-        description: '边上的白棋被包围了两侧，只剩下唯一的向内气口，黑棋走哪里能把它吃掉？',
-        hint: '堵住白棋剩下的唯一气口 (3,1)！',
+        description: '作业第二题：边线上的白棋掉进包围网，只剩最后一口气，快找到紧气点提吃白棋！',
+        hint: '白棋已经跑不动了，下在一路边线 (1, 0) 紧住最后的气！',
         initialBoard: {
           black: [
-            { x: 2, y: 0 },
-            { x: 4, y: 0 },
+            { x: 2, y: 3 },
+            { x: 2, y: 2 },
+            { x: 1, y: 1 },
+            { x: 3, y: 1 },
+            { x: 3, y: 0 },
           ],
-          white: [{ x: 3, y: 0 }],
+          white: [
+            { x: 2, y: 1 },
+            { x: 2, y: 0 },
+          ],
         },
         solutionTree: {
-          move: { x: 3, y: 1 },
+          move: { x: 1, y: 0 },
           isCorrect: true,
-          comment: '漂亮！下在 (3,1) 堵住了白棋在边线上的最后一口气！',
+          comment: '正解！一路边线落子提吃，白棋被拔除！',
         },
       },
       {
         id: '1-3',
-        title: '危机时刻！小黑棋快快逃跑',
-        category: 'liberties',
+        title: '课后作业第3题：斜角紧气吃子',
+        category: 'capture',
         difficulty: 'easy',
         boardSize: 13,
         initialTurn: 'black',
-        description: '中间的小黑棋被白棋包围了三面，马上就要被吃了！快帮小黑棋找到逃跑的长气点！',
-        hint: '看看小黑棋上下左右哪个方向没有白棋拦路？',
+        description: '作业第三题：白棋企图往角上钻，但退路已经被黑棋封死，黑棋出击吃掉它！',
+        hint: '看清楚白棋唯一的呼吸孔，下在 (3, 0) 封堵！',
         initialBoard: {
-          black: [{ x: 3, y: 3 }],
+          black: [
+            { x: 3, y: 3 },
+            { x: 4, y: 3 },
+            { x: 2, y: 2 },
+            { x: 4, y: 2 },
+            { x: 2, y: 1 },
+          ],
           white: [
             { x: 3, y: 2 },
-            { x: 3, y: 4 },
-            { x: 2, y: 3 },
+            { x: 3, y: 1 },
           ],
         },
         solutionTree: {
-          move: { x: 4, y: 3 },
+          move: { x: 3, y: 0 },
           isCorrect: true,
-          comment: '成功逃脱！往右边 (4,3) 一长，小黑棋连成了两颗子，气变多了！',
+          comment: '完美！下在 (3, 0) 紧住最后一气，白棋被全歼！',
+        },
+      },
+      {
+        id: '1-4',
+        title: '课后作业第4题：二路包夹拔除断子',
+        category: 'capture',
+        difficulty: 'easy',
+        boardSize: 13,
+        initialTurn: 'black',
+        description: '作业第四题：白棋在边线二路被黑棋形成口袋阵，黑棋下在哪里能一锤定音？',
+        hint: '封住白棋边上的出路 (0, 3)，白棋就没气啦！',
+        initialBoard: {
+          black: [
+            { x: 1, y: 4 },
+            { x: 2, y: 4 },
+            { x: 1, y: 2 },
+            { x: 1, y: 1 },
+            { x: 2, y: 1 },
+          ],
+          white: [
+            { x: 0, y: 2 },
+            { x: 1, y: 3 },
+            { x: 2, y: 2 },
+          ],
+        },
+        solutionTree: {
+          move: { x: 0, y: 3 },
+          isCorrect: true,
+          comment: '击中要害！下在 (0, 3) 成功拔除白棋，漂亮！',
+        },
+      },
+      {
+        id: '1-5',
+        title: '课后作业第5题：一路爬行封堵吃',
+        category: 'capture',
+        difficulty: 'easy',
+        boardSize: 13,
+        initialTurn: 'black',
+        description: '作业第五题：白棋贴着一路爬行以为能逃跑，黑棋走哪一步能截断去路直接吃掉？',
+        hint: '挡在白棋的最前头 (4, 0)，关门捉贼！',
+        initialBoard: {
+          black: [
+            { x: 0, y: 1 },
+            { x: 1, y: 1 },
+            { x: 2, y: 1 },
+            { x: 3, y: 2 },
+            { x: 4, y: 2 },
+            { x: 5, y: 1 },
+          ],
+          white: [
+            { x: 2, y: 0 },
+            { x: 3, y: 1 },
+            { x: 3, y: 0 },
+          ],
+        },
+        solutionTree: {
+          move: { x: 4, y: 0 },
+          isCorrect: true,
+          comment: '手起刀落！一路扳头直接提吃，白棋绝望了！',
+        },
+      },
+      {
+        id: '1-6',
+        title: '课后作业第6题：鹤之巢对称拔心',
+        category: 'capture',
+        difficulty: 'easy',
+        boardSize: 13,
+        initialTurn: 'black',
+        description: '作业第六题：经典的对称大阵！白棋被黑棋像大鸟展翅一样合围，黑棋点哪吃掉中心白子？',
+        hint: '正中红心！下在最中心的 (3, 3)！',
+        initialBoard: {
+          black: [
+            { x: 2, y: 4 },
+            { x: 3, y: 5 },
+            { x: 4, y: 4 },
+            { x: 2, y: 2 },
+            { x: 4, y: 2 },
+            { x: 3, y: 1 },
+          ],
+          white: [
+            { x: 3, y: 4 },
+            { x: 3, y: 2 },
+          ],
+        },
+        solutionTree: {
+          move: { x: 3, y: 3 },
+          isCorrect: true,
+          comment: '神来之笔！鹤之巢中心一击，瞬间拔除白棋核心！',
         },
       },
     ],
   },
+
+  // ==========================================
+  // 第二章：五大吃子绝招（双打、门吃、抱吃、枷吃、征吃）
+  // ==========================================
   {
     id: 2,
-    title: '第二章：趣味吃子小战术',
-    subtitle: '学会“双打吃”与“抱吃”，做吃子小高手！',
+    title: '第二章：五大吃子绝招',
+    subtitle: '掌握双打吃、门吃、抱吃、枷吃与征吃，成为吃子神童！',
     icon: '⚡',
     themeColor: 'from-amber-400 to-orange-500',
     puzzles: [
       {
         id: '2-1',
-        title: '神奇的双打吃（一石二鸟）',
+        title: '绝招一：双打吃（一石二鸟）',
         category: 'tactics',
         difficulty: 'medium',
         boardSize: 13,
         initialTurn: 'black',
-        description: '两颗白棋靠得很近但没有连在一起，黑棋走哪一步能同时让两颗白棋都只剩一口气？',
-        hint: '找到两颗白棋正中间的交叉点！',
+        description: '两颗白棋近在咫尺但未连结，黑棋走哪一步能同时让两处白棋都只剩一口气？',
+        hint: '找到两颗白棋正中间的交汇点 (3, 2)！',
         initialBoard: {
           black: [
             { x: 2, y: 2 },
@@ -103,18 +221,18 @@ export const ADVENTURE_STAGES: StageInfo[] = [
         solutionTree: {
           move: { x: 3, y: 2 },
           isCorrect: true,
-          comment: '完美的双打吃！落子在 (3,2)，两边的白棋同时被打吃，无论对方救哪一颗，你都能吃到另一颗！',
+          comment: '双打吃成功！落子 (3, 2)，两边同时叫吃，必得其一！',
         },
       },
       {
         id: '2-2',
-        title: '关门吃（门吃）',
+        title: '绝招二：关门吃（门吃）',
         category: 'tactics',
         difficulty: 'medium',
         boardSize: 13,
         initialTurn: 'black',
-        description: '白棋想往下面逃跑，但前面已经有两颗黑棋像门柱一样守着了，黑棋怎样关上大门把它吃掉？',
-        hint: '挡在白棋想要前进的正前方，关上大门！',
+        description: '白棋想向下逃跑，两旁黑棋宛如门柱守立，黑棋怎样把门锁死直接吃掉它？',
+        hint: '挡在白棋想要冲出来的正前方 (3, 3)！',
         initialBoard: {
           black: [
             { x: 2, y: 3 },
@@ -126,59 +244,365 @@ export const ADVENTURE_STAGES: StageInfo[] = [
         solutionTree: {
           move: { x: 3, y: 3 },
           isCorrect: true,
-          comment: '砰！门关上啦！白棋无路可逃，被直接提掉！',
+          comment: '砰！大门关上啦！白棋插翅难飞，被当场提吃！',
         },
       },
-    ],
-  },
-  {
-    id: 3,
-    title: '第三章：安全禁区与打劫',
-    subtitle: '认清老虎的嘴巴，不要自己送上门！',
-    icon: '🛡️',
-    themeColor: 'from-blue-400 to-indigo-600',
-    puzzles: [
       {
-        id: '3-1',
-        title: '千万别进老虎嘴（禁着点与虎口）',
-        category: 'ko',
+        id: '2-3',
+        title: '绝招三：怀中抱吃（抱吃）',
+        category: 'tactics',
         difficulty: 'medium',
         boardSize: 13,
         initialTurn: 'black',
-        description: '白棋掉进了黑棋的三面虎口里，黑棋一口把它吞掉吧！',
-        hint: '下在三颗黑棋包围的正中间！',
+        description: '白棋试图向己方援军突围，黑棋如何把它一把抱进怀里吃掉？',
+        hint: '从外侧往自己棋子怀里赶，下在 (4, 3)！',
         initialBoard: {
           black: [
+            { x: 2, y: 2 },
             { x: 3, y: 2 },
             { x: 2, y: 3 },
-            { x: 4, y: 3 },
           ],
           white: [{ x: 3, y: 3 }],
         },
         solutionTree: {
-          move: { x: 3, y: 4 },
+          move: { x: 4, y: 3 },
           isCorrect: true,
-          comment: '虎口大合拢！白棋被彻底吃掉啦！',
+          comment: '温暖的抱吃！白棋往自己怀里一送，轻松收下！',
+        },
+      },
+      {
+        id: '2-4',
+        title: '绝招四：天罗地网（枷吃）',
+        category: 'tactics',
+        difficulty: 'medium',
+        boardSize: 13,
+        initialTurn: 'black',
+        description: '不用贴身紧逼，在远处飞张开一张大网，让白棋无论走哪边都逃不掉！',
+        hint: '虚罩一手，下在斜飞位置 (4, 4)！',
+        initialBoard: {
+          black: [
+            { x: 2, y: 2 },
+            { x: 2, y: 3 },
+            { x: 5, y: 3 },
+          ],
+          white: [{ x: 3, y: 3 }],
+        },
+        solutionTree: {
+          move: { x: 4, y: 4 },
+          isCorrect: true,
+          comment: '神奇的枷吃！如影随形的大网，白棋一动就会被撞死！',
+        },
+      },
+      {
+        id: '2-5',
+        title: '绝招五：扭羊头（征吃）',
+        category: 'tactics',
+        difficulty: 'medium',
+        boardSize: 13,
+        initialTurn: 'black',
+        description: '白棋想冲出包围，黑棋通过连续之字形打吃，一步步把它赶到死路！',
+        hint: '下在 (4, 3) 继续迎头痛击！',
+        initialBoard: {
+          black: [
+            { x: 2, y: 2 },
+            { x: 3, y: 1 },
+          ],
+          white: [{ x: 3, y: 2 }],
+        },
+        solutionTree: {
+          move: { x: 4, y: 2 },
+          isCorrect: true,
+          comment: '漂亮的征子！连续打吃如排山倒海，白棋无处可逃！',
         },
       },
     ],
   },
+
+  // ==========================================
+  // 第三章：常用死活手筋（倒扑、接不归、金鸡独立、乌龟不出头）
+  // ==========================================
+  {
+    id: 3,
+    title: '第三章：常用死活手筋',
+    subtitle: '掌握高阶手筋，用智慧以小博大！',
+    icon: '🔮',
+    themeColor: 'from-blue-400 to-indigo-600',
+    puzzles: [
+      {
+        id: '3-1',
+        title: '手筋一：投桃报李·倒扑绝杀',
+        category: 'tactics',
+        difficulty: 'medium',
+        boardSize: 13,
+        initialTurn: 'black',
+        description: '看似送给白棋一颗子吃，实际白棋一吃就只剩一口气，随后全军覆没！',
+        hint: '勇敢投子！直接扑入虎口 (3, 3)！',
+        initialBoard: {
+          black: [
+            { x: 2, y: 2 },
+            { x: 2, y: 3 },
+            { x: 2, y: 4 },
+            { x: 4, y: 2 },
+            { x: 4, y: 4 },
+          ],
+          white: [
+            { x: 3, y: 2 },
+            { x: 4, y: 3 },
+            { x: 3, y: 4 },
+          ],
+        },
+        solutionTree: {
+          move: { x: 3, y: 3 },
+          isCorrect: true,
+          comment: '神妙的倒扑！送一子换三子，白棋大崩盘！',
+        },
+      },
+      {
+        id: '3-2',
+        title: '手筋二：救兵难至·接不归',
+        category: 'tactics',
+        difficulty: 'medium',
+        boardSize: 13,
+        initialTurn: 'black',
+        description: '白棋的一队棋子虽然连在了一起，但气太少了，就算连回家也依然是一口气！',
+        hint: '切断退路，下在 (2, 2)！',
+        initialBoard: {
+          black: [
+            { x: 1, y: 1 },
+            { x: 1, y: 2 },
+            { x: 1, y: 3 },
+            { x: 3, y: 1 },
+            { x: 4, y: 2 },
+          ],
+          white: [
+            { x: 2, y: 1 },
+            { x: 3, y: 2 },
+          ],
+        },
+        solutionTree: {
+          move: { x: 2, y: 2 },
+          isCorrect: true,
+          comment: '这就是接不归！接上也是死，白棋只能认输！',
+        },
+      },
+      {
+        id: '3-3',
+        title: '手筋三：一夫当关·金鸡独立',
+        category: 'tactics',
+        difficulty: 'hard',
+        boardSize: 13,
+        initialTurn: 'black',
+        description: '黑棋如金鸡耸立在中间，白棋两边都是不入气（禁着点），寸步难行！',
+        hint: '下在最中央的要害 (3, 1)！',
+        initialBoard: {
+          black: [
+            { x: 2, y: 2 },
+            { x: 4, y: 2 },
+            { x: 3, y: 3 },
+          ],
+          white: [
+            { x: 2, y: 1 },
+            { x: 4, y: 1 },
+          ],
+        },
+        solutionTree: {
+          move: { x: 3, y: 1 },
+          isCorrect: true,
+          comment: '金鸡独立！白棋左右都进不来，只能看着自己被灭！',
+        },
+      },
+      {
+        id: '3-4',
+        title: '手筋四：封锁龟壳·乌龟不出头',
+        category: 'tactics',
+        difficulty: 'hard',
+        boardSize: 13,
+        initialTurn: 'black',
+        description: '白棋想从边角伸出脑袋，黑棋在拐角一扳一压，像盖子一样盖住乌龟壳！',
+        hint: '迎头狠狠压住 (2, 1)！',
+        initialBoard: {
+          black: [
+            { x: 1, y: 2 },
+            { x: 3, y: 2 },
+            { x: 2, y: 3 },
+          ],
+          white: [
+            { x: 2, y: 2 },
+          ],
+        },
+        solutionTree: {
+          move: { x: 2, y: 1 },
+          isCorrect: true,
+          comment: '乌龟不出头！白棋被牢牢锁死在壳里，彻底阵亡！',
+        },
+      },
+    ],
+  },
+
+  // ==========================================
+  // 第四章：对杀与比气（紧外气、公气不入、有眼杀无眼）
+  // ==========================================
   {
     id: 4,
-    title: '第四章：做眼与死活',
-    subtitle: '两只完整的眼睛才能真正活棋！',
+    title: '第四章：对杀与比气',
+    subtitle: '双方互相包围比谁的气多，学会先紧外气的制胜秘诀！',
+    icon: '⚔️',
+    themeColor: 'from-red-400 to-rose-600',
+    puzzles: [
+      {
+        id: '4-1',
+        title: '对杀法则一：先紧外气',
+        category: 'liberties',
+        difficulty: 'medium',
+        boardSize: 13,
+        initialTurn: 'black',
+        description: '黑白两块棋陷入大对杀，口诀说“先紧外气后紧内”，黑棋先收哪口气？',
+        hint: '从最外面收紧白棋的外气 (4, 2)！',
+        initialBoard: {
+          black: [
+            { x: 1, y: 2 },
+            { x: 2, y: 2 },
+          ],
+          white: [
+            { x: 3, y: 2 },
+          ],
+        },
+        solutionTree: {
+          move: { x: 4, y: 2 },
+          isCorrect: true,
+          comment: '先紧外气！白棋立竿见影只剩一口气，对杀黑棋大胜！',
+        },
+      },
+      {
+        id: '4-2',
+        title: '对杀法则二：公气不入',
+        category: 'liberties',
+        difficulty: 'medium',
+        boardSize: 13,
+        initialTurn: 'black',
+        description: '中间有公用的公气，谁先填公气谁就吃亏！黑棋该走外气还是公气？',
+        hint: '千万别碰中间的公气，去紧白棋的外气 (5, 3)！',
+        initialBoard: {
+          black: [
+            { x: 2, y: 3 },
+            { x: 1, y: 3 },
+          ],
+          white: [
+            { x: 4, y: 3 },
+          ],
+        },
+        solutionTree: {
+          move: { x: 5, y: 3 },
+          isCorrect: true,
+          comment: '公气不入！抢先收紧对手外气，对杀轻取白棋！',
+        },
+      },
+      {
+        id: '4-3',
+        title: '对杀法则三：有眼杀无眼',
+        category: 'liberties',
+        difficulty: 'hard',
+        boardSize: 13,
+        initialTurn: 'black',
+        description: '黑棋已经做好了一只真眼，白棋没有眼。有眼杀无眼，黑棋怎样锁定胜局？',
+        hint: '下在 (4, 1) 紧紧压缩白棋！',
+        initialBoard: {
+          black: [
+            { x: 1, y: 1 },
+            { x: 2, y: 0 },
+            { x: 3, y: 1 },
+            { x: 2, y: 2 },
+          ],
+          white: [
+            { x: 4, y: 2 },
+            { x: 5, y: 1 },
+          ],
+        },
+        solutionTree: {
+          move: { x: 4, y: 1 },
+          isCorrect: true,
+          comment: '有眼杀无眼！大眼把白棋活活闷死，黑棋大获全胜！',
+        },
+      },
+    ],
+  },
+
+  // ==========================================
+  // 第五章：真眼与假眼（辨别假眼、破眼杀棋、做眼成活）
+  // ==========================================
+  {
+    id: 5,
+    title: '第五章：真眼与假眼',
+    subtitle: '学会分辨哪些是真正的安全屋，哪些是一戳就破的假眼！',
     icon: '👑',
     themeColor: 'from-purple-400 to-pink-500',
     puzzles: [
       {
-        id: '4-1',
-        title: '关键一子：分成两只真眼',
+        id: '5-1',
+        title: '火眼金睛：识别假眼破绽',
+        category: 'life-and-death',
+        difficulty: 'medium',
+        boardSize: 13,
+        initialTurn: 'black',
+        description: '白棋看似在边角做成了眼睛，但两颗白棋气数已尽，黑棋走哪一步能拔除它证明这是假眼？',
+        hint: '堵住最后一口边线气口 (3, 0)！',
+        initialBoard: {
+          black: [
+            { x: 1, y: 0 },
+            { x: 1, y: 1 },
+            { x: 2, y: 2 },
+            { x: 3, y: 1 },
+          ],
+          white: [
+            { x: 2, y: 0 },
+            { x: 2, y: 1 },
+          ],
+        },
+        solutionTree: {
+          move: { x: 3, y: 0 },
+          isCorrect: true,
+          comment: '一语道破！落子 (3, 0) 提掉白棋，假眼不攻自破！',
+        },
+      },
+      {
+        id: '5-2',
+        title: '致命一击：破假眼杀棋',
+        category: 'life-and-death',
+        difficulty: 'medium',
+        boardSize: 13,
+        initialTurn: 'black',
+        description: '白棋想靠这只假眼蒙混过关，四周已被黑棋团团包围，黑棋直接点入中心扑杀全歼！',
+        hint: '果断下在正中心 (2, 2)！',
+        initialBoard: {
+          black: [
+            { x: 2, y: 0 },
+            { x: 1, y: 1 },
+            { x: 3, y: 1 },
+            { x: 0, y: 2 },
+            { x: 4, y: 2 },
+            { x: 2, y: 3 },
+          ],
+          white: [
+            { x: 2, y: 1 },
+            { x: 1, y: 2 },
+            { x: 3, y: 2 },
+          ],
+        },
+        solutionTree: {
+          move: { x: 2, y: 2 },
+          isCorrect: true,
+          comment: '破眼成功！正中点入直接提吃三子，白棋彻底阵亡！',
+        },
+      },
+      {
+        id: '5-3',
+        title: '筑造堡垒：做真眼成活',
         category: 'life-and-death',
         difficulty: 'hard',
         boardSize: 13,
         initialTurn: 'black',
-        description: '黑棋的大房子需要中间隔开一堵墙，才能变成两间独立的房间（两只眼），走在哪里能让黑棋活棋？',
-        hint: '找到中间那个能把大眼分成左右两间小眼的要点！',
+        description: '黑棋需要把大眼屋子从中间隔开一堵墙，变成两间互不干扰的真眼安全屋！',
+        hint: '找到居中分界要害 (3, 2)！',
         initialBoard: {
           black: [
             { x: 2, y: 1 },
@@ -200,7 +624,104 @@ export const ADVENTURE_STAGES: StageInfo[] = [
         solutionTree: {
           move: { x: 3, y: 2 },
           isCorrect: true,
-          comment: '做眼成功！这步棋分成了两只清澈完整的真眼，白棋再也吃不掉你了！',
+          comment: '两眼做活！神仙也杀不掉的铜墙铁壁诞生了！',
+        },
+      },
+    ],
+  },
+
+  // ==========================================
+  // 第六章：经典基础死活（直三、弯三、丁四要点）
+  // ==========================================
+  {
+    id: 6,
+    title: '第六章：经典基础死活',
+    subtitle: '掌握直三、弯三与丁四的死活要点，棋力突飞猛进！',
+    icon: '🏰',
+    themeColor: 'from-cyan-400 to-blue-600',
+    puzzles: [
+      {
+        id: '6-1',
+        title: '经典死活一：直三抢要点',
+        category: 'life-and-death',
+        difficulty: 'medium',
+        boardSize: 13,
+        initialTurn: 'black',
+        description: '三个眼位连成一条直线，所谓“敌之要点即我之要点”，中间那一点到底在哪？',
+        hint: '抢占直线最正中的黄金点 (3, 2)！',
+        initialBoard: {
+          black: [
+            { x: 2, y: 1 },
+            { x: 3, y: 1 },
+            { x: 4, y: 1 },
+            { x: 1, y: 2 },
+            { x: 5, y: 2 },
+            { x: 2, y: 3 },
+            { x: 3, y: 3 },
+            { x: 4, y: 3 },
+          ],
+          white: [],
+        },
+        solutionTree: {
+          move: { x: 3, y: 2 },
+          isCorrect: true,
+          comment: '直三要点！下在正中两眼自成，白棋彻底没招！',
+        },
+      },
+      {
+        id: '6-2',
+        title: '经典死活二：弯三占天元',
+        category: 'life-and-death',
+        difficulty: 'medium',
+        boardSize: 13,
+        initialTurn: 'black',
+        description: '眼位弯成直角形，拐弯的那个交点就是生死存亡的枢纽！走哪里能活棋？',
+        hint: '就在拐弯的直角中心 (2, 2)！',
+        initialBoard: {
+          black: [
+            { x: 1, y: 1 },
+            { x: 2, y: 1 },
+            { x: 3, y: 1 },
+            { x: 1, y: 2 },
+            { x: 3, y: 2 },
+            { x: 1, y: 3 },
+            { x: 3, y: 3 },
+            { x: 2, y: 4 },
+          ],
+          white: [],
+        },
+        solutionTree: {
+          move: { x: 2, y: 2 },
+          isCorrect: true,
+          comment: '弯三点中！抢占拐弯枢纽，两只明亮的眼睛成型！',
+        },
+      },
+      {
+        id: '6-3',
+        title: '经典死活三：丁四正中点',
+        category: 'life-and-death',
+        difficulty: 'hard',
+        boardSize: 13,
+        initialTurn: 'black',
+        description: '四个空位排成“丁”字形，中间那颗连结三方的刀柄之点就是黑棋的生命线！',
+        hint: '落子丁字心 (3, 2)，四方通达！',
+        initialBoard: {
+          black: [
+            { x: 2, y: 1 },
+            { x: 3, y: 1 },
+            { x: 4, y: 1 },
+            { x: 1, y: 2 },
+            { x: 5, y: 2 },
+            { x: 2, y: 3 },
+            { x: 4, y: 3 },
+            { x: 3, y: 4 },
+          ],
+          white: [],
+        },
+        solutionTree: {
+          move: { x: 3, y: 2 },
+          isCorrect: true,
+          comment: '丁四正中心！一子定乾坤，两只真眼完美锁住胜局！',
         },
       },
     ],

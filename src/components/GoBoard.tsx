@@ -21,6 +21,9 @@ interface GoBoardProps {
   showCoordinates?: boolean;
   showLibertiesHelper?: boolean;
   captureTarget?: number;
+  highlightPoints?: Point[];
+  dangerPoints?: Point[];
+  singleTapToPlay?: boolean;
 }
 
 export const GoBoard: React.FC<GoBoardProps> = ({
@@ -29,6 +32,9 @@ export const GoBoard: React.FC<GoBoardProps> = ({
   disabled = false,
   showCoordinates = true,
   showLibertiesHelper = false,
+  highlightPoints = [],
+  dangerPoints = [],
+  singleTapToPlay = false,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -343,6 +349,55 @@ export const GoBoard: React.FC<GoBoardProps> = ({
       }
     }
 
+    // 7.1 Draw Danger / Atari Markers (Level 2 弱点透视)
+    if (dangerPoints.length > 0) {
+      for (const dp of dangerPoints) {
+        const { px, py } = pointToPixel(dp);
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(px, py, stoneRadius * 1.15, 0, Math.PI * 2);
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([4, 4]);
+        ctx.stroke();
+
+        // 1-liberty mini indicator
+        ctx.beginPath();
+        ctx.arc(px + stoneRadius * 0.7, py - stoneRadius * 0.7, 7, 0, Math.PI * 2);
+        ctx.fillStyle = '#dc2626';
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 9px "PingFang SC", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('1', px + stoneRadius * 0.7, py - stoneRadius * 0.7);
+        ctx.restore();
+      }
+    }
+
+    // 7.2 Draw Highlight / Scaffolding Target Points (Level 2 弱点透视)
+    if (highlightPoints.length > 0) {
+      for (const hp of highlightPoints) {
+        const { px, py } = pointToPixel(hp);
+        ctx.save();
+        // Golden glowing halo
+        ctx.beginPath();
+        ctx.arc(px, py, stoneRadius * 0.9, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(250, 204, 21, 0.4)';
+        ctx.fill();
+        ctx.strokeStyle = '#eab308';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // Target center dot
+        ctx.beginPath();
+        ctx.arc(px, py, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#ca8a04';
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
     // 8. Draw Ghost Stone on Hover or Selected Point
     const activePreview = selectedPoint || hoverPoint;
     if (activePreview && !disabled && state.grid[activePreview.y][activePreview.x] === null) {
@@ -403,6 +458,8 @@ export const GoBoard: React.FC<GoBoardProps> = ({
     disabled,
     showCoordinates,
     showLibertiesHelper,
+    dangerPoints,
+    highlightPoints,
     size,
     state,
   ]);
@@ -447,8 +504,8 @@ export const GoBoard: React.FC<GoBoardProps> = ({
 
     if (!point) return;
 
-    // Small boards (7x7 / 9x9): direct tap to play!
-    if (size <= 9) {
+    // Small boards (7x7 / 9x9) or singleTapToPlay mode: direct tap to play!
+    if (singleTapToPlay || size <= 9) {
       const check = GoCore.isLegalMove(state, point);
       if (check.legal) {
         SoundEngine.playStoneSound();
