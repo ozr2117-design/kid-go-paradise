@@ -88,6 +88,9 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
   const [timerMode, setTimerMode] = useState<'off' | '30s'>('off');
   const [timeLeft, setTimeLeft] = useState<number>(30);
 
+  // Restart Double-Insurance Modal (防误触双保险)
+  const [isRestartConfirmOpen, setIsRestartConfirmOpen] = useState<boolean>(false);
+
   const activeProfile = SPARRING_PROFILES.find((p) => p.id === aiLevel) || SPARRING_PROFILES[1];
   const aiColor: Color = playerColor === 'black' ? 'white' : 'black';
 
@@ -179,6 +182,15 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
     },
     [boardSize, playerColor, aiLevel, winRule, captureTarget]
   );
+
+  // Handle Restart with Double-Insurance Guard (防手滑误触)
+  const handleRequestRestart = () => {
+    if (boardState.moveHistory.length <= 2 || boardState.isGameOver) {
+      startNewGame();
+    } else {
+      setIsRestartConfirmOpen(true);
+    }
+  };
 
   // Trigger End Game and generate rich settlement data
   const triggerEndGame = useCallback(
@@ -489,12 +501,24 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-1">
-                <h3 className="font-black text-amber-950 text-xs sm:text-sm font-cartoon">
-                  {activeProfile.name}
-                </h3>
-                <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full shrink-0">
-                  {activeProfile.rank}
-                </span>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <h3 className="font-black text-amber-950 text-xs sm:text-sm font-cartoon truncate">
+                    {activeProfile.name}
+                  </h3>
+                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full shrink-0">
+                    {activeProfile.rank}
+                  </span>
+                </div>
+
+                {/* Repositioned Reset Button (Double-Insurance Protected) */}
+                <button
+                  onClick={handleRequestRestart}
+                  className="flex items-center gap-1 text-[11px] font-black text-amber-900 hover:text-amber-950 bg-amber-100 hover:bg-amber-200 px-2.5 py-1 rounded-xl border border-amber-300 transition active:scale-95 shrink-0 shadow-2xs"
+                  title="重新开始一盘对局（带防误触确认）"
+                >
+                  <RotateCcw className="w-3 h-3 text-amber-700" />
+                  <span>重开</span>
+                </button>
               </div>
               <p className="text-[11px] text-gray-500 leading-tight truncate mt-0.5">{activeProfile.description}</p>
             </div>
@@ -766,45 +790,40 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
           </div>
         </div>
 
-        {/* Bottom Section: Action Controls (2x2 Grid) */}
-        <div className="grid grid-cols-2 gap-1.5 shrink-0 pt-0.5">
+        {/* Bottom Section: In-Game Action Controls (3 Equal Columns, zero destructive buttons) */}
+        <div className="grid grid-cols-3 gap-1.5 shrink-0 pt-0.5">
           <button
             onClick={handleUndo}
             disabled={boardState.moveHistory.length < 2 || isAiThinking || isReviewMode}
-            className="flex items-center justify-center gap-1.5 py-2 px-2 bg-white hover:bg-amber-50 disabled:opacity-40 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs shadow-xs transition active:scale-95"
+            className="flex items-center justify-center gap-1 py-2 px-1 bg-white hover:bg-amber-50 disabled:opacity-40 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs shadow-xs transition active:scale-95"
+            title="悔棋一步"
           >
-            <Undo2 className="w-3.5 h-3.5" />
+            <Undo2 className="w-3.5 h-3.5 text-amber-700" />
             <span>悔棋一步</span>
           </button>
 
           <button
             onClick={handlePass}
             disabled={boardState.turn !== playerColor || isAiThinking || isReviewMode}
-            className="flex items-center justify-center gap-1.5 py-2 px-2 bg-white hover:bg-amber-50 disabled:opacity-40 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs shadow-xs transition active:scale-95"
+            className="flex items-center justify-center gap-1 py-2 px-1 bg-white hover:bg-amber-50 disabled:opacity-40 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs shadow-xs transition active:scale-95"
+            title="放弃本手（停一手）"
           >
-            <CheckCircle2 className="w-3.5 h-3.5" />
+            <CheckCircle2 className="w-3.5 h-3.5 text-amber-700" />
             <span>停一手(Pass)</span>
           </button>
 
           <button
             onClick={() => setShowLiberties(!showLiberties)}
             disabled={isReviewMode}
-            className={`flex items-center justify-center gap-1.5 py-2 px-2 font-bold rounded-xl border text-xs shadow-xs transition active:scale-95 ${
+            className={`flex items-center justify-center gap-1 py-2 px-1 font-bold rounded-xl border text-xs shadow-xs transition active:scale-95 ${
               showLiberties
                 ? 'bg-emerald-500 text-white border-emerald-600 shadow-xs'
                 : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
             }`}
+            title="数气辅助光圈"
           >
             <Eye className="w-3.5 h-3.5" />
             <span>数气光点</span>
-          </button>
-
-          <button
-            onClick={() => startNewGame()}
-            className="flex items-center justify-center gap-1.5 py-2 px-2 bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-500 hover:to-yellow-500 text-amber-950 font-black rounded-xl border border-amber-400 text-xs shadow-xs transition active:scale-95"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>重开一盘</span>
           </button>
         </div>
       </div>
@@ -908,6 +927,51 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
                 className="py-3 px-4 bg-white hover:bg-gray-100 text-gray-700 font-bold rounded-2xl border-2 border-gray-300 text-sm"
               >
                 取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6. RESTART CONFIRMATION MODAL (防误触双保险弹窗) */}
+      {isRestartConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-pop-in select-none">
+          <div className="bg-gradient-to-b from-amber-50 to-orange-100 rounded-3xl p-5 sm:p-6 max-w-sm w-full text-center shadow-2xl border-4 border-yellow-400 relative flex flex-col gap-3">
+            <div className="w-12 h-12 rounded-full bg-amber-200 text-amber-800 flex items-center justify-center text-2xl mx-auto shadow-inner border border-amber-300">
+              ⚠️
+            </div>
+
+            <div>
+              <h3 className="text-lg sm:text-xl font-black text-amber-950 font-cartoon">
+                正在激战中，确定重开吗？
+              </h3>
+              <p className="text-xs font-bold text-amber-900 mt-2 leading-relaxed bg-amber-100/80 p-3 rounded-2xl border border-amber-300">
+                当前对局已经下了 <span className="text-red-600 font-black">{boardState.moveHistory.length}</span> 手
+                {winRule === 'capture' && (
+                  <>，你已经吃了 <span className="text-emerald-700 font-black">{myCaptures}</span> 颗棋子</>
+                )}！<br />
+                重新开局将清空当前棋盘。
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 mt-1">
+              {/* Primary button: Continue playing (Huge, Green, Safe) */}
+              <button
+                onClick={() => setIsRestartConfirmOpen(false)}
+                className="w-full py-3 px-4 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-black rounded-2xl shadow-md text-sm active:scale-95 transition flex items-center justify-center gap-1.5 font-cartoon"
+              >
+                <span>🟢 继续这盘棋（不要重开）</span>
+              </button>
+
+              {/* Secondary button: Confirm restart */}
+              <button
+                onClick={() => {
+                  setIsRestartConfirmOpen(false);
+                  startNewGame();
+                }}
+                className="w-full py-2 px-3 bg-white hover:bg-gray-100 text-gray-600 font-bold rounded-xl border border-gray-300 text-xs active:scale-95 transition"
+              >
+                <span>确定清空并重新开始</span>
               </button>
             </div>
           </div>
