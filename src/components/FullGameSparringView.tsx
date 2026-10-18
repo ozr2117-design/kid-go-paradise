@@ -352,14 +352,14 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-1">
-                <h3 className="font-black text-amber-950 text-sm font-cartoon truncate">
+                <h3 className="font-black text-amber-950 text-sm font-cartoon">
                   {activeProfile.name}
                 </h3>
                 <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full shrink-0">
                   {activeProfile.rank}
                 </span>
               </div>
-              <p className="text-[11px] text-gray-500 truncate mt-0.5">{activeProfile.description}</p>
+              <p className="text-[11px] text-gray-600 leading-snug mt-0.5">{activeProfile.description}</p>
             </div>
           </div>
 
@@ -378,8 +378,8 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
 
           {/* Current Move Status Banner */}
           <div className="flex items-center justify-between text-[11px] font-bold bg-amber-100/70 px-2.5 py-1 rounded-lg text-amber-900 border border-amber-200">
-            <span>当前提示：</span>
-            <span className="text-amber-800 font-semibold truncate ml-1">{statusMessage}</span>
+            <span className="shrink-0">当前提示：</span>
+            <span className="text-amber-800 font-semibold ml-1 leading-snug">{statusMessage}</span>
           </div>
         </div>
 

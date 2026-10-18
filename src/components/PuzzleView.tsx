@@ -106,38 +106,47 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({
       <div className="w-full md:w-80 lg:w-84 xl:w-88 h-full flex flex-col justify-between gap-2 overflow-y-auto pr-1 shrink-0">
         {/* Top: Stage info & Prev/Next Navigation */}
         <div className="bg-white/95 rounded-2xl p-2.5 border-2 border-amber-300 shadow-sm flex flex-col gap-1.5 shrink-0">
+          {/* Top navigation row */}
           <div className="flex items-center justify-between">
             <button
               onClick={onBackToMap}
-              className="flex items-center gap-1 text-xs font-bold text-amber-900 hover:text-amber-700 bg-amber-100 px-2.5 py-1 rounded-xl border border-amber-300"
+              className="flex items-center gap-1 text-xs font-bold text-amber-900 hover:text-amber-700 bg-amber-100 px-2.5 py-1 rounded-xl border border-amber-300 active:scale-95"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>地图</span>
+              <span>返回地图</span>
             </button>
-
-            <span className="text-[11px] font-bold text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-full truncate max-w-[130px]">
-              {stage.title}
-            </span>
 
             <div className="flex items-center gap-1">
               <button
                 onClick={onPrevPuzzle}
                 disabled={!hasPrev}
-                className="p-1 rounded-lg bg-amber-100 hover:bg-amber-200 disabled:opacity-40 text-amber-900 border border-amber-300"
+                className="py-1 px-2 rounded-lg bg-amber-100 hover:bg-amber-200 disabled:opacity-40 text-amber-900 border border-amber-300 text-xs font-bold flex items-center gap-0.5 active:scale-95"
+                title="上一题"
               >
-                <ArrowLeft className="w-3.5 h-3.5" />
+                <ArrowLeft className="w-3 h-3" />
+                <span>上题</span>
               </button>
               <button
                 onClick={onNextPuzzle}
                 disabled={!hasNext}
-                className="p-1 rounded-lg bg-amber-100 hover:bg-amber-200 disabled:opacity-40 text-amber-900 border border-amber-300"
+                className="py-1 px-2 rounded-lg bg-amber-100 hover:bg-amber-200 disabled:opacity-40 text-amber-900 border border-amber-300 text-xs font-bold flex items-center gap-0.5 active:scale-95"
+                title="下一题"
               >
-                <ArrowRight className="w-3.5 h-3.5" />
+                <span>下题</span>
+                <ArrowRight className="w-3 h-3" />
               </button>
             </div>
           </div>
 
-          <h2 className="text-xs sm:text-sm font-black text-amber-950 font-cartoon text-center mt-0.5">
+          {/* Chapter title (full width, natural wrap, no truncate!) */}
+          <div className="text-center mt-0.5">
+            <span className="inline-block text-[11px] font-bold text-amber-800 bg-amber-100/90 px-3 py-0.5 rounded-full border border-amber-200">
+              {stage.title}
+            </span>
+          </div>
+
+          {/* Puzzle Title */}
+          <h2 className="text-xs sm:text-sm font-black text-amber-950 font-cartoon text-center mt-0.5 leading-snug">
             {puzzle.title}
           </h2>
         </div>
