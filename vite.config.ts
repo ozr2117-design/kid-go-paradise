@@ -1,10 +1,10 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vitest/config'
+import { viteSingleFile } from 'vite-plugin-singlefile'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: './',
-  plugins: [react()],
+  plugins: [react(), viteSingleFile()],
   test: {
     globals: true,
     environment: 'node',

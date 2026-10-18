@@ -9,7 +9,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Hide Streamlit header, footer, padding for full screen experience
+# Hide Streamlit header, footer, padding
 st.markdown(
     """
     <style>
@@ -22,10 +22,10 @@ st.markdown(
         max-width: 100% !important;
     }
     iframe {
-        width: 100vw !important;
-        height: 100vh !important;
+        width: 100% !important;
+        height: 92vh !important;
+        min-height: 760px !important;
         border: none !important;
-        display: block;
     }
     </style>
     """,
@@ -33,11 +33,13 @@ st.markdown(
 )
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-dist_dir = os.path.join(current_dir, "dist")
+html_path = os.path.join(current_dir, "dist", "index.html")
 
-if not os.path.exists(dist_dir):
-    st.error("未找到前端打包目录 dist，请先执行 npm run build")
+if not os.path.exists(html_path):
+    st.error("未找到前端打包文件 dist/index.html，请先运行构建。")
 else:
-    # Use declare_component with path pointing to dist
-    kid_go = components.declare_component("kid_go", path=dist_dir)
-    kid_go()
+    with open(html_path, "r", encoding="utf-8") as f:
+        html_content = f.read()
+
+    # Render complete inlined singlefile HTML
+    components.html(html_content, height=860, scrolling=True)
