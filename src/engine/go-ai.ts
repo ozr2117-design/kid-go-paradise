@@ -78,27 +78,18 @@ export class GoAI {
         ? 'club'
         : 'novice');
 
-    // Level A: Novice (~20K) - 35% chance to play friendly loose moves
+    // Level A: Novice (~15K) - Inherits standard tactical engine (No random blunders, steady sparring)
     if (level === 'novice') {
-      if (Math.random() < 0.35) {
-        const safe = legalMoves.filter(
-          (m) => m.x > 0 && m.x < size - 1 && m.y > 0 && m.y < size - 1
-        );
-        return safe.length > 0
-          ? safe[Math.floor(Math.random() * safe.length)]
-          : legalMoves[Math.floor(Math.random() * legalMoves.length)];
-      }
       return this.getTacticalHeuristicMove(state, color, opponentColor, legalMoves, options);
     }
 
-    // Level B: Club (~10K) - Tactical Engine (Double atari, ladder check, cut/connect, eyes)
+    // Level B: Club (~10K) - Advanced Tactical Engine with 2-ply Counter-attack & Double-Atari Defense
     if (level === 'club') {
-      return this.getTacticalHeuristicMove(state, color, opponentColor, legalMoves, options);
+      return this.getAdvancedClubTacticalMove(state, color, opponentColor, legalMoves, options);
     }
 
     // Level C: Master (5K ~ 1D) - High Performance MCTS (Monte Carlo Tree Search)
-    // Run 350-500 rollouts with rapid heuristic-guided rollouts
-    const mctsIterations = size === 9 ? 450 : size === 13 ? 250 : 120;
+    const mctsIterations = size === 9 ? 450 : size === 13 ? 280 : 140;
     return this.runMCTS(state, color, opponentColor, legalMoves, mctsIterations, options);
   }
 
@@ -158,14 +149,14 @@ export class GoAI {
         const res = GoCore.playMove(simState, move, nextColor, options.captureTarget);
         simState = res.nextState;
 
-        const childLegal = this.getFastLegalMoves(simState, node.color);
+        const childLegal = this.getFastLegalMoves(simState, simState.turn);
         const childNode = new MCTSNode(move, nextColor, node, childLegal);
         node.children.push(childNode);
         node = childNode;
       }
 
       // 3. Rollout / Simulation
-      const winResult = this.fastRollout(simState, node.color, aiColor, options);
+      const winResult = this.fastRollout(simState, simState.turn, aiColor, options);
 
       // 4. Backpropagation
       let curr: MCTSNode | null = node;
@@ -263,7 +254,105 @@ export class GoAI {
 
   /**
    * ==========================================
-   * 2. DEEP TACTICAL COMBAT ENGINE (CLUB LEVEL)
+   * 2. ADVANCED CLUB TACTICAL ENGINE (NEW 中鸟 ~10K)
+   * ==========================================
+   */
+  private static getAdvancedClubTacticalMove(
+    state: BoardState,
+    color: Color,
+    opponentColor: Color,
+    legalMoves: Point[],
+    options: AIMoveOptions
+  ): Point | null {
+    const size = state.size;
+
+    // 1. Immediate Win or Capture
+    const instantCaptures = this.findImmediateCaptures(state, color, legalMoves);
+    if (instantCaptures.length > 0) {
+      if (options.captureTarget) {
+        return instantCaptures[0];
+      }
+      let bestCap = instantCaptures[0];
+      let maxCapCount = 0;
+      for (const cap of instantCaptures) {
+        const sim = GoCore.playMove(state, cap, color);
+        if (sim.captured.length > maxCapCount) {
+          maxCapCount = sim.captured.length;
+          bestCap = cap;
+        }
+      }
+      return bestCap;
+    }
+
+    // 2. Urgent rescue: Save friendly groups in Atari (1 liberty)
+    const rescues = this.findEscapeAtariMoves(state, color, legalMoves);
+    if (rescues.length > 0) {
+      return rescues[0];
+    }
+
+    // 3. Double Atari offense
+    const doubleAtaris = this.findDoubleAtariMoves(state, color, legalMoves);
+    if (doubleAtaris.length > 0) {
+      return doubleAtaris[0];
+    }
+
+    // 4. Proactive Defense: Neutralize Opponent's Double-Atari threats!
+    const oppLegal = this.getFastLegalMoves(state, opponentColor);
+    const oppDoubleAtaris = this.findDoubleAtariMoves(state, opponentColor, oppLegal);
+    if (oppDoubleAtaris.length > 0) {
+      for (const threatPoint of oppDoubleAtaris) {
+        if (legalMoves.some((m) => GoCore.pointsEqual(m, threatPoint))) {
+          const sim = GoCore.playMove(state, threatPoint, color);
+          if (!sim.error) {
+            const grp = GoCore.findGroup(sim.nextState.grid, threatPoint);
+            if (grp && grp.liberties.length >= 2) {
+              return threatPoint; // Defuse the double atari before it happens!
+            }
+          }
+        }
+      }
+    }
+
+    // 5. Score all legal moves with 2-ply counter-attack penalty
+    let bestMove: Point | null = null;
+    let maxScore = -Infinity;
+
+    for (const move of legalMoves) {
+      let score = this.evaluateDeepTactics(state, move, color, opponentColor, options);
+
+      // 2-ply lookahead check: If I play this move, does opponent have an immediate capture against me?
+      const sim = GoCore.playMove(state, move, color, options.captureTarget);
+      if (!sim.error) {
+        const nextOppLegal = this.getFastLegalMoves(sim.nextState, opponentColor);
+        const oppImmediateCaps = this.findImmediateCaptures(sim.nextState, opponentColor, nextOppLegal);
+        if (oppImmediateCaps.length > 0) {
+          score -= 3000; // Walking directly into opponent's counter-capture!
+        }
+
+        // 2-liberty group protection near enemy
+        const grp = GoCore.findGroup(sim.nextState.grid, move);
+        if (grp && grp.liberties.length === 2) {
+          const hasAdjOpp = GoCore.getNeighbors(move, size).some(
+            (n) => sim.nextState.grid[n.y][n.x] === opponentColor
+          );
+          if (hasAdjOpp) {
+            score -= 150;
+          }
+        }
+      }
+
+      if (score > maxScore) {
+        maxScore = score;
+        bestMove = move;
+      }
+    }
+
+    return bestMove ?? legalMoves[0];
+  }
+
+  /**
+   * ==========================================
+   * 3. BASELINE TACTICAL COMBAT ENGINE (NEW 菜鸟 ~15K)
    * ==========================================
    */
   private static getTacticalHeuristicMove(

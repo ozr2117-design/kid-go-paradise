@@ -36,24 +36,24 @@ import {
 const SPARRING_PROFILES: SparringProfile[] = [
   {
     id: 'novice',
-    name: '启蒙棋童',
+    name: '俱乐部新秀',
     avatar: '🐤',
-    rank: '20K 启蒙练手',
-    description: '刚学围棋的小萌新，出子偶尔有破绽，最适合孩子练习抓吃子！',
+    rank: '15K 稳健练手',
+    description: '扎实的基本战术，绝不无故自杀送子，是森森热身与练习五大吃子绝招的最佳陪练！',
   },
   {
     id: 'club',
-    name: '冲段少年',
+    name: '道场尖子生',
     avatar: '🐺',
-    rank: '10K 棋院小将',
-    description: '懂双打吃、征子追杀与切断，攻守兼备，注重做活两眼！',
+    rank: '10K 警觉高手',
+    description: '全新强化！具备前瞻防守意识，能识破双打吃与反杀伏击，需要认真算路才能突破！',
   },
   {
     id: 'master',
     name: '弈林宗师',
     avatar: '🐲',
-    rank: '5K~1D MCTS算路',
-    description: '搭载蒙特卡洛树搜寻 (MCTS) 深度推演，算气严密、大局观强，强力对攻！',
+    rank: '5K~1D MCTS老手',
+    description: '搭载蒙特卡洛树搜寻 (MCTS) 深度推演，算气严密、大局观强，24子长局极具压迫感！',
   },
 ];
 

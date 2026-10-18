@@ -5,13 +5,13 @@ export const ANIMAL_OPPONENTS: AnimalOpponent[] = [
     id: 'rabbit',
     name: '萌萌兔',
     avatar: '🐰',
-    rank: '20K 启蒙练手',
+    rank: '15K 稳健练手',
     difficulty: 'beginner',
     boardSize: 13,
     captureTarget: 3, // 13路先吃3子获胜
-    intro: '你好呀！我是萌萌兔，在 13×13 棋盘上跟小棋手对阵！先吃到 3 颗棋子就赢啦！',
+    intro: '你好呀！我是萌萌兔，扎扎实实跟你下棋！先吃到 3 颗棋子就赢啦！',
     taunts: [
-      '哇，我的胡萝卜掉了，你可别吃我的棋子哦！',
+      '哇，我的小萝卜掉了，你可别吃我的棋子哦！',
       '咦？你好像要围住我了呀！',
       '看我跳到这里～',
     ],
@@ -25,11 +25,11 @@ export const ANIMAL_OPPONENTS: AnimalOpponent[] = [
     id: 'bear',
     name: '憨憨熊',
     avatar: '🐻',
-    rank: '15K 进阶小将',
+    rank: '10K 警觉小将',
     difficulty: 'intermediate',
     boardSize: 13,
     captureTarget: 5, // 13路先吃5子获胜
-    intro: '吼吼！我是憨憨熊！在 13×13 棋盘上，谁先吃满 5 颗棋子谁获胜，看我的断点追击！',
+    intro: '吼吼！我是憨憨熊！我可会防双打吃了，看你能攻破我的防守吗？',
     taunts: [
       '嘿嘿，我的棋子很结实，你吃不到我的～',
       '小心哦，我正盯着你的断点呢！',
@@ -37,7 +37,7 @@ export const ANIMAL_OPPONENTS: AnimalOpponent[] = [
     ],
     praises: [
       '好痛啊，我的小熊棋子被你连吃5颗！',
-      '你的双打吃太厉害了，佩服佩服！',
+      '你的突破太厉害了，佩服佩服！',
       '你已经是个合格的小棋手啦！',
     ],
   },
@@ -45,7 +45,7 @@ export const ANIMAL_OPPONENTS: AnimalOpponent[] = [
     id: 'fox',
     name: '聪聪狐',
     avatar: '🦊',
-    rank: '10K 战术高手',
+    rank: '5K~1D 战术老手',
     difficulty: 'advanced',
     boardSize: 13,
     captureTarget: 8, // 13路先吃8子获胜
