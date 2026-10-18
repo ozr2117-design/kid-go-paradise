@@ -330,298 +330,296 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
   const whitePercent = 100 - blackPercent;
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-1.5 sm:p-3 flex flex-col gap-2 select-none">
-      {/* 1. TOP RULE & CONTROLS DASHBOARD */}
-      <div className="bg-white/95 p-2 sm:p-3 rounded-2xl border-2 border-amber-300 shadow-sm flex flex-col gap-2">
-        {/* Row 1: Rule Mode Switcher */}
-        <div className="flex flex-wrap items-center justify-between gap-1.5 pb-1.5 border-b border-amber-200">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs sm:text-sm font-black text-amber-950 font-cartoon">胜负规则：</span>
-            {/* Capture Rule Switch - Opens input modal */}
-            <button
-              onClick={() => {
-                setCustomTargetInput(String(captureTarget));
-                setIsTargetModalOpen(true);
-              }}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-xl font-bold text-xs sm:text-sm transition ${
-                winRule === 'capture'
-                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-amber-950 shadow-md scale-105 border-2 border-amber-500'
-                  : 'bg-amber-100/70 hover:bg-amber-200 text-amber-900 border border-amber-300'
-              }`}
-            >
-              <Swords className="w-3.5 h-3.5" />
-              <span>🎯 吃子决胜（输入吃子数）</span>
-            </button>
+    <div className="w-full h-full flex flex-col md:flex-row items-stretch justify-between gap-2 p-1 sm:p-2 select-none overflow-hidden">
+      {/* 1. LEFT/CENTER: FULL-HEIGHT GO BOARD (ZERO top/bottom distractions, maximum scaling) */}
+      <div className="flex-1 h-full min-h-0 min-w-0 flex items-center justify-center overflow-hidden">
+        <GoBoard
+          state={boardState}
+          onPlayMove={handlePlayerMove}
+          disabled={boardState.turn !== playerColor || isAiThinking || boardState.isGameOver}
+          showCoordinates={showCoordinates}
+          showLibertiesHelper={showLiberties}
+        />
+      </div>
 
-            {/* Territory Rule Switch */}
-            <button
-              onClick={() => startNewGame(boardSize, playerColor, aiLevel, 'territory', captureTarget)}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-xl font-bold text-xs sm:text-sm transition ${
-                winRule === 'territory'
-                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-amber-950 shadow-md scale-105 border-2 border-amber-500'
-                  : 'bg-amber-100/70 hover:bg-amber-200 text-amber-900 border border-amber-300'
-              }`}
-            >
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>🏰 正规围地盘（终局点目）</span>
-            </button>
+      {/* 2. RIGHT SIDEBAR: ALL STATS, CAPTURE FEEDBACK & OPTIONS */}
+      <div className="w-full md:w-80 lg:w-84 xl:w-92 h-full flex flex-col justify-between gap-2 overflow-y-auto pr-1 shrink-0">
+        {/* Top Section: AI Avatar, Profile & Live Dialogue */}
+        <div className="bg-white/95 rounded-2xl p-2.5 sm:p-3 border-2 border-amber-300 shadow-sm flex flex-col gap-2 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-amber-100 to-yellow-200 border-2 border-amber-400 flex items-center justify-center text-2xl shadow-inner shrink-0">
+              {activeProfile.avatar}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-1">
+                <h3 className="font-black text-amber-950 text-sm font-cartoon truncate">
+                  {activeProfile.name}
+                </h3>
+                <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full shrink-0">
+                  {activeProfile.rank}
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-500 truncate mt-0.5">{activeProfile.description}</p>
+            </div>
           </div>
 
-          {/* If Capture Mode: Clickable badge showing current target */}
-          {winRule === 'capture' && (
-            <button
-              onClick={() => {
-                setCustomTargetInput(String(captureTarget));
-                setIsTargetModalOpen(true);
-              }}
-              className="flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200/90 text-amber-950 px-3 py-1 rounded-xl border-2 border-dashed border-amber-500 text-xs font-bold transition shadow-sm animate-pop-in"
-              title="点击修改目标吃子数"
-            >
-              <span>目标：先吃</span>
-              <span className="text-sm font-black text-red-600 bg-white px-1.5 py-0.2 rounded-md shadow-inner font-cartoon">
-                {captureTarget}
-              </span>
-              <span>颗子获胜 (点击修改 ✏️)</span>
-            </button>
+          {/* Dynamic AI speech bubble */}
+          <div className="bg-amber-50/90 p-2 sm:p-2.5 rounded-xl border border-amber-200 text-xs font-bold text-amber-950 relative">
+            <div className="absolute -top-1.5 left-5 w-3 h-3 bg-amber-50 border-t border-l border-amber-200 transform rotate-45"></div>
+            {isAiThinking ? (
+              <div className="flex items-center gap-1.5 text-amber-600 animate-pulse">
+                <Bot className="w-3.5 h-3.5" />
+                <span>{activeProfile.name} 正在深度推演局势...</span>
+              </div>
+            ) : (
+              <span className="line-clamp-2">“{aiDialogue}”</span>
+            )}
+          </div>
+
+          {/* Current Move Status Banner */}
+          <div className="flex items-center justify-between text-[11px] font-bold bg-amber-100/70 px-2.5 py-1 rounded-lg text-amber-900 border border-amber-200">
+            <span>当前提示：</span>
+            <span className="text-amber-800 font-semibold truncate ml-1">{statusMessage}</span>
+          </div>
+        </div>
+
+        {/* Middle Section 1: Capture Status / Live Progress (吃子情况) */}
+        <div className="shrink-0">
+          {winRule === 'capture' ? (
+            /* Capture Race Badge Tracker */
+            <div className="bg-gradient-to-r from-yellow-100 via-amber-100 to-orange-100 p-2.5 rounded-2xl border-2 border-amber-400 shadow-sm flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-amber-950 font-cartoon flex items-center gap-1">
+                  <Swords className="w-3.5 h-3.5 text-amber-700" />
+                  <span>吃子战况</span>
+                </span>
+
+                {/* Target badge - opens custom input modal */}
+                <button
+                  onClick={() => {
+                    setCustomTargetInput(String(captureTarget));
+                    setIsTargetModalOpen(true);
+                  }}
+                  className="flex items-center gap-1 bg-white hover:bg-amber-50 text-amber-950 px-2 py-0.5 rounded-lg border border-amber-400 text-[11px] font-bold shadow-xs transition"
+                  title="点击修改目标吃子数"
+                >
+                  <span>先吃满</span>
+                  <span className="font-black text-red-600 font-cartoon text-xs">{captureTarget}</span>
+                  <span>子胜 ✏️</span>
+                </button>
+              </div>
+
+              {/* Progress Duel Cards */}
+              <div className="grid grid-cols-2 gap-2 mt-0.5">
+                {/* Player Card */}
+                <div className="bg-white/90 p-2 rounded-xl border border-amber-200 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3.5 h-3.5 rounded-full bg-black inline-block border border-gray-700 shrink-0" />
+                    <span className="text-xs font-bold text-amber-950">你已吃</span>
+                  </div>
+                  <div className="text-base font-black text-emerald-700 font-cartoon">
+                    {myCaptures} <span className="text-[10px] text-gray-500 font-normal">/ {captureTarget}</span>
+                  </div>
+                </div>
+
+                {/* AI Opponent Card */}
+                <div className="bg-white/90 p-2 rounded-xl border border-amber-200 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3.5 h-3.5 rounded-full bg-white inline-block border border-gray-300 shrink-0" />
+                    <span className="text-xs font-bold text-amber-950">AI 已吃</span>
+                  </div>
+                  <div className="text-base font-black text-orange-700 font-cartoon">
+                    {oppCaptures} <span className="text-[10px] text-gray-500 font-normal">/ {captureTarget}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Match point alert if close */}
+              {myCaptures >= captureTarget - 1 && myCaptures < captureTarget && (
+                <div className="text-[11px] font-black text-red-600 bg-red-100 py-1 px-2 rounded-lg border border-red-300 animate-bounce flex items-center justify-center gap-1">
+                  <Zap className="w-3 h-3 fill-current" />
+                  <span>赛点！再吃 1 颗直接获胜！</span>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Territory Live Progress */
+            <div className="bg-gradient-to-r from-amber-100 via-yellow-100 to-amber-100 p-2.5 rounded-2xl border-2 border-amber-400 shadow-sm flex flex-col gap-1.5">
+              <div className="flex items-center justify-between text-xs font-black text-amber-950 px-0.5">
+                <div className="flex items-center gap-1">
+                  <span className="w-3 h-3 rounded-full bg-black inline-block border border-gray-700" />
+                  <span>黑: {blackScore} 目</span>
+                </div>
+                <div className="flex items-center gap-1 text-amber-800 font-cartoon text-[11px]">
+                  <Flame className="w-3.5 h-3.5 text-orange-500 fill-orange-500 animate-pulse" />
+                  <span>实时地盘</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span>白: {whiteScore.toFixed(1)} 目</span>
+                  <span className="w-3 h-3 rounded-full bg-white inline-block border border-gray-300" />
+                </div>
+              </div>
+              <div className="w-full h-2.5 bg-gray-300 rounded-full overflow-hidden flex shadow-inner border border-amber-300">
+                <div
+                  style={{ width: `${blackPercent}%` }}
+                  className="h-full bg-gray-900 transition-all duration-500"
+                />
+                <div
+                  style={{ width: `${whitePercent}%` }}
+                  className="h-full bg-gray-100 transition-all duration-500"
+                />
+              </div>
+            </div>
           )}
         </div>
 
-        {/* Row 2: Board Size, Color & AI Opponent */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          {/* Board size */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-black text-amber-950 font-cartoon">棋盘：</span>
-            {([9, 13, 19] as BoardSize[]).map((sz) => (
-              <button
-                key={sz}
-                onClick={() => startNewGame(sz, playerColor, aiLevel, winRule, captureTarget)}
-                className={`px-2.5 py-1 rounded-xl font-bold text-xs transition ${
-                  boardSize === sz
-                    ? 'bg-amber-600 text-white shadow'
-                    : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
-                }`}
-              >
-                {sz}×{sz}
-              </button>
-            ))}
+        {/* Middle Section 2: Options & Settings (选项的情况) */}
+        <div className="bg-white/95 rounded-2xl p-2.5 sm:p-3 border-2 border-amber-300 shadow-sm flex flex-col gap-2 shrink-0">
+          <div className="text-xs font-black text-amber-950 font-cartoon flex items-center gap-1 border-b border-amber-200 pb-1">
+            <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+            <span>对弈设置与选项</span>
           </div>
 
-          {/* Color choice */}
+          {/* Rule Mode Buttons */}
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-black text-amber-950 font-cartoon">执子：</span>
             <button
-              onClick={() => startNewGame(boardSize, 'black', aiLevel, winRule, captureTarget)}
-              className={`px-2.5 py-1 rounded-xl font-bold text-xs border transition ${
-                playerColor === 'black'
-                  ? 'bg-black text-white border-black shadow'
-                  : 'bg-gray-100 text-gray-800 border-gray-300'
+              onClick={() => {
+                setCustomTargetInput(String(captureTarget));
+                setIsTargetModalOpen(true);
+              }}
+              className={`flex-1 py-1 px-1.5 rounded-xl font-bold text-xs transition flex items-center justify-center gap-1 ${
+                winRule === 'capture'
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-amber-950 font-black shadow border border-amber-500 scale-[1.02]'
+                  : 'bg-amber-100/70 hover:bg-amber-200 text-amber-900 border border-amber-300'
               }`}
             >
-              ⚫ 执黑先行
+              <Swords className="w-3 h-3" />
+              <span>🎯 吃子决胜</span>
             </button>
             <button
-              onClick={() => startNewGame(boardSize, 'white', aiLevel, winRule, captureTarget)}
-              className={`px-2.5 py-1 rounded-xl font-bold text-xs border transition ${
-                playerColor === 'white'
-                  ? 'bg-white text-gray-900 border-amber-400 shadow'
-                  : 'bg-gray-100 text-gray-800 border-gray-300'
+              onClick={() => startNewGame(boardSize, playerColor, aiLevel, 'territory', captureTarget)}
+              className={`flex-1 py-1 px-1.5 rounded-xl font-bold text-xs transition flex items-center justify-center gap-1 ${
+                winRule === 'territory'
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-amber-950 font-black shadow border border-amber-500 scale-[1.02]'
+                  : 'bg-amber-100/70 hover:bg-amber-200 text-amber-900 border border-amber-300'
               }`}
             >
-              ⚪ 执白后行
+              <CheckCircle2 className="w-3 h-3" />
+              <span>🏰 正规点目</span>
             </button>
           </div>
 
-          {/* AI Difficulty Level */}
-          <div className="flex items-center gap-1">
+          {/* Board Size & Stone Color */}
+          <div className="grid grid-cols-2 gap-1.5 text-xs">
+            {/* Size */}
+            <div className="flex items-center gap-1 bg-amber-50 p-1 rounded-xl border border-amber-200 justify-between">
+              <span className="text-[11px] font-bold text-amber-900 ml-1">路数:</span>
+              <div className="flex gap-0.5">
+                {([9, 13, 19] as BoardSize[]).map((sz) => (
+                  <button
+                    key={sz}
+                    onClick={() => startNewGame(sz, playerColor, aiLevel, winRule, captureTarget)}
+                    className={`px-1.5 py-0.5 rounded-lg font-black text-[11px] transition ${
+                      boardSize === sz
+                        ? 'bg-amber-600 text-white shadow-xs'
+                        : 'bg-white hover:bg-amber-100 text-amber-900 border border-amber-200'
+                    }`}
+                  >
+                    {sz}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Color */}
+            <div className="flex items-center gap-1 bg-amber-50 p-1 rounded-xl border border-amber-200 justify-between">
+              <span className="text-[11px] font-bold text-amber-900 ml-1">执子:</span>
+              <div className="flex gap-0.5">
+                <button
+                  onClick={() => startNewGame(boardSize, 'black', aiLevel, winRule, captureTarget)}
+                  className={`px-1.5 py-0.5 rounded-lg font-black text-[11px] transition ${
+                    playerColor === 'black'
+                      ? 'bg-black text-white shadow-xs'
+                      : 'bg-white text-gray-800 border border-gray-300'
+                  }`}
+                >
+                  ⚫黑
+                </button>
+                <button
+                  onClick={() => startNewGame(boardSize, 'white', aiLevel, winRule, captureTarget)}
+                  className={`px-1.5 py-0.5 rounded-lg font-black text-[11px] transition ${
+                    playerColor === 'white'
+                      ? 'bg-white text-gray-900 border-2 border-amber-500 shadow-xs'
+                      : 'bg-gray-100 text-gray-700 border border-gray-300'
+                  }`}
+                >
+                  ⚪白
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* AI Difficulty Selection */}
+          <div className="flex items-center gap-1 pt-0.5">
             {SPARRING_PROFILES.map((p) => {
               const isSelected = p.id === aiLevel;
               return (
                 <button
                   key={p.id}
                   onClick={() => startNewGame(boardSize, playerColor, p.id, winRule, captureTarget)}
-                  className={`flex items-center gap-1 px-2 py-1 rounded-xl text-xs font-black transition ${
+                  className={`flex-1 py-1 px-1 rounded-xl text-[11px] font-black transition flex items-center justify-center gap-1 ${
                     isSelected
-                      ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow scale-105'
+                      ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow'
                       : 'bg-amber-100/70 hover:bg-amber-200 text-amber-900 border border-amber-300'
                   }`}
                 >
                   <span>{p.avatar}</span>
-                  <span>{p.name}</span>
+                  <span>{p.name.slice(0, 3)}</span>
                 </button>
               );
             })}
           </div>
         </div>
-      </div>
 
-      {/* 2. DYNAMIC LIVE FEEDBACK & PROGRESS BAR */}
-      {winRule === 'capture' ? (
-        /* Capture Race Badge Tracker */
-        <div className="bg-gradient-to-r from-yellow-200 via-amber-200 to-orange-200 p-2.5 sm:p-3 rounded-2xl border-2 border-amber-400 shadow-sm flex items-center justify-between">
-          {/* Player Progress */}
-          <div className="flex items-center gap-2">
-            <span className="w-5 h-5 rounded-full bg-black inline-block border border-gray-800 shadow-sm" />
-            <div>
-              <div className="text-xs font-bold text-amber-950">小棋手 (你)</div>
-              <div className="flex items-center gap-1 mt-0.5">
-                <span className="text-xl font-black text-emerald-700 font-cartoon">
-                  {myCaptures}
-                </span>
-                <span className="text-xs text-gray-600 font-bold">/ {captureTarget} 子</span>
-              </div>
-            </div>
-          </div>
+        {/* Bottom Section: Action Controls (2x2 Grid) */}
+        <div className="grid grid-cols-2 gap-1.5 shrink-0 pt-0.5">
+          <button
+            onClick={handleUndo}
+            disabled={boardState.moveHistory.length < 2 || isAiThinking}
+            className="flex items-center justify-center gap-1 py-2 px-2 bg-white hover:bg-amber-50 disabled:opacity-40 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs shadow-sm transition active:scale-95"
+          >
+            <Undo2 className="w-3.5 h-3.5" />
+            <span>悔棋一步</span>
+          </button>
 
-          {/* Central Target Status & Milestone Alert */}
-          <div className="text-center px-2">
-            {myCaptures >= captureTarget - 1 && myCaptures < captureTarget ? (
-              <span className="text-xs font-black text-red-600 bg-red-100 px-3 py-1 rounded-full border border-red-300 animate-bounce flex items-center gap-1">
-                <Zap className="w-3.5 h-3.5 fill-current" />
-                <span>赛点！再吃 1 颗直接绝杀！</span>
-              </span>
-            ) : (
-              <span className="text-xs font-bold text-amber-900 bg-white/70 px-2.5 py-0.5 rounded-full border border-amber-300 font-cartoon">
-                先吃满 {captureTarget} 颗胜
-              </span>
-            )}
-          </div>
+          <button
+            onClick={handlePass}
+            disabled={boardState.turn !== playerColor || isAiThinking}
+            className="flex items-center justify-center gap-1 py-2 px-2 bg-white hover:bg-amber-50 disabled:opacity-40 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs shadow-sm transition active:scale-95"
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>停一手(Pass)</span>
+          </button>
 
-          {/* Opponent Progress */}
-          <div className="flex items-center gap-2 text-right">
-            <div>
-              <div className="text-xs font-bold text-amber-950">{activeProfile.name}</div>
-              <div className="flex items-center justify-end gap-1 mt-0.5">
-                <span className="text-xl font-black text-orange-700 font-cartoon">
-                  {oppCaptures}
-                </span>
-                <span className="text-xs text-gray-600 font-bold">/ {captureTarget} 子</span>
-              </div>
-            </div>
-            <span className="w-5 h-5 rounded-full bg-white inline-block border border-gray-300 shadow-sm" />
-          </div>
-        </div>
-      ) : (
-        /* Standard Territory Live Energy Bar */
-        <div className="bg-gradient-to-r from-amber-200 via-yellow-200 to-amber-200 p-2.5 sm:p-3 rounded-2xl border-2 border-amber-400 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-black text-amber-950 mb-1 px-1">
-            <div className="flex items-center gap-1">
-              <span className="w-3.5 h-3.5 rounded-full bg-black inline-block border border-gray-700" />
-              <span>黑方: {blackScore} 目 ({blackPercent}%)</span>
-            </div>
-            <div className="flex items-center gap-1 text-amber-800 font-cartoon">
-              <Flame className="w-4 h-4 text-orange-500 fill-orange-500 animate-pulse" />
-              <span>实时地盘推算</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span>白方: {whiteScore.toFixed(1)} 目 ({whitePercent}%)</span>
-              <span className="w-3.5 h-3.5 rounded-full bg-white inline-block border border-gray-300" />
-            </div>
-          </div>
-          <div className="w-full h-3 bg-gray-300 rounded-full overflow-hidden flex shadow-inner border border-amber-300">
-            <div
-              style={{ width: `${blackPercent}%` }}
-              className="h-full bg-gray-900 transition-all duration-500"
-            />
-            <div
-              style={{ width: `${whitePercent}%` }}
-              className="h-full bg-gray-100 transition-all duration-500"
-            />
-          </div>
-        </div>
-      )}
+          <button
+            onClick={() => setShowLiberties(!showLiberties)}
+            className={`flex items-center justify-center gap-1 py-2 px-2 font-bold rounded-xl border text-xs shadow-sm transition active:scale-95 ${
+              showLiberties
+                ? 'bg-emerald-500 text-white border-emerald-600 shadow'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            <Eye className="w-3.5 h-3.5" />
+            <span>数气光点</span>
+          </button>
 
-      {/* 3. MAIN ARENA LAYOUT (Optimized for Tablets & Desktop) */}
-      <div className="flex flex-col lg:flex-row items-center justify-center gap-4 sm:gap-6">
-        {/* Canvas Board Area */}
-        <div className="flex flex-col items-center">
-          <GoBoard
-            state={boardState}
-            onPlayMove={handlePlayerMove}
-            disabled={boardState.turn !== playerColor || isAiThinking || boardState.isGameOver}
-            showCoordinates={showCoordinates}
-            showLibertiesHelper={showLiberties}
-          />
-
-          {/* Action buttons */}
-          <div className="flex items-center gap-2 sm:gap-3 mt-2.5 flex-wrap justify-center">
-            <button
-              onClick={handleUndo}
-              disabled={boardState.moveHistory.length < 2 || isAiThinking}
-              className="flex items-center gap-1.5 px-3 py-1.5 sm:py-2 bg-white hover:bg-amber-50 disabled:opacity-40 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs sm:text-sm shadow-sm"
-            >
-              <Undo2 className="w-4 h-4" />
-              <span>悔棋一步</span>
-            </button>
-
-            <button
-              onClick={handlePass}
-              disabled={boardState.turn !== playerColor || isAiThinking}
-              className="flex items-center gap-1.5 px-3 py-1.5 sm:py-2 bg-white hover:bg-amber-50 disabled:opacity-40 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs sm:text-sm shadow-sm"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>停一手(Pass)</span>
-            </button>
-
-            <button
-              onClick={() => setShowLiberties(!showLiberties)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 sm:py-2 font-bold rounded-xl border text-xs sm:text-sm shadow-sm ${
-                showLiberties
-                  ? 'bg-emerald-500 text-white border-emerald-600'
-                  : 'bg-white text-gray-700 border-gray-300'
-              }`}
-            >
-              <Eye className="w-4 h-4" />
-              <span>数气光点</span>
-            </button>
-
-            <button
-              onClick={() => startNewGame()}
-              className="flex items-center gap-1.5 px-3 py-1.5 sm:py-2 bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold rounded-xl border border-amber-300 text-xs sm:text-sm shadow-sm"
-            >
-              <RotateCcw className="w-4 h-4" />
-              <span>重开一盘</span>
-            </button>
-          </div>
-        </div>
-
-        {/* AI Opponent Speech Bubble & Status Card */}
-        <div className="w-full lg:w-72 flex flex-col gap-3">
-          {/* Animal Avatar & Speech */}
-          <div className="bg-white rounded-3xl p-4 shadow-md border-3 border-amber-300 flex flex-col gap-2.5">
-            <div className="flex items-center gap-3">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-100 to-yellow-200 border-2 border-amber-400 flex items-center justify-center text-3xl shadow-inner">
-                {activeProfile.avatar}
-              </div>
-              <div>
-                <h3 className="font-black text-amber-950 text-base font-cartoon">
-                  {activeProfile.name}
-                </h3>
-                <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-                  {activeProfile.rank}
-                </span>
-                <p className="text-xs text-gray-600 mt-0.5 line-clamp-1">{activeProfile.description}</p>
-              </div>
-            </div>
-
-            {/* Dynamic AI speech bubble */}
-            <div className="bg-amber-50 p-3 rounded-2xl border border-amber-200 text-xs sm:text-sm font-bold text-amber-950 relative">
-              <div className="absolute -top-1.5 left-6 w-3 h-3 bg-amber-50 border-t border-l border-amber-200 transform rotate-45"></div>
-              {isAiThinking ? (
-                <div className="flex items-center gap-2 text-amber-600 animate-pulse">
-                  <Bot className="w-4 h-4" />
-                  <span>{activeProfile.name} 正在深度推演局势...</span>
-                </div>
-              ) : (
-                <span>“{aiDialogue}”</span>
-              )}
-            </div>
-          </div>
-
-          {/* Current Move Status Banner */}
-          <div className="bg-white rounded-2xl p-3 border-2 border-amber-300 text-xs font-bold text-amber-900 shadow-sm flex items-center justify-between">
-            <span>当前提示：</span>
-            <span className="text-amber-700">{statusMessage}</span>
-          </div>
+          <button
+            onClick={() => startNewGame()}
+            className="flex items-center justify-center gap-1 py-2 px-2 bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-500 hover:to-yellow-500 text-amber-950 font-black rounded-xl border border-amber-400 text-xs shadow-sm transition active:scale-95"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>重开一盘</span>
+          </button>
         </div>
       </div>
 

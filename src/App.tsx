@@ -80,7 +80,7 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#fdfaf5] flex flex-col select-none">
+    <div className={`bg-[#fdfaf5] flex flex-col select-none ${currentMode === 'sparring' ? 'h-screen max-h-screen overflow-hidden' : 'min-h-screen'}`}>
       {/* Top Navbar */}
       <KidNavbar
         currentMode={currentMode}
@@ -93,7 +93,7 @@ export const App: React.FC = () => {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col items-center justify-start py-1 sm:py-2 px-1 sm:px-3 w-full">
+      <main className={`flex-1 flex flex-col items-center justify-start w-full min-h-0 ${currentMode === 'sparring' ? 'p-1 overflow-hidden' : 'py-1 sm:py-2 px-1 sm:px-3'}`}>
         {currentMode === 'adventure' && (
           <AdventureMap
             unlockedStageId={progress.unlockedStageId}
@@ -134,9 +134,11 @@ export const App: React.FC = () => {
       </main>
 
       {/* Footer Encouragement Note */}
-      <footer className="text-center py-2 text-xs font-bold text-amber-800/60 border-t border-amber-200 bg-amber-50/50">
-        棋虽小道，品德最尊 · 少儿围棋趣味启蒙乐园
-      </footer>
+      {currentMode !== 'sparring' && (
+        <footer className="text-center py-2 text-xs font-bold text-amber-800/60 border-t border-amber-200 bg-amber-50/50">
+          棋虽小道，品德最尊 · 少儿围棋趣味启蒙乐园
+        </footer>
+      )}
     </div>
   );
 };

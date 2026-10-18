@@ -43,22 +43,35 @@ export const GoBoard: React.FC<GoBoardProps> = ({
     const updateSize = () => {
       if (containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
-        // Allow board to expand and fill tablet screen height
-        const maxFitHeight = Math.max(300, window.innerHeight - 120);
-        const available = Math.min(rect.width, maxFitHeight);
-        const clamped = Math.max(280, Math.min(Math.floor(available), 720));
+        // Fully utilize container width and height
+        const w = rect.width > 20 ? rect.width : window.innerWidth * 0.72;
+        const h = rect.height > 20 ? rect.height : window.innerHeight - 70;
+        const maxSquare = Math.min(w, h) - 6;
+        const clamped = Math.max(260, Math.min(Math.floor(maxSquare), 960));
         setDisplaySize(clamped);
       }
     };
 
     updateSize();
+
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
+      ro = new ResizeObserver(() => {
+        updateSize();
+      });
+      ro.observe(containerRef.current);
+    }
+
     window.addEventListener('resize', updateSize);
-    return () => window.removeEventListener('resize', updateSize);
+    return () => {
+      if (ro) ro.disconnect();
+      window.removeEventListener('resize', updateSize);
+    };
   }, []);
 
   // Compute geometry
   const size = state.size;
-  const padding = showCoordinates ? 24 : 16;
+  const padding = showCoordinates ? 20 : 12;
   const boardAreaSize = displaySize - padding * 2;
   const cellSize = boardAreaSize / (size - 1);
 
@@ -461,7 +474,7 @@ export const GoBoard: React.FC<GoBoardProps> = ({
   };
 
   return (
-    <div ref={containerRef} className="flex flex-col items-center justify-center p-2 relative">
+    <div ref={containerRef} className="w-full h-full flex flex-col items-center justify-center p-0.5 sm:p-1 relative min-h-0">
       <div className="relative wood-board-shadow rounded-2xl overflow-hidden bg-amber-100 border-4 border-amber-800/40">
         <canvas
           ref={canvasRef}
