@@ -70,6 +70,8 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
   const [statusMessage, setStatusMessage] = useState<string>('请在棋盘上落子开始！');
   const [settlementData, setSettlementData] = useState<GameSettlementData | null>(null);
   const [isSettlementOpen, setIsSettlementOpen] = useState<boolean>(false);
+  const [isTargetModalOpen, setIsTargetModalOpen] = useState<boolean>(false);
+  const [customTargetInput, setCustomTargetInput] = useState<string>('5');
 
   const activeProfile = SPARRING_PROFILES.find((p) => p.id === aiLevel) || SPARRING_PROFILES[1];
   const aiColor: Color = playerColor === 'black' ? 'white' : 'black';
@@ -335,9 +337,12 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
         <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-amber-200">
           <div className="flex items-center gap-1.5">
             <span className="text-xs sm:text-sm font-black text-amber-950 font-cartoon">胜负规则：</span>
-            {/* Capture Rule Switch */}
+            {/* Capture Rule Switch - Opens input modal */}
             <button
-              onClick={() => startNewGame(boardSize, playerColor, aiLevel, 'capture', captureTarget)}
+              onClick={() => {
+                setCustomTargetInput(String(captureTarget));
+                setIsTargetModalOpen(true);
+              }}
               className={`flex items-center gap-1 px-3 py-1.5 rounded-xl font-bold text-xs sm:text-sm transition ${
                 winRule === 'capture'
                   ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-amber-950 shadow-md scale-105 border-2 border-amber-500'
@@ -345,7 +350,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
               }`}
             >
               <Swords className="w-3.5 h-3.5" />
-              <span>🎯 吃子决胜（先吃N子获胜）</span>
+              <span>🎯 吃子决胜（输入吃子数）</span>
             </button>
 
             {/* Territory Rule Switch */}
@@ -362,24 +367,22 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
             </button>
           </div>
 
-          {/* If Capture Mode: Select target stones count */}
+          {/* If Capture Mode: Clickable badge showing current target */}
           {winRule === 'capture' && (
-            <div className="flex items-center gap-1 bg-amber-100/80 p-1 rounded-xl border border-amber-300 animate-pop-in">
-              <span className="text-xs font-bold text-amber-900 px-1">目标:</span>
-              {[1, 3, 5, 10].map((num) => (
-                <button
-                  key={num}
-                  onClick={() => startNewGame(boardSize, playerColor, aiLevel, 'capture', num)}
-                  className={`px-2 py-0.5 rounded-lg text-xs font-black transition ${
-                    captureTarget === num
-                      ? 'bg-amber-600 text-white shadow'
-                      : 'bg-white hover:bg-amber-200 text-amber-900'
-                  }`}
-                >
-                  吃 {num} 子
-                </button>
-              ))}
-            </div>
+            <button
+              onClick={() => {
+                setCustomTargetInput(String(captureTarget));
+                setIsTargetModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200/90 text-amber-950 px-3 py-1 rounded-xl border-2 border-dashed border-amber-500 text-xs font-bold transition shadow-sm animate-pop-in"
+              title="点击修改目标吃子数"
+            >
+              <span>目标：先吃</span>
+              <span className="text-sm font-black text-red-600 bg-white px-1.5 py-0.2 rounded-md shadow-inner font-cartoon">
+                {captureTarget}
+              </span>
+              <span>颗子获胜 (点击修改 ✏️)</span>
+            </button>
           )}
         </div>
 
@@ -630,6 +633,98 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
         onCloseReview={() => setIsSettlementOpen(false)}
         onBackToMap={() => setIsSettlementOpen(false)}
       />
+
+      {/* 5. CUSTOM TARGET STONES INPUT MODAL */}
+      {isTargetModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-pop-in">
+          <div className="bg-gradient-to-b from-amber-50 to-orange-100 rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl border-4 border-yellow-400 relative">
+            <h3 className="text-xl sm:text-2xl font-black text-amber-950 font-cartoon flex items-center justify-center gap-2">
+              <Swords className="w-6 h-6 text-amber-600" />
+              <span>设置吃子获胜目标</span>
+            </h3>
+            <p className="text-xs sm:text-sm font-bold text-amber-800 mt-1 mb-4">
+              你想挑战先吃几颗子获胜？请在下方直接输入：
+            </p>
+
+            {/* Input field with plus/minus buttons */}
+            <div className="flex items-center justify-center gap-3 my-3">
+              <button
+                type="button"
+                onClick={() => {
+                  const current = parseInt(customTargetInput, 10) || 1;
+                  setCustomTargetInput(String(Math.max(1, current - 1)));
+                }}
+                className="w-10 h-10 rounded-2xl bg-white hover:bg-gray-100 border-2 border-amber-300 text-amber-950 font-black text-xl flex items-center justify-center shadow-sm active:scale-95"
+              >
+                -
+              </button>
+
+              <div className="relative">
+                <input
+                  type="number"
+                  min="1"
+                  max="99"
+                  value={customTargetInput}
+                  onChange={(e) => setCustomTargetInput(e.target.value)}
+                  className="w-24 h-12 text-center text-3xl font-black font-cartoon text-red-600 bg-white rounded-2xl border-3 border-amber-400 shadow-inner focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                  autoFocus
+                />
+                <span className="text-xs font-bold text-amber-800 block mt-1">颗棋子</span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const current = parseInt(customTargetInput, 10) || 1;
+                  setCustomTargetInput(String(Math.min(99, current + 1)));
+                }}
+                className="w-10 h-10 rounded-2xl bg-white hover:bg-gray-100 border-2 border-amber-300 text-amber-950 font-black text-xl flex items-center justify-center shadow-sm active:scale-95"
+              >
+                +
+              </button>
+            </div>
+
+            {/* Quick recommend pills */}
+            <div className="flex items-center justify-center gap-2 mb-5">
+              <span className="text-[11px] font-bold text-gray-500">快捷预设:</span>
+              {[1, 3, 5, 10].map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setCustomTargetInput(String(preset))}
+                  className="px-2 py-0.5 rounded-lg text-xs font-black bg-amber-200/80 hover:bg-amber-300 text-amber-900 border border-amber-400"
+                >
+                  {preset}子
+                </button>
+              ))}
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const parsed = parseInt(customTargetInput, 10);
+                  const valid = isNaN(parsed) || parsed < 1 ? 1 : Math.min(parsed, 99);
+                  startNewGame(boardSize, playerColor, aiLevel, 'capture', valid);
+                  setIsTargetModalOpen(false);
+                }}
+                className="flex-1 py-3 px-4 btn-cartoon-yellow text-amber-950 font-black rounded-2xl shadow-md text-sm sm:text-base"
+              >
+                确定开战
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsTargetModalOpen(false)}
+                className="py-3 px-4 bg-white hover:bg-gray-100 text-gray-700 font-bold rounded-2xl border-2 border-gray-300 text-sm"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
