@@ -93,7 +93,7 @@ export const App: React.FC = () => {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col items-center justify-start py-4 px-2 sm:px-4">
+      <main className="flex-1 flex flex-col items-center justify-start py-1 sm:py-2 px-1 sm:px-3 w-full">
         {currentMode === 'adventure' && (
           <AdventureMap
             unlockedStageId={progress.unlockedStageId}

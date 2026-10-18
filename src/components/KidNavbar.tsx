@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { GameMode } from '../types/go';
-import { Volume2, VolumeX, Sparkles, Map, Swords, Puzzle, Grid, Bot } from 'lucide-react';
+import { Volume2, VolumeX, Sparkles, Map, Swords, Puzzle, Grid, Bot, Maximize, Minimize } from 'lucide-react';
 
 interface KidNavbarProps {
   currentMode: GameMode;
@@ -21,6 +21,23 @@ export const KidNavbar: React.FC<KidNavbarProps> = ({
   showCoordinates,
   onToggleCoordinates,
 }) => {
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  };
   return (
     <header className="w-full bg-amber-500 text-white shadow-md border-b-4 border-amber-600 px-4 py-2 flex flex-wrap items-center justify-between gap-2 select-none">
       {/* Brand & Stars */}
@@ -112,6 +129,15 @@ export const KidNavbar: React.FC<KidNavbarProps> = ({
           }`}
         >
           坐标
+        </button>
+
+        <button
+          onClick={toggleFullscreen}
+          title={isFullscreen ? '退出全屏' : '全屏下棋 (推荐平板使用)'}
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 border border-amber-300 text-white font-bold text-xs shadow-sm transition"
+        >
+          {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
+          <span className="hidden sm:inline">{isFullscreen ? '退出全屏' : '全屏'}</span>
         </button>
 
         <button

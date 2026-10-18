@@ -330,11 +330,11 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
   const whitePercent = 100 - blackPercent;
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-2 sm:p-4 flex flex-col gap-3.5 select-none">
+    <div className="w-full max-w-7xl mx-auto p-1.5 sm:p-3 flex flex-col gap-2 select-none">
       {/* 1. TOP RULE & CONTROLS DASHBOARD */}
-      <div className="bg-white/95 p-3 sm:p-4 rounded-3xl border-3 border-amber-300 shadow-md flex flex-col gap-2.5">
+      <div className="bg-white/95 p-2 sm:p-3 rounded-2xl border-2 border-amber-300 shadow-sm flex flex-col gap-2">
         {/* Row 1: Rule Mode Switcher */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-amber-200">
+        <div className="flex flex-wrap items-center justify-between gap-1.5 pb-1.5 border-b border-amber-200">
           <div className="flex items-center gap-1.5">
             <span className="text-xs sm:text-sm font-black text-amber-950 font-cartoon">胜负规则：</span>
             {/* Capture Rule Switch - Opens input modal */}

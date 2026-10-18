@@ -23,8 +23,8 @@ st.markdown(
     }
     iframe {
         width: 100% !important;
-        height: 92vh !important;
-        min-height: 760px !important;
+        height: 98vh !important;
+        min-height: 880px !important;
         border: none !important;
     }
     </style>
@@ -42,4 +42,4 @@ else:
         html_content = f.read()
 
     # Render complete inlined singlefile HTML
-    components.html(html_content, height=860, scrolling=True)
+    components.html(html_content, height=920, scrolling=True)

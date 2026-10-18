@@ -43,10 +43,10 @@ export const GoBoard: React.FC<GoBoardProps> = ({
     const updateSize = () => {
       if (containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
-        // Allow board to adapt to tablet viewport height in landscape mode
-        const maxFitHeight = Math.max(280, window.innerHeight - 180);
+        // Allow board to expand and fill tablet screen height
+        const maxFitHeight = Math.max(300, window.innerHeight - 120);
         const available = Math.min(rect.width, maxFitHeight);
-        const clamped = Math.max(260, Math.min(Math.floor(available), 580));
+        const clamped = Math.max(280, Math.min(Math.floor(available), 720));
         setDisplaySize(clamped);
       }
     };
@@ -58,7 +58,7 @@ export const GoBoard: React.FC<GoBoardProps> = ({
 
   // Compute geometry
   const size = state.size;
-  const padding = showCoordinates ? 32 : 22;
+  const padding = showCoordinates ? 24 : 16;
   const boardAreaSize = displaySize - padding * 2;
   const cellSize = boardAreaSize / (size - 1);
 
@@ -226,10 +226,10 @@ export const GoBoard: React.FC<GoBoardProps> = ({
       const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T'];
       for (let i = 0; i < size; i++) {
         const topCoord = pointToPixel({ x: i, y: 0 });
-        ctx.fillText(letters[i], topCoord.px, 14);
+        ctx.fillText(letters[i], topCoord.px, Math.max(9, padding * 0.45));
 
         const leftCoord = pointToPixel({ x: 0, y: i });
-        ctx.fillText(String(size - i), 14, leftCoord.py);
+        ctx.fillText(String(size - i), Math.max(9, padding * 0.45), leftCoord.py);
       }
     }
 
