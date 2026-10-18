@@ -38,16 +38,31 @@ export const GoBoard: React.FC<GoBoardProps> = ({
   const particlesRef = useRef<Particle[]>([]);
   const animFrameRef = useRef<number | null>(null);
 
-  // Resize observer to ensure board fits perfectly on all tablets and screens
+  // Resize observer to ensure board fits 100% completely on all tablets and screens without scrolling
   useEffect(() => {
     const updateSize = () => {
       if (containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
-        // Fully utilize container width and height
-        const w = rect.width > 20 ? rect.width : window.innerWidth * 0.72;
-        const h = rect.height > 20 ? rect.height : window.innerHeight - 70;
-        const maxSquare = Math.min(w, h) - 6;
-        const clamped = Math.max(260, Math.min(Math.floor(maxSquare), 960));
+        const maxVw = window.innerWidth;
+        const maxVh = window.innerHeight;
+
+        // Container available width & height
+        let w = rect.width > 20 ? rect.width : maxVw * 0.65;
+        let h = rect.height > 20 ? rect.height : maxVh - 60;
+
+        // CRITICAL SAFEGUARD FOR TABLETS:
+        // The board canvas height MUST NOT exceed (viewport height - 64px) to prevent vertical overflow/scrolling
+        const hardMaxH = Math.max(200, maxVh - 64);
+        h = Math.min(h, hardMaxH);
+
+        // Also ensure width leaves room for sidebar in landscape mode
+        if (maxVw >= 768) {
+          const hardMaxW = Math.max(200, maxVw - 320);
+          w = Math.min(w, hardMaxW);
+        }
+
+        const maxSquare = Math.min(w, h) - 10;
+        const clamped = Math.max(240, Math.min(Math.floor(maxSquare), 720));
         setDisplaySize(clamped);
       }
     };

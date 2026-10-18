@@ -16,6 +16,7 @@ st.markdown(
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
+    .stDeployButton {display: none;}
     .block-container {
         padding: 0 !important;
         margin: 0 !important;
@@ -23,9 +24,11 @@ st.markdown(
     }
     iframe {
         width: 100% !important;
-        height: 98vh !important;
-        min-height: 880px !important;
+        height: 100vh !important;
+        max-height: 100vh !important;
+        min-height: 0 !important;
         border: none !important;
+        overflow: hidden !important;
     }
     </style>
     """,
@@ -42,4 +45,4 @@ else:
         html_content = f.read()
 
     # Render complete inlined singlefile HTML
-    components.html(html_content, height=920, scrolling=True)
+    components.html(html_content, height=650, scrolling=False)

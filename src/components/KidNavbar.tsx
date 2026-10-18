@@ -39,7 +39,7 @@ export const KidNavbar: React.FC<KidNavbarProps> = ({
     }
   };
   return (
-    <header className="w-full bg-amber-500 text-white shadow-md border-b-4 border-amber-600 px-4 py-2 flex flex-wrap items-center justify-between gap-2 select-none">
+    <header className="w-full bg-amber-500 text-white shadow-sm border-b-2 sm:border-b-4 border-amber-600 px-2 sm:px-3 py-1 sm:py-1.5 flex items-center justify-between gap-1.5 select-none shrink-0 overflow-x-auto">
       {/* Brand & Stars */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-1.5 bg-amber-600/60 px-3 py-1 rounded-2xl border border-amber-400">

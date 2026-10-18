@@ -103,130 +103,128 @@ export const FreePlayView: React.FC<FreePlayViewProps> = ({ showCoordinates }) =
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-3 sm:p-5 flex flex-col gap-4">
-      {/* Board Size Selector */}
-      <div className="flex items-center justify-between bg-white/80 p-3 rounded-2xl border border-amber-300 shadow-sm flex-wrap gap-2">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-black text-amber-950 font-cartoon">棋盘路数：</span>
-          {([13, 19] as BoardSize[]).map((sz) => (
-            <button
-              key={sz}
-              onClick={() => changeSize(sz)}
-              className={`px-3 py-1 rounded-xl font-bold text-sm transition ${
-                boardSize === sz
-                  ? 'bg-amber-600 text-white shadow'
-                  : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
-              }`}
-            >
-              {sz}×{sz}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-2 text-sm font-bold text-amber-900">
-          <span>当前执子：</span>
-          <span className="flex items-center gap-1 bg-amber-100 px-2.5 py-1 rounded-full border border-amber-300">
-            <span
-              className={`inline-block w-4 h-4 rounded-full border ${
-                boardState.turn === 'black' ? 'bg-black border-gray-700' : 'bg-white border-gray-300'
-              }`}
-            />
-            <span>{boardState.turn === 'black' ? '黑方走' : '白方走'}</span>
-          </span>
-        </div>
+    <div className="w-full h-full flex flex-col md:flex-row items-stretch justify-between gap-2 p-1 sm:p-2 select-none overflow-hidden">
+      {/* 1. LEFT/CENTER: FULL-HEIGHT GO BOARD (ZERO top/bottom distractions, maximum scaling) */}
+      <div className="flex-1 h-full min-h-0 min-w-0 flex items-center justify-center overflow-hidden">
+        <GoBoard
+          state={boardState}
+          onPlayMove={handlePlayMove}
+          disabled={boardState.isGameOver}
+          showCoordinates={showCoordinates}
+        />
       </div>
 
-      {/* Main Board & Sidebar Controls */}
-      <div className="flex flex-col lg:flex-row items-center justify-center gap-6">
-        <div className="flex flex-col items-center">
-          <GoBoard
-            state={boardState}
-            onPlayMove={handlePlayMove}
-            disabled={boardState.isGameOver}
-            showCoordinates={showCoordinates}
-          />
+      {/* 2. RIGHT SIDEBAR: OPTIONS, STATUS & ACTIONS */}
+      <div className="w-full md:w-80 lg:w-84 xl:w-88 h-full flex flex-col justify-between gap-2 overflow-y-auto pr-1 shrink-0">
+        {/* Top: Size & Turn Status */}
+        <div className="bg-white/95 rounded-2xl p-2.5 border-2 border-amber-300 shadow-sm flex flex-col gap-2 shrink-0">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black text-amber-950 font-cartoon">棋盘路数：</span>
+            <div className="flex gap-1">
+              {([13, 19] as BoardSize[]).map((sz) => (
+                <button
+                  key={sz}
+                  onClick={() => changeSize(sz)}
+                  className={`px-2.5 py-1 rounded-xl font-bold text-xs transition ${
+                    boardSize === sz
+                      ? 'bg-amber-600 text-white shadow'
+                      : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
+                  }`}
+                >
+                  {sz}×{sz}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between text-xs font-bold text-amber-900 pt-1 border-t border-amber-100">
+            <span>当前执子：</span>
+            <span className="flex items-center gap-1.5 bg-amber-100/80 px-2.5 py-0.5 rounded-full border border-amber-300">
+              <span
+                className={`inline-block w-3.5 h-3.5 rounded-full border ${
+                  boardState.turn === 'black' ? 'bg-black border-gray-700' : 'bg-white border-gray-300'
+                }`}
+              />
+              <span>{boardState.turn === 'black' ? '黑方走' : '白方走'}</span>
+            </span>
+          </div>
 
           {statusMessage && (
-            <div className="mt-2 text-sm font-bold text-amber-900 bg-amber-100/90 px-4 py-1.5 rounded-full border border-amber-300 animate-pop-in">
+            <div className="text-xs font-bold text-amber-900 bg-amber-100/90 px-2.5 py-1 rounded-lg border border-amber-300 animate-pop-in text-center">
               {statusMessage}
             </div>
           )}
         </div>
 
-        {/* Sidebar Action Cards */}
-        <div className="w-full lg:w-72 flex flex-col gap-3">
-          {/* Action buttons */}
-          <div className="bg-white rounded-3xl p-4 shadow-md border-3 border-amber-300 flex flex-col gap-2">
-            <h3 className="font-black text-amber-950 text-sm font-cartoon mb-1">对局操作</h3>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={handleUndo}
-                disabled={boardState.moveHistory.length === 0}
-                className="py-2 px-3 bg-amber-50 hover:bg-amber-100 disabled:opacity-40 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs flex items-center justify-center gap-1"
-              >
-                <Undo2 className="w-3.5 h-3.5" />
-                <span>悔棋一步</span>
-              </button>
-
-              <button
-                onClick={handlePass}
-                className="py-2 px-3 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs flex items-center justify-center gap-1"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>停一手(虚手)</span>
-              </button>
-
-              <button
-                onClick={handleEstimateTerritory}
-                className="py-2 px-3 bg-blue-50 hover:bg-blue-100 text-blue-900 font-bold rounded-xl border border-blue-300 text-xs flex items-center justify-center gap-1"
-              >
-                <BarChart2 className="w-3.5 h-3.5" />
-                <span>形势判断</span>
-              </button>
-
-              <button
-                onClick={() => changeSize(boardSize)}
-                className="py-2 px-3 bg-red-50 hover:bg-red-100 text-red-900 font-bold rounded-xl border border-red-300 text-xs flex items-center justify-center gap-1"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>清空棋盘</span>
-              </button>
+        {/* Middle: Territory Estimation Card */}
+        {territoryEstimate && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-3 border-2 border-blue-300 text-xs font-bold animate-pop-in shrink-0">
+            <div className="text-blue-950 font-black text-xs mb-1">📊 形势大致推算：</div>
+            <div className="flex justify-between text-gray-800 py-0.5">
+              <span>黑方目数 (含提子):</span>
+              <span className="text-black font-black text-sm">{territoryEstimate.black} 目</span>
+            </div>
+            <div className="flex justify-between text-gray-800 py-0.5">
+              <span>白方目数 (含提子):</span>
+              <span className="text-gray-700 font-black text-sm">{territoryEstimate.white} 目</span>
             </div>
           </div>
+        )}
 
-          {/* Territory estimation result */}
-          {territoryEstimate && (
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-3 border-2 border-blue-300 text-xs font-bold animate-pop-in">
-              <div className="text-blue-950 font-black text-sm mb-1.5">📊 形势大致推算：</div>
-              <div className="flex justify-between text-gray-800 py-0.5">
-                <span>黑方目数 (含提子):</span>
-                <span className="text-black font-black text-sm">{territoryEstimate.black} 目</span>
-              </div>
-              <div className="flex justify-between text-gray-800 py-0.5">
-                <span>白方目数 (含提子):</span>
-                <span className="text-gray-700 font-black text-sm">{territoryEstimate.white} 目</span>
-              </div>
-            </div>
-          )}
-
-          {/* SGF Import & Export */}
-          <div className="bg-white rounded-3xl p-4 shadow-md border-3 border-amber-300 flex flex-col gap-2">
-            <h3 className="font-black text-amber-950 text-sm font-cartoon mb-1">
-              SGF 题谱/棋谱交换
-            </h3>
-
+        {/* Middle 2: Action Buttons */}
+        <div className="bg-white/95 rounded-2xl p-2.5 border-2 border-amber-300 shadow-sm flex flex-col gap-1.5 shrink-0">
+          <h3 className="font-black text-amber-950 text-xs font-cartoon">棋局操作</h3>
+          <div className="grid grid-cols-2 gap-1.5">
             <button
-              onClick={handleExportSGF}
-              className="w-full py-2 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold rounded-xl border border-emerald-300 text-xs flex items-center justify-center gap-1.5"
+              onClick={handleUndo}
+              disabled={boardState.moveHistory.length === 0}
+              className="py-1.5 px-2 bg-amber-50 hover:bg-amber-100 disabled:opacity-40 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs flex items-center justify-center gap-1 active:scale-95"
             >
-              <Download className="w-4 h-4" />
-              <span>保存/导出当前棋谱 (.sgf)</span>
+              <Undo2 className="w-3.5 h-3.5" />
+              <span>悔棋一步</span>
             </button>
 
-            <label className="w-full py-2 px-3 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs flex items-center justify-center gap-1.5 cursor-pointer text-center">
-              <Upload className="w-4 h-4" />
-              <span>导入老师/家长的题谱 (.sgf)</span>
+            <button
+              onClick={handlePass}
+              className="py-1.5 px-2 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs flex items-center justify-center gap-1 active:scale-95"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>停一手(虚手)</span>
+            </button>
+
+            <button
+              onClick={handleEstimateTerritory}
+              className="py-1.5 px-2 bg-blue-50 hover:bg-blue-100 text-blue-900 font-bold rounded-xl border border-blue-300 text-xs flex items-center justify-center gap-1 active:scale-95"
+            >
+              <BarChart2 className="w-3.5 h-3.5" />
+              <span>形势判断</span>
+            </button>
+
+            <button
+              onClick={() => changeSize(boardSize)}
+              className="py-1.5 px-2 bg-red-50 hover:bg-red-100 text-red-900 font-bold rounded-xl border border-red-300 text-xs flex items-center justify-center gap-1 active:scale-95"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>清空重摆</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Bottom: SGF Import & Export */}
+        <div className="bg-white/95 rounded-2xl p-2.5 border-2 border-amber-300 shadow-sm flex flex-col gap-1.5 shrink-0">
+          <h3 className="font-black text-amber-950 text-xs font-cartoon">SGF 棋谱交换</h3>
+          <div className="flex flex-col gap-1">
+            <button
+              onClick={handleExportSGF}
+              className="w-full py-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold rounded-xl border border-emerald-300 text-xs flex items-center justify-center gap-1"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>保存/导出棋谱 (.sgf)</span>
+            </button>
+
+            <label className="w-full py-1.5 px-2 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs flex items-center justify-center gap-1 cursor-pointer text-center">
+              <Upload className="w-3.5 h-3.5" />
+              <span>导入题谱 (.sgf)</span>
               <input type="file" accept=".sgf" onChange={handleImportSGF} className="hidden" />
             </label>
           </div>

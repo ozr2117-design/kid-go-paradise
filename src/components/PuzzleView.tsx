@@ -90,115 +90,113 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-3 sm:p-5 flex flex-col gap-4">
-      {/* Top Breadcrumb & Navigation */}
-      <div className="flex items-center justify-between bg-white/80 p-3 rounded-2xl border border-amber-300 shadow-sm">
-        <button
-          onClick={onBackToMap}
-          className="flex items-center gap-1 text-sm font-bold text-amber-900 hover:text-amber-700 bg-amber-100 px-3 py-1.5 rounded-xl border border-amber-300"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>返回地图</span>
-        </button>
+    <div className="w-full h-full flex flex-col md:flex-row items-stretch justify-between gap-2 p-1 sm:p-2 select-none overflow-hidden">
+      {/* 1. LEFT/CENTER: FULL-HEIGHT GO BOARD (ZERO top/bottom distractions, maximum scaling) */}
+      <div className="flex-1 h-full min-h-0 min-w-0 flex items-center justify-center overflow-hidden">
+        <GoBoard
+          state={boardState}
+          onPlayMove={handlePlayMove}
+          disabled={boardState.isGameOver}
+          showCoordinates={showCoordinates}
+          showLibertiesHelper={false}
+        />
+      </div>
 
-        <div className="text-center">
-          <span className="text-xs font-bold text-amber-700 bg-amber-100/80 px-2.5 py-0.5 rounded-full">
-            {stage.title}
-          </span>
-          <h2 className="text-base sm:text-lg font-black text-amber-950 font-cartoon">
+      {/* 2. RIGHT SIDEBAR: BREADCRUMB, QUESTION & ACTIONS */}
+      <div className="w-full md:w-80 lg:w-84 xl:w-88 h-full flex flex-col justify-between gap-2 overflow-y-auto pr-1 shrink-0">
+        {/* Top: Stage info & Prev/Next Navigation */}
+        <div className="bg-white/95 rounded-2xl p-2.5 border-2 border-amber-300 shadow-sm flex flex-col gap-1.5 shrink-0">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={onBackToMap}
+              className="flex items-center gap-1 text-xs font-bold text-amber-900 hover:text-amber-700 bg-amber-100 px-2.5 py-1 rounded-xl border border-amber-300"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>地图</span>
+            </button>
+
+            <span className="text-[11px] font-bold text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-full truncate max-w-[130px]">
+              {stage.title}
+            </span>
+
+            <div className="flex items-center gap-1">
+              <button
+                onClick={onPrevPuzzle}
+                disabled={!hasPrev}
+                className="p-1 rounded-lg bg-amber-100 hover:bg-amber-200 disabled:opacity-40 text-amber-900 border border-amber-300"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={onNextPuzzle}
+                disabled={!hasNext}
+                className="p-1 rounded-lg bg-amber-100 hover:bg-amber-200 disabled:opacity-40 text-amber-900 border border-amber-300"
+              >
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          <h2 className="text-xs sm:text-sm font-black text-amber-950 font-cartoon text-center mt-0.5">
             {puzzle.title}
           </h2>
         </div>
 
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={onPrevPuzzle}
-            disabled={!hasPrev}
-            className="p-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 disabled:opacity-40 text-amber-900 border border-amber-300"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-          <button
-            onClick={onNextPuzzle}
-            disabled={!hasNext}
-            className="p-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 disabled:opacity-40 text-amber-900 border border-amber-300"
-          >
-            <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
+        {/* Middle: Question Description & Feedback */}
+        <div className="bg-white/95 rounded-2xl p-2.5 sm:p-3 shadow-sm border-2 border-amber-300 flex flex-col gap-1.5 shrink-0">
+          <h3 className="font-black text-amber-950 text-xs flex items-center gap-1.5 font-cartoon">
+            <HelpCircle className="w-3.5 h-3.5 text-amber-600" />
+            <span>闯关任务</span>
+          </h3>
+          <p className="text-xs font-bold text-amber-900 leading-relaxed bg-amber-50 p-2 rounded-xl border border-amber-200">
+            {puzzle.description}
+          </p>
 
-      {/* Main Puzzle Grid */}
-      <div className="flex flex-col lg:flex-row items-center justify-center gap-6">
-        {/* Go Board */}
-        <div className="flex flex-col items-center">
-          <GoBoard
-            state={boardState}
-            onPlayMove={handlePlayMove}
-            disabled={boardState.isGameOver}
-            showCoordinates={showCoordinates}
-            showLibertiesHelper={false}
-          />
-
-          {/* Action buttons */}
-          <div className="flex items-center gap-3 mt-3">
-            <button
-              onClick={resetPuzzle}
-              className="flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-amber-50 text-amber-900 font-bold rounded-xl border border-amber-300 text-sm shadow-sm"
+          {/* Real-time Feedback alert */}
+          {feedback && (
+            <div
+              className={`p-2 rounded-xl text-xs font-bold animate-pop-in ${
+                feedback.includes('🎉')
+                  ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                  : 'bg-orange-100 text-orange-950 border border-orange-300'
+              }`}
             >
-              <RotateCcw className="w-4 h-4" />
-              <span>重新摆题</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setHintVisible(!hintVisible);
-                setUsedHint(true);
-              }}
-              className="flex items-center gap-1.5 px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-amber-950 font-black rounded-xl border border-yellow-500 text-sm shadow-sm"
-            >
-              <Lightbulb className="w-4 h-4" />
-              <span>{hintVisible ? '隐藏提示' : '灵感锦囊'}</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Puzzle Description & Hint Card */}
-        <div className="w-full lg:w-80 flex flex-col gap-3">
-          {/* Question Goal */}
-          <div className="bg-white rounded-3xl p-5 shadow-md border-3 border-amber-300">
-            <h3 className="font-black text-amber-950 text-base flex items-center gap-2 font-cartoon">
-              <HelpCircle className="w-5 h-5 text-amber-600" />
-              <span>闯关任务</span>
-            </h3>
-            <p className="text-sm font-bold text-amber-900 mt-2 leading-relaxed bg-amber-50 p-3 rounded-2xl border border-amber-200">
-              {puzzle.description}
-            </p>
-
-            {/* Real-time Feedback alert */}
-            {feedback && (
-              <div
-                className={`mt-3 p-3 rounded-2xl text-sm font-bold animate-pop-in ${
-                  feedback.includes('🎉')
-                    ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-                    : 'bg-orange-100 text-orange-950 border border-orange-300'
-                }`}
-              >
-                {feedback}
-              </div>
-            )}
-          </div>
-
-          {/* Hint Card */}
-          {hintVisible && (
-            <div className="bg-yellow-100/90 rounded-3xl p-4 shadow-sm border-2 border-yellow-400 animate-pop-in">
-              <div className="flex items-center gap-1.5 text-amber-900 font-black text-sm mb-1">
-                <Lightbulb className="w-4 h-4 text-amber-700" />
-                <span>老师的小锦囊：</span>
-              </div>
-              <p className="text-xs font-bold text-amber-800 leading-normal">{puzzle.hint}</p>
+              {feedback}
             </div>
           )}
+        </div>
+
+        {/* Hint Card */}
+        {hintVisible && (
+          <div className="bg-yellow-100/95 rounded-2xl p-2.5 shadow-sm border-2 border-yellow-400 animate-pop-in shrink-0">
+            <div className="flex items-center gap-1 text-amber-900 font-black text-xs mb-1">
+              <Lightbulb className="w-3.5 h-3.5 text-amber-700" />
+              <span>锦囊提示：</span>
+            </div>
+            <p className="text-[11px] font-bold text-amber-800 leading-normal">{puzzle.hint}</p>
+          </div>
+        )}
+
+        {/* Bottom: Action Buttons */}
+        <div className="grid grid-cols-2 gap-1.5 shrink-0 pt-0.5">
+          <button
+            onClick={resetPuzzle}
+            className="flex items-center justify-center gap-1 py-2 px-2 bg-white hover:bg-amber-50 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs shadow-sm transition active:scale-95"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>重新摆题</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setHintVisible(!hintVisible);
+              setUsedHint(true);
+            }}
+            className="flex items-center justify-center gap-1 py-2 px-2 bg-yellow-400 hover:bg-yellow-500 text-amber-950 font-black rounded-xl border border-yellow-500 text-xs shadow-sm transition active:scale-95"
+          >
+            <Lightbulb className="w-3.5 h-3.5" />
+            <span>{hintVisible ? '隐藏提示' : '灵感锦囊'}</span>
+          </button>
         </div>
       </div>
 
