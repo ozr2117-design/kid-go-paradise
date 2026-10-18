@@ -78,7 +78,7 @@ export const FreePlayView: React.FC<FreePlayViewProps> = ({ showCoordinates }) =
       </div>
 
       {/* 2. RIGHT SIDEBAR: OPTIONS, STATUS & LARGER ACTIONS */}
-      <div className="w-full md:w-80 lg:w-88 xl:w-92 h-full flex flex-col justify-between gap-3 p-0.5 overflow-hidden shrink-0">
+      <div className="w-full md:w-80 lg:w-88 xl:w-92 h-full flex flex-col justify-start gap-3 p-0.5 overflow-y-auto shrink-0">
         {/* Top: Board Size & Turn & Captures Card */}
         <div className="bg-white/95 rounded-2xl p-3 sm:p-3.5 border-2 border-amber-300 shadow-sm flex flex-col gap-3 shrink-0">
           {/* Header & Size switcher */}

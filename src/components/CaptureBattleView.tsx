@@ -143,10 +143,10 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
       </div>
 
       {/* 2. RIGHT SIDEBAR: ANIMAL SELECTOR, DIALOGUE, STATS & ACTIONS */}
-      <div className="w-full md:w-80 lg:w-84 xl:w-88 h-full flex flex-col justify-between gap-2 overflow-y-auto pr-1 shrink-0">
+      <div className="w-full md:w-80 lg:w-84 xl:w-88 h-full flex flex-col justify-start gap-2.5 overflow-y-auto pr-1 shrink-0">
         {/* Top: Animal Opponents Selector */}
-        <div className="bg-white/95 rounded-2xl p-2 border-2 border-amber-300 shadow-sm flex flex-col gap-1.5 shrink-0">
-          <span className="text-[11px] font-black text-amber-950 font-cartoon">选择吃子对战伙伴：</span>
+        <div className="bg-white/95 rounded-2xl p-2.5 border-2 border-amber-300 shadow-sm flex flex-col gap-1.5 shrink-0">
+          <span className="text-xs font-black text-amber-950 font-cartoon">选择吃子对战伙伴：</span>
           <div className="grid grid-cols-3 gap-1.5">
             {ANIMAL_OPPONENTS.map((animal) => {
               const isSelected = animal.id === selectedAnimal.id;
@@ -172,7 +172,7 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
         {/* Middle 1: Opponent Avatar & Live Speech Bubble */}
         <div className="bg-white/95 rounded-2xl p-2.5 sm:p-3 shadow-sm border-2 border-amber-300 flex flex-col gap-2 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-100 to-yellow-200 border-2 border-amber-400 flex items-center justify-center text-2xl shadow-inner shrink-0">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-amber-100 to-yellow-200 border-2 border-amber-400 flex items-center justify-center text-2xl shadow-inner shrink-0">
               {selectedAnimal.avatar}
             </div>
             <div className="min-w-0 flex-1">
@@ -241,7 +241,7 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
         </div>
 
         {/* Bottom: Action Buttons */}
-        <div className="grid grid-cols-3 gap-1.5 shrink-0 pt-0.5 pb-8 sm:pb-10">
+        <div className="grid grid-cols-3 gap-1.5 shrink-0 pt-0.5 pb-1">
           <button
             onClick={handleUndo}
             disabled={boardState.moveHistory.length < 2 || isAiThinking}

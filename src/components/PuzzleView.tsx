@@ -103,24 +103,24 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({
       </div>
 
       {/* 2. RIGHT SIDEBAR: BREADCRUMB, QUESTION & ACTIONS */}
-      <div className="w-full md:w-80 lg:w-84 xl:w-88 h-full flex flex-col justify-between gap-2 overflow-y-auto pr-1 shrink-0">
+      <div className="w-full md:w-80 lg:w-84 xl:w-88 h-full flex flex-col justify-start gap-2.5 overflow-y-auto pr-1 shrink-0">
         {/* Top: Stage info & Prev/Next Navigation */}
-        <div className="bg-white/95 rounded-2xl p-2.5 border-2 border-amber-300 shadow-sm flex flex-col gap-1.5 shrink-0">
+        <div className="bg-white/95 rounded-2xl p-2.5 sm:p-3 border-2 border-amber-300 shadow-sm flex flex-col gap-2 shrink-0">
           {/* Top navigation row */}
           <div className="flex items-center justify-between">
             <button
               onClick={onBackToMap}
-              className="flex items-center gap-1 text-xs font-bold text-amber-900 hover:text-amber-700 bg-amber-100 px-2.5 py-1 rounded-xl border border-amber-300 active:scale-95"
+              className="flex items-center gap-1 text-xs font-bold text-amber-900 hover:text-amber-700 bg-amber-100 px-2.5 py-1 rounded-xl border border-amber-300 active:scale-95 transition"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>返回地图</span>
             </button>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <button
                 onClick={onPrevPuzzle}
                 disabled={!hasPrev}
-                className="py-1 px-2 rounded-lg bg-amber-100 hover:bg-amber-200 disabled:opacity-40 text-amber-900 border border-amber-300 text-xs font-bold flex items-center gap-0.5 active:scale-95"
+                className="py-1 px-2.5 rounded-xl bg-amber-100 hover:bg-amber-200 disabled:opacity-40 text-amber-900 border border-amber-300 text-xs font-bold flex items-center gap-0.5 active:scale-95 transition"
                 title="上一题"
               >
                 <ArrowLeft className="w-3 h-3" />
@@ -129,7 +129,7 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({
               <button
                 onClick={onNextPuzzle}
                 disabled={!hasNext}
-                className="py-1 px-2 rounded-lg bg-amber-100 hover:bg-amber-200 disabled:opacity-40 text-amber-900 border border-amber-300 text-xs font-bold flex items-center gap-0.5 active:scale-95"
+                className="py-1 px-2.5 rounded-xl bg-amber-100 hover:bg-amber-200 disabled:opacity-40 text-amber-900 border border-amber-300 text-xs font-bold flex items-center gap-0.5 active:scale-95 transition"
                 title="下一题"
               >
                 <span>下题</span>
@@ -139,32 +139,32 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({
           </div>
 
           {/* Chapter title (full width, natural wrap, no truncate!) */}
-          <div className="text-center mt-0.5">
+          <div className="text-center">
             <span className="inline-block text-[11px] font-bold text-amber-800 bg-amber-100/90 px-3 py-0.5 rounded-full border border-amber-200">
               {stage.title}
             </span>
           </div>
 
           {/* Puzzle Title */}
-          <h2 className="text-xs sm:text-sm font-black text-amber-950 font-cartoon text-center mt-0.5 leading-snug">
+          <h2 className="text-xs sm:text-sm font-black text-amber-950 font-cartoon text-center leading-snug">
             {puzzle.title}
           </h2>
         </div>
 
         {/* Middle: Question Description & Feedback */}
-        <div className="bg-white/95 rounded-2xl p-2.5 sm:p-3 shadow-sm border-2 border-amber-300 flex flex-col gap-1.5 shrink-0">
-          <h3 className="font-black text-amber-950 text-xs flex items-center gap-1.5 font-cartoon">
-            <HelpCircle className="w-3.5 h-3.5 text-amber-600" />
+        <div className="bg-white/95 rounded-2xl p-2.5 sm:p-3 shadow-sm border-2 border-amber-300 flex flex-col gap-2 shrink-0">
+          <h3 className="font-black text-amber-950 text-xs sm:text-sm flex items-center gap-1.5 font-cartoon">
+            <HelpCircle className="w-4 h-4 text-amber-600" />
             <span>闯关任务</span>
           </h3>
-          <p className="text-xs font-bold text-amber-900 leading-relaxed bg-amber-50 p-2 rounded-xl border border-amber-200">
+          <p className="text-xs sm:text-sm font-bold text-amber-900 leading-relaxed bg-amber-50 p-2.5 rounded-xl border border-amber-200">
             {puzzle.description}
           </p>
 
           {/* Real-time Feedback alert */}
           {feedback && (
             <div
-              className={`p-2 rounded-xl text-xs font-bold animate-pop-in ${
+              className={`p-2.5 rounded-xl text-xs font-bold animate-pop-in ${
                 feedback.includes('🎉')
                   ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
                   : 'bg-orange-100 text-orange-950 border border-orange-300'
@@ -177,22 +177,22 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({
 
         {/* Hint Card */}
         {hintVisible && (
-          <div className="bg-yellow-100/95 rounded-2xl p-2.5 shadow-sm border-2 border-yellow-400 animate-pop-in shrink-0">
-            <div className="flex items-center gap-1 text-amber-900 font-black text-xs mb-1">
-              <Lightbulb className="w-3.5 h-3.5 text-amber-700" />
+          <div className="bg-yellow-100/95 rounded-2xl p-3 shadow-sm border-2 border-yellow-400 animate-pop-in shrink-0">
+            <div className="flex items-center gap-1.5 text-amber-900 font-black text-xs sm:text-sm mb-1">
+              <Lightbulb className="w-4 h-4 text-amber-700" />
               <span>锦囊提示：</span>
             </div>
-            <p className="text-[11px] font-bold text-amber-800 leading-normal">{puzzle.hint}</p>
+            <p className="text-xs font-bold text-amber-900 leading-relaxed">{puzzle.hint}</p>
           </div>
         )}
 
         {/* Bottom: Action Buttons */}
-        <div className="grid grid-cols-2 gap-1.5 shrink-0 pt-0.5">
+        <div className="grid grid-cols-2 gap-2 shrink-0 pt-0.5">
           <button
             onClick={resetPuzzle}
-            className="flex items-center justify-center gap-1 py-2 px-2 bg-white hover:bg-amber-50 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs shadow-sm transition active:scale-95"
+            className="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-white hover:bg-amber-50 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs sm:text-sm shadow-xs transition active:scale-95"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
+            <RotateCcw className="w-4 h-4 text-amber-700" />
             <span>重新摆题</span>
           </button>
 
@@ -201,9 +201,9 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({
               setHintVisible(!hintVisible);
               setUsedHint(true);
             }}
-            className="flex items-center justify-center gap-1 py-2 px-2 bg-yellow-400 hover:bg-yellow-500 text-amber-950 font-black rounded-xl border border-yellow-500 text-xs shadow-sm transition active:scale-95"
+            className="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-yellow-400 hover:bg-yellow-500 text-amber-950 font-black rounded-xl border border-yellow-500 text-xs sm:text-sm shadow-xs transition active:scale-95"
           >
-            <Lightbulb className="w-3.5 h-3.5" />
+            <Lightbulb className="w-4 h-4 text-amber-900" />
             <span>{hintVisible ? '隐藏提示' : '灵感锦囊'}</span>
           </button>
         </div>
