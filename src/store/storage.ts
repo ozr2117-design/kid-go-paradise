@@ -5,6 +5,7 @@ export interface UserProgress {
   soundMuted: boolean;
   showCoordinates: boolean;
   battleWins: Record<string, number>; // animalId -> wins
+  mistakePuzzles: string[]; // puzzleId list of mistakes to eliminate
 }
 
 const STORAGE_KEY = 'kid_go_user_progress_v1';
@@ -20,6 +21,7 @@ const defaultProgress: UserProgress = {
     bear: 0,
     fox: 0,
   },
+  mistakePuzzles: [],
 };
 
 export class ProgressStore {
@@ -28,7 +30,12 @@ export class ProgressStore {
     try {
       const data = localStorage.getItem(STORAGE_KEY);
       if (data) {
-        return { ...defaultProgress, ...JSON.parse(data) };
+        const parsed = JSON.parse(data);
+        return {
+          ...defaultProgress,
+          ...parsed,
+          mistakePuzzles: Array.isArray(parsed.mistakePuzzles) ? parsed.mistakePuzzles : [],
+        };
       }
     } catch (e) {
       console.warn('Failed to load user progress:', e);
@@ -45,6 +52,24 @@ export class ProgressStore {
     }
   }
 
+  static recordMistake(puzzleId: string): UserProgress {
+    const p = this.load();
+    if (!p.mistakePuzzles.includes(puzzleId)) {
+      p.mistakePuzzles.push(puzzleId);
+      this.save(p);
+    }
+    return p;
+  }
+
+  static resolveMistake(puzzleId: string): UserProgress {
+    const p = this.load();
+    if (p.mistakePuzzles.includes(puzzleId)) {
+      p.mistakePuzzles = p.mistakePuzzles.filter((id) => id !== puzzleId);
+      this.save(p);
+    }
+    return p;
+  }
+
   static recordPuzzleSuccess(puzzleId: string, stageId: number, starsEarned: number = 3): UserProgress {
     const p = this.load();
     const prevStars = p.stars[puzzleId] || 0;
@@ -52,6 +77,11 @@ export class ProgressStore {
 
     if (!p.completedPuzzles.includes(puzzleId)) {
       p.completedPuzzles.push(puzzleId);
+    }
+
+    // Automatically eliminate from mistake notebook once solved!
+    if (p.mistakePuzzles.includes(puzzleId)) {
+      p.mistakePuzzles = p.mistakePuzzles.filter((id) => id !== puzzleId);
     }
 
     // Unlock next stage if this stage is finished

@@ -3,6 +3,7 @@ import { AnimalOpponent, BoardState, Point } from '../types/go';
 import { ANIMAL_OPPONENTS } from '../data/animals';
 import { GoCore } from '../engine/go-core';
 import { GoAI } from '../engine/go-ai';
+import { SoundEngine } from '../engine/sound-engine';
 import { GoBoard } from './GoBoard';
 import { WinModal } from './WinModal';
 import { RotateCcw, Undo2, Eye, Award } from 'lucide-react';
@@ -25,34 +26,46 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
   const [isAiThinking, setIsAiThinking] = useState<boolean>(false);
   const [isWinModalOpen, setIsWinModalOpen] = useState<boolean>(false);
 
+  const updateDialogue = useCallback((text: string) => {
+    setAnimalDialogue(text);
+    SoundEngine.speakText(text);
+  }, []);
+
   // Initialize board when changing opponent
-  const initGame = useCallback((animal: AnimalOpponent) => {
+  const initGame = useCallback((animal: AnimalOpponent = selectedAnimal) => {
     setSelectedAnimal(animal);
     setBoardState(GoCore.createEmptyBoard(animal.boardSize));
-    setAnimalDialogue(animal.intro);
+    updateDialogue(animal.intro);
     setIsWinModalOpen(false);
     setIsAiThinking(false);
-  }, []);
+  }, [selectedAnimal, updateDialogue]);
 
   // Handle Player (Black) Move
   const handlePlayerMove = (point: Point) => {
     if (boardState.isGameOver || boardState.turn !== 'black' || isAiThinking) return;
 
     const result = GoCore.playMove(boardState, point, 'black', selectedAnimal.captureTarget);
-    if (result.error) return;
+    if (result.error) {
+      SoundEngine.playErrorSound();
+      return;
+    }
 
     setBoardState(result.nextState);
 
     // If player captured stones
     if (result.captured.length > 0) {
+      SoundEngine.playCaptureSound();
       const praise =
         selectedAnimal.praises[Math.floor(Math.random() * selectedAnimal.praises.length)];
-      setAnimalDialogue(praise);
+      updateDialogue(praise);
+    } else {
+      SoundEngine.playStoneSound();
     }
 
     // Check game over
     if (result.nextState.isGameOver) {
       if (result.nextState.winner === 'black') {
+        SoundEngine.playVictoryFanfare();
         onWinRecord(selectedAnimal.id);
         setIsWinModalOpen(true);
       }
@@ -91,14 +104,19 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
           setBoardState(aiResult.nextState);
 
           if (aiResult.captured.length > 0) {
-            setAnimalDialogue('嘿嘿，我吃到你的棋子啦！不过不要灰心哦～');
-          } else if (Math.random() < 0.3) {
-            const taunt =
-              selectedAnimal.taunts[Math.floor(Math.random() * selectedAnimal.taunts.length)];
-            setAnimalDialogue(taunt);
+            SoundEngine.playCaptureSound();
+            updateDialogue('嘿嘿，我吃到你的棋子啦！不过不要灰心哦～');
+          } else {
+            SoundEngine.playStoneSound();
+            if (Math.random() < 0.3) {
+              const taunt =
+                selectedAnimal.taunts[Math.floor(Math.random() * selectedAnimal.taunts.length)];
+              updateDialogue(taunt);
+            }
           }
 
           if (aiResult.nextState.isGameOver && aiResult.nextState.winner === 'black') {
+            SoundEngine.playVictoryFanfare();
             onWinRecord(selectedAnimal.id);
             setIsWinModalOpen(true);
           }
@@ -106,7 +124,7 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
           // AI passes
           const passed = GoCore.pass(current);
           setBoardState(passed);
-          setAnimalDialogue('我找不到合适的地方下了，这一手我虚手（Pass）～');
+          updateDialogue('我找不到合适的地方下了，这一手我虚手（Pass）～');
         }
 
         setIsAiThinking(false);
@@ -114,7 +132,7 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
 
       return () => clearTimeout(timer);
     }
-  }, [boardState.turn, boardState.isGameOver, selectedAnimal, onWinRecord]);
+  }, [boardState.turn, boardState.isGameOver, selectedAnimal, onWinRecord, updateDialogue]);
 
   // Undo Move (Take back 2 moves: player + AI)
   const handleUndo = () => {

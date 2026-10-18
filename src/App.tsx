@@ -100,6 +100,7 @@ export const App: React.FC = () => {
               unlockedStageId={progress.unlockedStageId}
               completedPuzzles={progress.completedPuzzles}
               starsMap={progress.stars}
+              mistakePuzzles={progress.mistakePuzzles}
               onSelectPuzzle={handleSelectPuzzle}
             />
             {/* Footer Encouragement Note */}
@@ -125,6 +126,7 @@ export const App: React.FC = () => {
             puzzle={activePuzzle}
             stage={activeStage}
             onPuzzleComplete={handlePuzzleComplete}
+            onPuzzleMistake={() => setProgress(ProgressStore.load())}
             onNextPuzzle={handleNextPuzzle}
             onPrevPuzzle={handlePrevPuzzle}
             onBackToMap={() => setCurrentMode('adventure')}

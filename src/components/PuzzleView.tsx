@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { BoardState, Point, PuzzleData, StageInfo } from '../types/go';
 import { GoCore } from '../engine/go-core';
+import { SoundEngine } from '../engine/sound-engine';
+import { ProgressStore } from '../store/storage';
 import { GoBoard } from './GoBoard';
 import { WinModal } from './WinModal';
-import { Lightbulb, RotateCcw, ArrowLeft, ArrowRight, HelpCircle } from 'lucide-react';
+import { Lightbulb, RotateCcw, ArrowLeft, ArrowRight, HelpCircle, BookOpen } from 'lucide-react';
 
 interface PuzzleViewProps {
   puzzle: PuzzleData;
   stage: StageInfo;
   onPuzzleComplete: (puzzleId: string, stageId: number, stars: number) => void;
+  onPuzzleMistake?: () => void;
   onNextPuzzle?: () => void;
   onPrevPuzzle?: () => void;
   onBackToMap: () => void;
@@ -21,6 +24,7 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({
   puzzle,
   stage,
   onPuzzleComplete,
+  onPuzzleMistake,
   onNextPuzzle,
   onPrevPuzzle,
   onBackToMap,
@@ -64,7 +68,9 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({
     // Check legality first
     const check = GoCore.isLegalMove(boardState, point, puzzle.initialTurn);
     if (!check.legal) {
+      SoundEngine.playErrorSound();
       setFeedback(`❌ ${check.reason || '不能下在这里哦'}`);
+      SoundEngine.speakText('不能下在这里哦');
       return;
     }
 
@@ -77,15 +83,28 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({
     setBoardState(playRes.nextState);
 
     if (isCorrectMove) {
+      ProgressStore.resolveMistake(puzzle.id);
+      if (playRes.captured.length > 0) {
+        SoundEngine.playCaptureSound();
+      } else {
+        SoundEngine.playStoneSound();
+      }
       const praise = puzzle.solutionTree.comment || '太棒了！完全正确！';
       setFeedback(`🎉 ${praise}`);
+      SoundEngine.speakText(praise);
       const starsEarned = usedHint ? 2 : 3;
       onPuzzleComplete(puzzle.id, stage.id, starsEarned);
       setTimeout(() => {
+        SoundEngine.playVictoryFanfare();
         setIsWinModalOpen(true);
       }, 400);
     } else {
-      setFeedback('🤔 咦，这步棋不是最佳解法哦，再想想看！');
+      ProgressStore.recordMistake(puzzle.id);
+      onPuzzleMistake?.();
+      SoundEngine.playErrorSound();
+      const retryMsg = '🤔 咦，这步棋不是最佳解法哦，再想想看！';
+      setFeedback(retryMsg);
+      SoundEngine.speakText('这步棋不是最佳解法哦，再想想看！');
     }
   };
 

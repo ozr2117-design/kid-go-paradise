@@ -1,12 +1,13 @@
 import React from 'react';
 import { ADVENTURE_STAGES } from '../data/stages';
 import { PuzzleData, StageInfo } from '../types/go';
-import { Star, Lock, Play, Award } from 'lucide-react';
+import { Star, Lock, Play, Award, BookOpen } from 'lucide-react';
 
 interface AdventureMapProps {
   unlockedStageId: number;
   completedPuzzles: string[];
   starsMap: Record<string, number>;
+  mistakePuzzles?: string[];
   onSelectPuzzle: (puzzle: PuzzleData, stage: StageInfo) => void;
 }
 
@@ -14,8 +15,11 @@ export const AdventureMap: React.FC<AdventureMapProps> = ({
   unlockedStageId,
   completedPuzzles,
   starsMap,
+  mistakePuzzles = [],
   onSelectPuzzle,
 }) => {
+  const mistakeCount = mistakePuzzles.length;
+
   return (
     <div className="w-full max-w-4xl mx-auto p-4 flex flex-col gap-6">
       {/* Adventure Header Banner */}
@@ -29,9 +33,33 @@ export const AdventureMap: React.FC<AdventureMapProps> = ({
             一步一步闯关摘星星，掌握从吃子到做眼的围棋绝招！
           </p>
         </div>
-        <div className="hidden sm:flex flex-col items-center bg-white/70 px-4 py-2 rounded-2xl border border-amber-300">
-          <Award className="w-8 h-8 text-amber-600" />
-          <span className="text-xs font-bold text-amber-900 mt-1">启蒙成就</span>
+        <div className="flex items-center gap-2">
+          {mistakeCount > 0 && (
+            <button
+              onClick={() => {
+                for (const stage of ADVENTURE_STAGES) {
+                  const found = stage.puzzles.find((p) => mistakePuzzles.includes(p.id));
+                  if (found) {
+                    onSelectPuzzle(found, stage);
+                    break;
+                  }
+                }
+              }}
+              className="flex flex-col items-center bg-white/95 hover:bg-white text-red-900 px-3 py-1.5 rounded-2xl border-2 border-red-400 shadow-sm transition active:scale-95 animate-pulse"
+              title="点击进入错题本逐个攻克"
+            >
+              <div className="flex items-center gap-1 font-cartoon text-xs sm:text-sm font-black text-red-700">
+                <BookOpen className="w-3.5 h-3.5 text-red-600" />
+                <span>消灭错题营</span>
+              </div>
+              <span className="text-[10px] font-bold text-red-600">剩余 {mistakeCount} 题待攻克</span>
+            </button>
+          )}
+
+          <div className="hidden sm:flex flex-col items-center bg-white/70 px-4 py-2 rounded-2xl border border-amber-300">
+            <Award className="w-8 h-8 text-amber-600" />
+            <span className="text-xs font-bold text-amber-900 mt-1">启蒙成就</span>
+          </div>
         </div>
       </div>
 
@@ -92,9 +120,16 @@ export const AdventureMap: React.FC<AdventureMapProps> = ({
                       }`}
                     >
                       <div className="flex items-start justify-between">
-                        <span className="text-xs font-black px-2 py-0.5 rounded-full bg-amber-200 text-amber-900">
-                          第 {pIdx + 1} 关
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-black px-2 py-0.5 rounded-full bg-amber-200 text-amber-900">
+                            第 {pIdx + 1} 关
+                          </span>
+                          {mistakePuzzles.includes(puzzle.id) && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-red-100 text-red-700 border border-red-300 animate-pulse">
+                              待攻克
+                            </span>
+                          )}
+                        </div>
                         {/* Stars */}
                         <div className="flex items-center gap-0.5">
                           {[1, 2, 3].map((s) => (

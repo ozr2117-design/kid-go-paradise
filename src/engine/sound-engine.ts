@@ -18,10 +18,39 @@ export class SoundEngine {
 
   static setMuted(muted: boolean) {
     this.isMuted = muted;
+    if (muted && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
   }
 
   static getMuted(): boolean {
     return this.isMuted;
+  }
+
+  /**
+   * Speak friendly kid dialogue using native Web Speech API
+   */
+  static speakText(text: string) {
+    if (this.isMuted) return;
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    try {
+      window.speechSynthesis.cancel();
+      const clean = text.replace(/[*#_~`“”"']/g, '').trim();
+      if (!clean) return;
+      const utterance = new SpeechSynthesisUtterance(clean);
+      utterance.lang = 'zh-CN';
+      utterance.rate = 1.05; // Lively pace for kids
+      utterance.pitch = 1.25; // Warm, friendly higher tone
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      // Graceful silence if speech not supported or blocked
+    }
+  }
+
+  static stopSpeech() {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
   }
 
   /**
