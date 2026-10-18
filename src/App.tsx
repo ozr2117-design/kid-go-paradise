@@ -80,7 +80,7 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className={`bg-[#fdfaf5] flex flex-col select-none ${currentMode !== 'adventure' ? 'h-screen max-h-screen overflow-hidden' : 'min-h-screen'}`}>
+    <div className="h-screen max-h-screen bg-[#fdfaf5] flex flex-col select-none overflow-hidden">
       {/* Top Navbar */}
       <KidNavbar
         currentMode={currentMode}
@@ -93,14 +93,20 @@ export const App: React.FC = () => {
       />
 
       {/* Main Content Area */}
-      <main className={`flex-1 flex flex-col items-center justify-start w-full min-h-0 ${currentMode !== 'adventure' ? 'p-1 overflow-hidden' : 'py-1 sm:py-2 px-1 sm:px-3'}`}>
+      <main className={`flex-1 w-full min-h-0 ${currentMode === 'adventure' ? 'overflow-y-auto py-2 px-2 sm:px-4' : 'p-1 overflow-hidden flex flex-col items-center justify-center'}`}>
         {currentMode === 'adventure' && (
-          <AdventureMap
-            unlockedStageId={progress.unlockedStageId}
-            completedPuzzles={progress.completedPuzzles}
-            starsMap={progress.stars}
-            onSelectPuzzle={handleSelectPuzzle}
-          />
+          <div className="flex flex-col items-center w-full">
+            <AdventureMap
+              unlockedStageId={progress.unlockedStageId}
+              completedPuzzles={progress.completedPuzzles}
+              starsMap={progress.stars}
+              onSelectPuzzle={handleSelectPuzzle}
+            />
+            {/* Footer Encouragement Note */}
+            <footer className="text-center py-4 text-xs font-bold text-amber-800/60 border-t border-amber-200 bg-amber-50/50 w-full mt-4">
+              棋虽小道，品德最尊 · 少儿围棋趣味启蒙乐园
+            </footer>
+          </div>
         )}
 
         {currentMode === 'battle' && (
@@ -132,13 +138,6 @@ export const App: React.FC = () => {
           <FreePlayView showCoordinates={progress.showCoordinates} />
         )}
       </main>
-
-      {/* Footer Encouragement Note (only on adventure map) */}
-      {currentMode === 'adventure' && (
-        <footer className="text-center py-2 text-xs font-bold text-amber-800/60 border-t border-amber-200 bg-amber-50/50">
-          棋虽小道，品德最尊 · 少儿围棋趣味启蒙乐园
-        </footer>
-      )}
     </div>
   );
 };

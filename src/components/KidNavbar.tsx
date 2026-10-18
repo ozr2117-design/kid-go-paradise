@@ -48,9 +48,12 @@ export const KidNavbar: React.FC<KidNavbarProps> = ({
         </div>
 
         {/* Stars counter */}
-        <div className="flex items-center gap-1.5 bg-yellow-400 text-amber-900 font-black px-3 py-1 rounded-full shadow-inner border border-yellow-300">
-          <Sparkles className="w-4 h-4 text-amber-700 fill-amber-700" />
-          <span className="text-base font-cartoon">⭐ {totalStars}</span>
+        <div
+          title="通关累计获得的星星总数（每过一关摘得2~3颗星）"
+          className="flex items-center gap-1.5 bg-yellow-400 text-amber-900 font-black px-2.5 py-0.5 rounded-full shadow-inner border border-yellow-300"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-amber-700 fill-amber-700" />
+          <span className="text-xs sm:text-sm font-cartoon">⭐ {totalStars}星</span>
         </div>
       </div>
 
