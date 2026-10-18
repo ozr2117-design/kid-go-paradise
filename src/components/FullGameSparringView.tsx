@@ -1,9 +1,18 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { BoardSize, BoardState, Color, Point, AISparringLevel, SparringProfile } from '../types/go';
+import {
+  BoardSize,
+  BoardState,
+  Color,
+  Point,
+  AISparringLevel,
+  SparringProfile,
+  WinRuleMode,
+  GameSettlementData,
+} from '../types/go';
 import { GoCore } from '../engine/go-core';
 import { GoAI } from '../engine/go-ai';
 import { GoBoard } from './GoBoard';
-import { WinModal } from './WinModal';
+import { SparringSettlementModal } from './SparringSettlementModal';
 import {
   RotateCcw,
   Undo2,
@@ -14,6 +23,7 @@ import {
   Flame,
   Award,
   Sparkles,
+  Zap,
 } from 'lucide-react';
 
 const SPARRING_PROFILES: SparringProfile[] = [
@@ -45,32 +55,51 @@ interface FullGameSparringViewProps {
 }
 
 export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ showCoordinates }) => {
+  // Game Configuration State
   const [boardSize, setBoardSize] = useState<BoardSize>(9);
   const [playerColor, setPlayerColor] = useState<Color>('black');
   const [aiLevel, setAiLevel] = useState<AISparringLevel>('club');
+  const [winRule, setWinRule] = useState<WinRuleMode>('capture'); // Default to Kid-Friendly Capture Race!
+  const [captureTarget, setCaptureTarget] = useState<number>(5); // Default: First to capture 5 stones wins!
+
+  // Runtime Game State
   const [boardState, setBoardState] = useState<BoardState>(() => GoCore.createEmptyBoard(9));
   const [isAiThinking, setIsAiThinking] = useState<boolean>(false);
   const [showLiberties, setShowLiberties] = useState<boolean>(false);
-  const [statusMessage, setStatusMessage] = useState<string>('对局开始！请在棋盘上落子。');
-  const [isGameOverModalOpen, setIsGameOverModalOpen] = useState<boolean>(false);
-  const [gameOverResult, setGameOverResult] = useState<{ title: string; subtitle: string; stars: number }>({
-    title: '',
-    subtitle: '',
-    stars: 3,
-  });
+  const [aiDialogue, setAiDialogue] = useState<string>('你好呀！今天我们下一盘，看谁能先达成目标！');
+  const [statusMessage, setStatusMessage] = useState<string>('请在棋盘上落子开始！');
+  const [settlementData, setSettlementData] = useState<GameSettlementData | null>(null);
+  const [isSettlementOpen, setIsSettlementOpen] = useState<boolean>(false);
 
   const activeProfile = SPARRING_PROFILES.find((p) => p.id === aiLevel) || SPARRING_PROFILES[1];
+  const aiColor: Color = playerColor === 'black' ? 'white' : 'black';
 
-  // Start a fresh game
+  // Start fresh game
   const startNewGame = useCallback(
-    (sz: BoardSize = boardSize, pColor: Color = playerColor, lvl: AISparringLevel = aiLevel) => {
+    (
+      sz: BoardSize = boardSize,
+      pColor: Color = playerColor,
+      lvl: AISparringLevel = aiLevel,
+      rule: WinRuleMode = winRule,
+      target: number = captureTarget
+    ) => {
       setBoardSize(sz);
       setPlayerColor(pColor);
       setAiLevel(lvl);
-      const emptyBoard = GoCore.createEmptyBoard(sz);
-      setBoardState(emptyBoard);
+      setWinRule(rule);
+      setCaptureTarget(target);
+
+      const empty = GoCore.createEmptyBoard(sz);
+      setBoardState(empty);
       setIsAiThinking(false);
-      setIsGameOverModalOpen(false);
+      setIsSettlementOpen(false);
+      setSettlementData(null);
+
+      if (rule === 'capture') {
+        setAiDialogue(`本盘规则：先吃满 ${target} 颗棋子获胜！看看谁的手法更敏锐～`);
+      } else {
+        setAiDialogue('本盘规则：正规围地盘点目！金角银边，占领更多地盘就能赢！');
+      }
 
       if (pColor === 'white') {
         setStatusMessage('你执白后行，AI 正在思考第一手开局...');
@@ -79,16 +108,123 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
         setStatusMessage('你执黑先行，请占角开局！');
       }
     },
-    [boardSize, playerColor, aiLevel]
+    [boardSize, playerColor, aiLevel, winRule, captureTarget]
   );
 
-  // AI Turn Trigger
+  // Trigger End Game and generate rich settlement data
+  const triggerEndGame = useCallback(
+    (finalState: BoardState, reason?: string, manualWinner?: 'player' | 'ai') => {
+      const est = GoCore.estimateTerritory(finalState);
+      const komi = boardSize === 19 ? 7.5 : boardSize === 13 ? 5.5 : 3.5;
+      const isPlayerBlack = playerColor === 'black';
+
+      const playerCaptures = isPlayerBlack ? finalState.captures.black : finalState.captures.white;
+      const aiCaptures = isPlayerBlack ? finalState.captures.white : finalState.captures.black;
+
+      const playerTerritory = isPlayerBlack ? est.black : est.white + komi;
+      const aiTerritory = isPlayerBlack ? est.white + komi : est.black;
+
+      let winner: 'player' | 'ai' | 'draw' = 'draw';
+      let titleBadge = '坚韧小棋手';
+      let stars = 2;
+      let finalReason = reason || '';
+
+      if (manualWinner) {
+        winner = manualWinner;
+      } else if (winRule === 'capture') {
+        if (playerCaptures >= captureTarget) {
+          winner = 'player';
+          finalReason = `🎯 率先吃满 ${captureTarget} 颗棋子，达成绝杀！`;
+          titleBadge = captureTarget >= 10 ? '屠龙小神将' : '吃子小神童';
+          stars = 3;
+        } else if (aiCaptures >= captureTarget) {
+          winner = 'ai';
+          finalReason = `${activeProfile.name} 率先吃满了 ${captureTarget} 颗棋子。`;
+          titleBadge = '百折不挠小健将';
+          stars = 1;
+        }
+      } else {
+        // Territory mode
+        if (playerTerritory > aiTerritory) {
+          winner = 'player';
+          finalReason = `🏆 终局点目以 ${playerTerritory.toFixed(1)} 目领先 ${activeProfile.name} (${aiTerritory.toFixed(1)} 目)！`;
+          titleBadge = '围地大领主';
+          stars = 3;
+        } else if (aiTerritory > playerTerritory) {
+          winner = 'ai';
+          finalReason = `${activeProfile.name} 最终以 ${aiTerritory.toFixed(1)} 目险胜 (${playerTerritory.toFixed(1)} 目)。`;
+          titleBadge = '实战小达人';
+          stars = 1;
+        } else {
+          winner = 'draw';
+          finalReason = '双方总目数完全一致，握手言和！';
+          titleBadge = '弈林和平使者';
+          stars = 2;
+        }
+      }
+
+      setSettlementData({
+        winner,
+        winReason: finalReason,
+        winRule,
+        playerCaptures,
+        aiCaptures,
+        playerTerritory,
+        aiTerritory,
+        totalMoves: finalState.moveHistory.length,
+        titleBadge,
+        stars,
+      });
+      setIsSettlementOpen(true);
+    },
+    [boardSize, playerColor, winRule, captureTarget, activeProfile.name]
+  );
+
+  // Player Move Handler
+  const handlePlayerMove = (point: Point) => {
+    if (boardState.isGameOver || boardState.turn !== playerColor || isAiThinking) return;
+
+    const targetRule = winRule === 'capture' ? captureTarget : undefined;
+    const res = GoCore.playMove(boardState, point, playerColor, targetRule);
+    if (res.error) {
+      setStatusMessage(`❌ ${res.error}`);
+      return;
+    }
+
+    setBoardState(res.nextState);
+
+    // Dynamic positive audio & visual reaction
+    if (res.captured.length > 0) {
+      const myCaps = playerColor === 'black' ? res.nextState.captures.black : res.nextState.captures.white;
+      if (winRule === 'capture' && myCaps >= captureTarget) {
+        setAiDialogue('哇！你已经吃满目标了，太厉害了！我甘拜下风！');
+        triggerEndGame(res.nextState);
+        return;
+      } else if (winRule === 'capture' && myCaps === captureTarget - 1) {
+        setAiDialogue('哎呀！我的大子被你提走了，你只要再吃一颗就赢了！我要拼命防守了！');
+      } else {
+        const reactions = [
+          '哎呀！我的棋子被你吃掉了！这步吃子太漂亮了！',
+          '痛痛痛！你居然看穿了我的断点！',
+          '好厉害的打吃！我得小心了！',
+        ];
+        setAiDialogue(reactions[Math.floor(Math.random() * reactions.length)]);
+      }
+      setStatusMessage(`你提掉了对方 ${res.captured.length} 颗棋子！`);
+    } else {
+      setStatusMessage('落子完成，等待 AI 应对...');
+    }
+
+    if (res.nextState.isGameOver) {
+      triggerEndGame(res.nextState);
+    }
+  };
+
+  // AI Turn Logic
   const stateRef = useRef(boardState);
   stateRef.current = boardState;
 
   useEffect(() => {
-    const aiColor: Color = playerColor === 'black' ? 'white' : 'black';
-
     if (boardState.turn === aiColor && !boardState.isGameOver) {
       setIsAiThinking(true);
       const timer = setTimeout(() => {
@@ -98,30 +234,43 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
           return;
         }
 
+        const targetRule = winRule === 'capture' ? captureTarget : undefined;
         const aiMove = GoAI.getBestMove(current, aiColor, {
           sparringLevel: aiLevel,
-          isFullGame: true,
+          captureTarget: targetRule,
+          isFullGame: winRule === 'territory',
         });
 
         if (aiMove) {
-          const res = GoCore.playMove(current, aiMove, aiColor);
+          const res = GoCore.playMove(current, aiMove, aiColor, targetRule);
           setBoardState(res.nextState);
-          setStatusMessage(
-            res.captured.length > 0
-              ? `${activeProfile.name} 落子 (${aiMove.x + 1}, ${aiMove.y + 1}) 并提掉了 ${res.captured.length} 子！`
-              : `${activeProfile.name} 落子于 (${aiMove.x + 1}, ${aiMove.y + 1})`
-          );
+
+          if (res.captured.length > 0) {
+            const aiCaps = aiColor === 'black' ? res.nextState.captures.black : res.nextState.captures.white;
+            if (winRule === 'capture' && aiCaps >= captureTarget) {
+              setAiDialogue('嘿嘿，我吃满目标子数啦！承让承让～');
+              triggerEndGame(res.nextState);
+              setIsAiThinking(false);
+              return;
+            } else {
+              setAiDialogue('嘿嘿，我也吃到了一颗棋子，接下来换你反击啦！');
+            }
+            setStatusMessage(`${activeProfile.name} 提掉了你 ${res.captured.length} 颗棋子！`);
+          } else {
+            setStatusMessage(`${activeProfile.name} 落子于 (${aiMove.x + 1}, ${aiMove.y + 1})`);
+          }
 
           if (res.nextState.isGameOver) {
-            handleEndGame(res.nextState);
+            triggerEndGame(res.nextState);
           }
         } else {
           // AI passes
           const passed = GoCore.pass(current);
           setBoardState(passed);
-          setStatusMessage(`${activeProfile.name} 认为大局已定，选择停一手 (Pass)！`);
+          setAiDialogue('棋局大势已定，边界已经分清，我选择停一手 (Pass)！');
+          setStatusMessage(`${activeProfile.name} 停一手 (Pass)`);
           if (passed.isGameOver) {
-            handleEndGame(passed);
+            triggerEndGame(passed);
           }
         }
 
@@ -130,54 +279,16 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
 
       return () => clearTimeout(timer);
     }
-  }, [boardState.turn, boardState.isGameOver, playerColor, aiLevel, activeProfile.name]);
-
-  // Handle End Game summary
-  const handleEndGame = (state: BoardState) => {
-    const est = GoCore.estimateTerritory(state);
-    const komi = boardSize === 19 ? 7.5 : boardSize === 13 ? 5.5 : 3.5;
-    const totalBlack = est.black;
-    const totalWhite = est.white + komi;
-
-    const isPlayerBlack = playerColor === 'black';
-    const playerTotal = isPlayerBlack ? totalBlack : totalWhite;
-    const aiTotal = isPlayerBlack ? totalWhite : totalBlack;
-
-    if (playerTotal > aiTotal) {
-      setGameOverResult({
-        title: '🏆 恭喜大获全胜！',
-        subtitle: `你的总目数 (${playerTotal.toFixed(1)} 目) 战胜了 ${activeProfile.name} (${aiTotal.toFixed(1)} 目)！`,
-        stars: 3,
-      });
-    } else {
-      setGameOverResult({
-        title: '👏 顽强拼搏，再接再厉！',
-        subtitle: `${activeProfile.name} 稍占优势 (${aiTotal.toFixed(1)} 目比 ${playerTotal.toFixed(1)} 目)。复盘再战吧！`,
-        stars: 1,
-      });
-    }
-    setIsGameOverModalOpen(true);
-  };
-
-  // Player Move
-  const handlePlayerMove = (point: Point) => {
-    if (boardState.isGameOver || boardState.turn !== playerColor || isAiThinking) return;
-
-    const res = GoCore.playMove(boardState, point, playerColor);
-    if (res.error) {
-      setStatusMessage(`❌ ${res.error}`);
-      return;
-    }
-
-    setBoardState(res.nextState);
-    setStatusMessage(
-      res.captured.length > 0 ? `你提掉了对方 ${res.captured.length} 颗棋子！` : '落子完成，等待 AI 应对...'
-    );
-
-    if (res.nextState.isGameOver) {
-      handleEndGame(res.nextState);
-    }
-  };
+  }, [
+    boardState.turn,
+    boardState.isGameOver,
+    aiColor,
+    aiLevel,
+    winRule,
+    captureTarget,
+    activeProfile.name,
+    triggerEndGame,
+  ]);
 
   // Player Pass
   const handlePass = () => {
@@ -186,7 +297,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
     setBoardState(next);
     setStatusMessage('你选择停一手 (Pass)');
     if (next.isGameOver) {
-      handleEndGame(next);
+      triggerEndGame(next);
     }
   };
 
@@ -194,128 +305,231 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
   const handleUndo = () => {
     if (boardState.moveHistory.length < 2 || isAiThinking) return;
     let reverted = GoCore.createEmptyBoard(boardSize);
+    const targetRule = winRule === 'capture' ? captureTarget : undefined;
     const moves = boardState.moveHistory.slice(0, -2);
     for (const m of moves) {
-      reverted = GoCore.playMove(reverted, { x: m.x, y: m.y }, m.color).nextState;
+      reverted = GoCore.playMove(reverted, { x: m.x, y: m.y }, m.color, targetRule).nextState;
     }
     setBoardState(reverted);
+    setAiDialogue('没关系，悔棋重来，再看清气数再下！');
     setStatusMessage('已悔棋回上一个回合');
   };
 
-  // Real-time dynamic territory & win-rate energy bar calculation
+  // Calculate live capture progress & energy bar
+  const myCaptures = playerColor === 'black' ? boardState.captures.black : boardState.captures.white;
+  const oppCaptures = playerColor === 'black' ? boardState.captures.white : boardState.captures.black;
+
   const territory = GoCore.estimateTerritory(boardState);
   const komi = boardSize === 19 ? 7.5 : boardSize === 13 ? 5.5 : 3.5;
   const blackScore = territory.black;
   const whiteScore = territory.white + komi;
-  const totalPoints = blackScore + whiteScore || 1;
-  const blackPercent = Math.min(95, Math.max(5, Math.round((blackScore / totalPoints) * 100)));
+  const totalScore = blackScore + whiteScore || 1;
+  const blackPercent = Math.min(95, Math.max(5, Math.round((blackScore / totalScore) * 100)));
   const whitePercent = 100 - blackPercent;
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-3 sm:p-5 flex flex-col gap-4">
-      {/* Game Setup Header Bar */}
-      <div className="bg-white/90 p-3 sm:p-4 rounded-3xl border-3 border-amber-300 shadow-md flex flex-wrap items-center justify-between gap-3">
-        {/* Board Size Selector */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs sm:text-sm font-black text-amber-950 font-cartoon">棋盘：</span>
-          {([9, 13, 19] as BoardSize[]).map((sz) => (
+    <div className="w-full max-w-4xl mx-auto p-2 sm:p-4 flex flex-col gap-3.5 select-none">
+      {/* 1. TOP RULE & CONTROLS DASHBOARD */}
+      <div className="bg-white/95 p-3 sm:p-4 rounded-3xl border-3 border-amber-300 shadow-md flex flex-col gap-2.5">
+        {/* Row 1: Rule Mode Switcher */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-amber-200">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs sm:text-sm font-black text-amber-950 font-cartoon">胜负规则：</span>
+            {/* Capture Rule Switch */}
             <button
-              key={sz}
-              onClick={() => startNewGame(sz, playerColor, aiLevel)}
-              className={`px-3 py-1 rounded-xl font-bold text-xs sm:text-sm transition ${
-                boardSize === sz
-                  ? 'bg-amber-600 text-white shadow'
-                  : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
+              onClick={() => startNewGame(boardSize, playerColor, aiLevel, 'capture', captureTarget)}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-xl font-bold text-xs sm:text-sm transition ${
+                winRule === 'capture'
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-amber-950 shadow-md scale-105 border-2 border-amber-500'
+                  : 'bg-amber-100/70 hover:bg-amber-200 text-amber-900 border border-amber-300'
               }`}
             >
-              {sz}×{sz}
+              <Swords className="w-3.5 h-3.5" />
+              <span>🎯 吃子决胜（先吃N子获胜）</span>
             </button>
-          ))}
+
+            {/* Territory Rule Switch */}
+            <button
+              onClick={() => startNewGame(boardSize, playerColor, aiLevel, 'territory', captureTarget)}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-xl font-bold text-xs sm:text-sm transition ${
+                winRule === 'territory'
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-amber-950 shadow-md scale-105 border-2 border-amber-500'
+                  : 'bg-amber-100/70 hover:bg-amber-200 text-amber-900 border border-amber-300'
+              }`}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>🏰 正规围地盘（终局点目）</span>
+            </button>
+          </div>
+
+          {/* If Capture Mode: Select target stones count */}
+          {winRule === 'capture' && (
+            <div className="flex items-center gap-1 bg-amber-100/80 p-1 rounded-xl border border-amber-300 animate-pop-in">
+              <span className="text-xs font-bold text-amber-900 px-1">目标:</span>
+              {[1, 3, 5, 10].map((num) => (
+                <button
+                  key={num}
+                  onClick={() => startNewGame(boardSize, playerColor, aiLevel, 'capture', num)}
+                  className={`px-2 py-0.5 rounded-lg text-xs font-black transition ${
+                    captureTarget === num
+                      ? 'bg-amber-600 text-white shadow'
+                      : 'bg-white hover:bg-amber-200 text-amber-900'
+                  }`}
+                >
+                  吃 {num} 子
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Player Color Choice */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs sm:text-sm font-black text-amber-950 font-cartoon">执子：</span>
-          <button
-            onClick={() => startNewGame(boardSize, 'black', aiLevel)}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-xl font-bold text-xs sm:text-sm border transition ${
-              playerColor === 'black'
-                ? 'bg-black text-white border-black shadow'
-                : 'bg-gray-100 hover:bg-gray-200 text-gray-800 border-gray-300'
-            }`}
-          >
-            <span>⚫ 执黑先行</span>
-          </button>
-          <button
-            onClick={() => startNewGame(boardSize, 'white', aiLevel)}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-xl font-bold text-xs sm:text-sm border transition ${
-              playerColor === 'white'
-                ? 'bg-white text-gray-900 border-amber-400 shadow'
-                : 'bg-gray-100 hover:bg-gray-200 text-gray-800 border-gray-300'
-            }`}
-          >
-            <span>⚪ 执白后行</span>
-          </button>
-        </div>
-
-        {/* AI Opponent Selector */}
-        <div className="flex items-center gap-1.5">
-          {SPARRING_PROFILES.map((p) => {
-            const isSelected = p.id === aiLevel;
-            return (
+        {/* Row 2: Board Size, Color & AI Opponent */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {/* Board size */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-black text-amber-950 font-cartoon">棋盘：</span>
+            {([9, 13, 19] as BoardSize[]).map((sz) => (
               <button
-                key={p.id}
-                onClick={() => startNewGame(boardSize, playerColor, p.id)}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-black transition ${
-                  isSelected
-                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow scale-105'
-                    : 'bg-amber-100/70 hover:bg-amber-200 text-amber-900 border border-amber-300'
+                key={sz}
+                onClick={() => startNewGame(sz, playerColor, aiLevel, winRule, captureTarget)}
+                className={`px-2.5 py-1 rounded-xl font-bold text-xs transition ${
+                  boardSize === sz
+                    ? 'bg-amber-600 text-white shadow'
+                    : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
                 }`}
               >
-                <span>{p.avatar}</span>
-                <span>{p.name}</span>
+                {sz}×{sz}
               </button>
-            );
-          })}
+            ))}
+          </div>
+
+          {/* Color choice */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-black text-amber-950 font-cartoon">执子：</span>
+            <button
+              onClick={() => startNewGame(boardSize, 'black', aiLevel, winRule, captureTarget)}
+              className={`px-2.5 py-1 rounded-xl font-bold text-xs border transition ${
+                playerColor === 'black'
+                  ? 'bg-black text-white border-black shadow'
+                  : 'bg-gray-100 text-gray-800 border-gray-300'
+              }`}
+            >
+              ⚫ 执黑先行
+            </button>
+            <button
+              onClick={() => startNewGame(boardSize, 'white', aiLevel, winRule, captureTarget)}
+              className={`px-2.5 py-1 rounded-xl font-bold text-xs border transition ${
+                playerColor === 'white'
+                  ? 'bg-white text-gray-900 border-amber-400 shadow'
+                  : 'bg-gray-100 text-gray-800 border-gray-300'
+              }`}
+            >
+              ⚪ 执白后行
+            </button>
+          </div>
+
+          {/* AI Difficulty Level */}
+          <div className="flex items-center gap-1">
+            {SPARRING_PROFILES.map((p) => {
+              const isSelected = p.id === aiLevel;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => startNewGame(boardSize, playerColor, p.id, winRule, captureTarget)}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-xl text-xs font-black transition ${
+                    isSelected
+                      ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow scale-105'
+                      : 'bg-amber-100/70 hover:bg-amber-200 text-amber-900 border border-amber-300'
+                  }`}
+                >
+                  <span>{p.avatar}</span>
+                  <span>{p.name}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      {/* Live Win Rate & Territory Energy Bar */}
-      <div className="bg-gradient-to-r from-amber-200 via-yellow-200 to-amber-200 p-3 rounded-2xl border-2 border-amber-400 shadow-sm">
-        <div className="flex items-center justify-between text-xs font-black text-amber-950 mb-1.5 px-1">
-          <div className="flex items-center gap-1.5">
-            <span className="w-3.5 h-3.5 rounded-full bg-black inline-block border border-gray-700" />
-            <span>黑方: {blackScore} 目</span>
-            <span className="text-gray-500 font-normal">({blackPercent}%)</span>
+      {/* 2. DYNAMIC LIVE FEEDBACK & PROGRESS BAR */}
+      {winRule === 'capture' ? (
+        /* Capture Race Badge Tracker */
+        <div className="bg-gradient-to-r from-yellow-200 via-amber-200 to-orange-200 p-2.5 sm:p-3 rounded-2xl border-2 border-amber-400 shadow-sm flex items-center justify-between">
+          {/* Player Progress */}
+          <div className="flex items-center gap-2">
+            <span className="w-5 h-5 rounded-full bg-black inline-block border border-gray-800 shadow-sm" />
+            <div>
+              <div className="text-xs font-bold text-amber-950">小棋手 (你)</div>
+              <div className="flex items-center gap-1 mt-0.5">
+                <span className="text-xl font-black text-emerald-700 font-cartoon">
+                  {myCaptures}
+                </span>
+                <span className="text-xs text-gray-600 font-bold">/ {captureTarget} 子</span>
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-1 text-amber-800 font-cartoon">
-            <Flame className="w-4 h-4 text-orange-500 fill-orange-500 animate-pulse" />
-            <span>全局实时形势预测</span>
+          {/* Central Target Status & Milestone Alert */}
+          <div className="text-center px-2">
+            {myCaptures >= captureTarget - 1 && myCaptures < captureTarget ? (
+              <span className="text-xs font-black text-red-600 bg-red-100 px-3 py-1 rounded-full border border-red-300 animate-bounce flex items-center gap-1">
+                <Zap className="w-3.5 h-3.5 fill-current" />
+                <span>赛点！再吃 1 颗直接绝杀！</span>
+              </span>
+            ) : (
+              <span className="text-xs font-bold text-amber-900 bg-white/70 px-2.5 py-0.5 rounded-full border border-amber-300 font-cartoon">
+                先吃满 {captureTarget} 颗胜
+              </span>
+            )}
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <span className="text-gray-500 font-normal">({whitePercent}%)</span>
-            <span>白方: {whiteScore.toFixed(1)} 目 (含贴目)</span>
-            <span className="w-3.5 h-3.5 rounded-full bg-white inline-block border border-gray-300" />
+          {/* Opponent Progress */}
+          <div className="flex items-center gap-2 text-right">
+            <div>
+              <div className="text-xs font-bold text-amber-950">{activeProfile.name}</div>
+              <div className="flex items-center justify-end gap-1 mt-0.5">
+                <span className="text-xl font-black text-orange-700 font-cartoon">
+                  {oppCaptures}
+                </span>
+                <span className="text-xs text-gray-600 font-bold">/ {captureTarget} 子</span>
+              </div>
+            </div>
+            <span className="w-5 h-5 rounded-full bg-white inline-block border border-gray-300 shadow-sm" />
           </div>
         </div>
-
-        {/* Dynamic Energy Bar */}
-        <div className="w-full h-3.5 bg-gray-300 rounded-full overflow-hidden flex shadow-inner border border-amber-300">
-          <div
-            style={{ width: `${blackPercent}%` }}
-            className="h-full bg-gradient-to-r from-gray-900 to-gray-700 transition-all duration-500"
-          />
-          <div
-            style={{ width: `${whitePercent}%` }}
-            className="h-full bg-gradient-to-r from-white to-gray-100 transition-all duration-500"
-          />
+      ) : (
+        /* Standard Territory Live Energy Bar */
+        <div className="bg-gradient-to-r from-amber-200 via-yellow-200 to-amber-200 p-2.5 sm:p-3 rounded-2xl border-2 border-amber-400 shadow-sm">
+          <div className="flex items-center justify-between text-xs font-black text-amber-950 mb-1 px-1">
+            <div className="flex items-center gap-1">
+              <span className="w-3.5 h-3.5 rounded-full bg-black inline-block border border-gray-700" />
+              <span>黑方: {blackScore} 目 ({blackPercent}%)</span>
+            </div>
+            <div className="flex items-center gap-1 text-amber-800 font-cartoon">
+              <Flame className="w-4 h-4 text-orange-500 fill-orange-500 animate-pulse" />
+              <span>实时地盘推算</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span>白方: {whiteScore.toFixed(1)} 目 ({whitePercent}%)</span>
+              <span className="w-3.5 h-3.5 rounded-full bg-white inline-block border border-gray-300" />
+            </div>
+          </div>
+          <div className="w-full h-3 bg-gray-300 rounded-full overflow-hidden flex shadow-inner border border-amber-300">
+            <div
+              style={{ width: `${blackPercent}%` }}
+              className="h-full bg-gray-900 transition-all duration-500"
+            />
+            <div
+              style={{ width: `${whitePercent}%` }}
+              className="h-full bg-gray-100 transition-all duration-500"
+            />
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Main Board Arena */}
-      <div className="flex flex-col lg:flex-row items-center justify-center gap-6">
+      {/* 3. MAIN ARENA LAYOUT (Optimized for Tablets & Desktop) */}
+      <div className="flex flex-col lg:flex-row items-center justify-center gap-4 sm:gap-6">
+        {/* Canvas Board Area */}
         <div className="flex flex-col items-center">
           <GoBoard
             state={boardState}
@@ -326,11 +540,11 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
           />
 
           {/* Action buttons */}
-          <div className="flex items-center gap-2.5 mt-3 flex-wrap justify-center">
+          <div className="flex items-center gap-2 sm:gap-3 mt-2.5 flex-wrap justify-center">
             <button
               onClick={handleUndo}
               disabled={boardState.moveHistory.length < 2 || isAiThinking}
-              className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-amber-50 disabled:opacity-40 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs sm:text-sm shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 sm:py-2 bg-white hover:bg-amber-50 disabled:opacity-40 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs sm:text-sm shadow-sm"
             >
               <Undo2 className="w-4 h-4" />
               <span>悔棋一步</span>
@@ -339,15 +553,15 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
             <button
               onClick={handlePass}
               disabled={boardState.turn !== playerColor || isAiThinking}
-              className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-amber-50 disabled:opacity-40 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs sm:text-sm shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 sm:py-2 bg-white hover:bg-amber-50 disabled:opacity-40 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs sm:text-sm shadow-sm"
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>停一手 (Pass)</span>
+              <span>停一手(Pass)</span>
             </button>
 
             <button
               onClick={() => setShowLiberties(!showLiberties)}
-              className={`flex items-center gap-1.5 px-3 py-2 font-bold rounded-xl border text-xs sm:text-sm shadow-sm ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 sm:py-2 font-bold rounded-xl border text-xs sm:text-sm shadow-sm ${
                 showLiberties
                   ? 'bg-emerald-500 text-white border-emerald-600'
                   : 'bg-white text-gray-700 border-gray-300'
@@ -359,7 +573,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
 
             <button
               onClick={() => startNewGame()}
-              className="flex items-center gap-1.5 px-3 py-2 bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold rounded-xl border border-amber-300 text-xs sm:text-sm shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 sm:py-2 bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold rounded-xl border border-amber-300 text-xs sm:text-sm shadow-sm"
             >
               <RotateCcw className="w-4 h-4" />
               <span>重开一盘</span>
@@ -367,10 +581,10 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
           </div>
         </div>
 
-        {/* AI Opponent Status & Game Tips Card */}
+        {/* AI Opponent Speech Bubble & Status Card */}
         <div className="w-full lg:w-72 flex flex-col gap-3">
-          {/* Opponent Card */}
-          <div className="bg-white rounded-3xl p-4 shadow-md border-3 border-amber-300 flex flex-col gap-2">
+          {/* Animal Avatar & Speech */}
+          <div className="bg-white rounded-3xl p-4 shadow-md border-3 border-amber-300 flex flex-col gap-2.5">
             <div className="flex items-center gap-3">
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-100 to-yellow-200 border-2 border-amber-400 flex items-center justify-center text-3xl shadow-inner">
                 {activeProfile.avatar}
@@ -382,59 +596,39 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
                 <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
                   {activeProfile.rank}
                 </span>
-                <p className="text-xs text-gray-600 mt-1 line-clamp-1">{activeProfile.description}</p>
+                <p className="text-xs text-gray-600 mt-0.5 line-clamp-1">{activeProfile.description}</p>
               </div>
             </div>
 
-            {/* Current status display */}
-            <div className="mt-2 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs font-bold text-amber-950">
+            {/* Dynamic AI speech bubble */}
+            <div className="bg-amber-50 p-3 rounded-2xl border border-amber-200 text-xs sm:text-sm font-bold text-amber-950 relative">
+              <div className="absolute -top-1.5 left-6 w-3 h-3 bg-amber-50 border-t border-l border-amber-200 transform rotate-45"></div>
               {isAiThinking ? (
                 <div className="flex items-center gap-2 text-amber-600 animate-pulse">
                   <Bot className="w-4 h-4" />
                   <span>{activeProfile.name} 正在深度推演局势...</span>
                 </div>
               ) : (
-                <div>{statusMessage}</div>
+                <span>“{aiDialogue}”</span>
               )}
             </div>
           </div>
 
-          {/* Capture Count & Komi Information */}
-          <div className="bg-white rounded-3xl p-4 shadow-md border-3 border-amber-300 flex flex-col gap-2">
-            <h4 className="font-black text-amber-950 text-xs sm:text-sm font-cartoon flex items-center gap-1.5">
-              <Award className="w-4 h-4 text-amber-600" />
-              <span>提子与规则详情</span>
-            </h4>
-            <div className="grid grid-cols-2 gap-2 text-xs font-bold text-center mt-1">
-              <div className="p-2 bg-amber-50 rounded-xl border border-amber-200">
-                <span className="text-gray-600">黑棋提子</span>
-                <div className="text-xl font-black text-amber-900 font-cartoon">
-                  {boardState.captures.black} 颗
-                </div>
-              </div>
-              <div className="p-2 bg-amber-50 rounded-xl border border-amber-200">
-                <span className="text-gray-600">白棋提子</span>
-                <div className="text-xl font-black text-amber-900 font-cartoon">
-                  {boardState.captures.white} 颗
-                </div>
-              </div>
-            </div>
-            <p className="text-xs text-gray-500 text-center mt-1">
-              本盘贴目：白方贴 {komi} 目
-            </p>
+          {/* Current Move Status Banner */}
+          <div className="bg-white rounded-2xl p-3 border-2 border-amber-300 text-xs font-bold text-amber-900 shadow-sm flex items-center justify-between">
+            <span>当前提示：</span>
+            <span className="text-amber-700">{statusMessage}</span>
           </div>
         </div>
       </div>
 
-      {/* Game Over Win/Loss Modal */}
-      <WinModal
-        isOpen={isGameOverModalOpen}
-        title={gameOverResult.title}
-        subtitle={gameOverResult.subtitle}
-        stars={gameOverResult.stars}
-        onRetry={() => startNewGame()}
-        onBackToMap={() => setIsGameOverModalOpen(false)}
-        hasNext={false}
+      {/* 4. VISUAL SETTLEMENT MODAL */}
+      <SparringSettlementModal
+        isOpen={isSettlementOpen}
+        data={settlementData}
+        onPlayAgain={() => startNewGame()}
+        onCloseReview={() => setIsSettlementOpen(false)}
+        onBackToMap={() => setIsSettlementOpen(false)}
       />
     </div>
   );

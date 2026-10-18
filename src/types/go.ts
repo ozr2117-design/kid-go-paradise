@@ -37,15 +37,31 @@ export interface BoardState {
 
 export type GameMode = 'adventure' | 'battle' | 'sparring' | 'puzzle' | 'sandbox';
 
+export type WinRuleMode = 'capture' | 'territory';
+
 export type AISparringLevel = 'novice' | 'club' | 'master';
 
 export interface SparringProfile {
   id: AISparringLevel;
   name: string;
   avatar: string;
-  rank: string; // e.g. "18K (小棋童)", "10K (冲段少年)", "3K~1D (弈林宗师)"
+  rank: string;
   description: string;
 }
+
+export interface GameSettlementData {
+  winner: 'player' | 'ai' | 'draw';
+  winReason: string;
+  winRule: WinRuleMode;
+  playerCaptures: number;
+  aiCaptures: number;
+  playerTerritory: number;
+  aiTerritory: number;
+  totalMoves: number;
+  titleBadge: string;
+  stars: number;
+}
+
 
 export interface PuzzleNode {
   comment?: string;

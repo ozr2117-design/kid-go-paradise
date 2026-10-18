@@ -43,9 +43,10 @@ export const GoBoard: React.FC<GoBoardProps> = ({
     const updateSize = () => {
       if (containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
-        const available = Math.min(rect.width, rect.height > 0 ? rect.height : rect.width);
-        // Clamp size between 280px and 620px
-        const clamped = Math.max(280, Math.min(Math.floor(available), 600));
+        // Allow board to adapt to tablet viewport height in landscape mode
+        const maxFitHeight = Math.max(280, window.innerHeight - 180);
+        const available = Math.min(rect.width, maxFitHeight);
+        const clamped = Math.max(260, Math.min(Math.floor(available), 580));
         setDisplaySize(clamped);
       }
     };
