@@ -31,25 +31,37 @@ describe('GoAI Kid-Friendly Sparring Engine', () => {
       isFullGame: true,
     });
     expect(move).not.toBeNull();
-    // Should choose center (4,4) or a star point like (2,2), (6,2), etc.
     const goodPoints = ['4,4', '2,2', '6,2', '2,6', '6,6'];
     expect(goodPoints).toContain(`${move?.x},${move?.y}`);
   });
 
   it('rescues own stones in Atari during full game sparring', () => {
     let board = GoCore.createEmptyBoard(9);
-    // Black at (4,4), White at (4,3), (4,5), (3,4).
-    // Black only has liberty at (5,4).
     board = GoCore.playMove(board, { x: 4, y: 4 }, 'black').nextState;
     board = GoCore.playMove(board, { x: 4, y: 3 }, 'white').nextState;
     board = GoCore.playMove(board, { x: 4, y: 5 }, 'white').nextState;
     board = GoCore.playMove(board, { x: 3, y: 4 }, 'white').nextState;
 
-    // Black's turn to save itself
     const move = GoAI.getBestMove(board, 'black', {
       sparringLevel: 'club',
       isFullGame: true,
     });
     expect(move).toEqual({ x: 5, y: 4 });
+  });
+
+  it('runs MCTS master level on mid-game position and returns a valid legal move', () => {
+    let board = GoCore.createEmptyBoard(9);
+    board = GoCore.playMove(board, { x: 4, y: 4 }, 'black').nextState;
+    board = GoCore.playMove(board, { x: 2, y: 2 }, 'white').nextState;
+    board = GoCore.playMove(board, { x: 6, y: 6 }, 'black').nextState;
+
+    const move = GoAI.getBestMove(board, 'white', {
+      sparringLevel: 'master',
+      isFullGame: true,
+    });
+    expect(move).not.toBeNull();
+    if (move) {
+      expect(GoCore.isLegalMove(board, move, 'white').legal).toBe(true);
+    }
   });
 });

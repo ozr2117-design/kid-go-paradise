@@ -11,9 +11,42 @@ export interface AIMoveOptions {
   isFullGame?: boolean;
 }
 
+/**
+ * Monte Carlo Tree Search Node
+ */
+class MCTSNode {
+  move: Point | null; // null for root or pass
+  color: Color;
+  parent: MCTSNode | null;
+  children: MCTSNode[] = [];
+  untriedMoves: Point[];
+  visits = 0;
+  wins = 0;
+
+  constructor(
+    move: Point | null,
+    color: Color,
+    parent: MCTSNode | null,
+    untriedMoves: Point[]
+  ) {
+    this.move = move;
+    this.color = color;
+    this.parent = parent;
+    this.untriedMoves = untriedMoves;
+  }
+
+  get uctValue(): number {
+    if (this.visits === 0) return Infinity;
+    const parentVisits = this.parent ? this.parent.visits : 1;
+    const exploitation = this.wins / this.visits;
+    const exploration = 1.414 * Math.sqrt(Math.log(parentVisits) / this.visits);
+    return exploitation + exploration;
+  }
+}
+
 export class GoAI {
   /**
-   * Main entry point: Get best move for either Capture Go or Full Game Go
+   * Main Entry: Choose best move using MCTS or Tactical Engine based on level
    */
   static getBestMove(
     state: BoardState,
@@ -26,146 +59,463 @@ export class GoAI {
     const opponentColor: Color = color === 'black' ? 'white' : 'black';
 
     // 1. Gather all legal moves
-    const legalMoves: Point[] = [];
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        if (GoCore.isLegalMove(state, { x, y }, color).legal) {
-          legalMoves.push({ x, y });
-        }
+    const legalMoves = this.getFastLegalMoves(state, color);
+    if (legalMoves.length === 0) return null;
+
+    // 2. Absolute Urgent Tactical Moves (急所): Immediate capture of opponent groups
+    const instantCaptures = this.findImmediateCaptures(state, color, legalMoves);
+    if (options.captureTarget && instantCaptures.length > 0) {
+      // In capture race mode, always take the immediate capture
+      return instantCaptures[0];
+    }
+
+    // 3. Level-specific Routing:
+    const level: AISparringLevel =
+      options.sparringLevel ||
+      (options.difficulty === 'advanced'
+        ? 'master'
+        : options.difficulty === 'intermediate'
+        ? 'club'
+        : 'novice');
+
+    // Level A: Novice (~20K) - 35% chance to play friendly loose moves
+    if (level === 'novice') {
+      if (Math.random() < 0.35) {
+        const safe = legalMoves.filter(
+          (m) => m.x > 0 && m.x < size - 1 && m.y > 0 && m.y < size - 1
+        );
+        return safe.length > 0
+          ? safe[Math.floor(Math.random() * safe.length)]
+          : legalMoves[Math.floor(Math.random() * legalMoves.length)];
       }
+      return this.getTacticalHeuristicMove(state, color, opponentColor, legalMoves, options);
     }
 
-    if (legalMoves.length === 0) {
-      return null; // Pass
+    // Level B: Club (~10K) - Tactical Engine (Double atari, ladder check, cut/connect, eyes)
+    if (level === 'club') {
+      return this.getTacticalHeuristicMove(state, color, opponentColor, legalMoves, options);
     }
 
-    // 2. If Capture Go mode (with captureTarget)
-    if (options.captureTarget && options.captureTarget > 0) {
-      return this.getCaptureGoMove(state, color, opponentColor, legalMoves, options);
-    }
-
-    // 3. Full Standard Go Sparring Mode (全盘正规对弈)
-    return this.getFullGameMove(state, color, opponentColor, legalMoves, options.sparringLevel || 'club');
+    // Level C: Master (5K ~ 1D) - High Performance MCTS (Monte Carlo Tree Search)
+    // Run 350-500 rollouts with rapid heuristic-guided rollouts
+    const mctsIterations = size === 9 ? 450 : size === 13 ? 250 : 120;
+    return this.runMCTS(state, color, opponentColor, legalMoves, mctsIterations, options);
   }
 
   /**
-   * Capture Go (吃子战) Heuristic
+   * ==========================================
+   * 1. MONTE CARLO TREE SEARCH (MCTS) ENGINE
+   * ==========================================
    */
-  private static getCaptureGoMove(
+  private static runMCTS(
+    rootState: BoardState,
+    aiColor: Color,
+    oppColor: Color,
+    legalMoves: Point[],
+    iterations: number,
+    options: AIMoveOptions
+  ): Point | null {
+    const startTime = Date.now();
+    const maxTimeMs = 450; // Cap execution at 450ms for zero UI lag
+
+    // Prioritize high-value opening book if early in the game on standard board
+    const moveNumber = rootState.moveHistory.length;
+    const hasEmergency = this.hasUrgentAtari(rootState, aiColor, oppColor);
+    if (!hasEmergency && !options.captureTarget && moveNumber < (rootState.size === 9 ? 6 : 14)) {
+      const opening = this.getOpeningBookMove(rootState, legalMoves);
+      if (opening) return opening;
+    }
+
+    // Sort untried moves by quick heuristic so MCTS expands promising moves first
+    const sortedUntried = [...legalMoves].sort((a, b) => {
+      return (
+        this.quickEval(rootState, b, aiColor, oppColor) -
+        this.quickEval(rootState, a, aiColor, oppColor)
+      );
+    });
+
+    const root = new MCTSNode(null, oppColor, null, sortedUntried);
+
+    for (let iter = 0; iter < iterations; iter++) {
+      if (Date.now() - startTime > maxTimeMs) break;
+
+      // 1. Selection
+      let node = root;
+      let simState = GoCore.cloneState(rootState);
+
+      while (node.untriedMoves.length === 0 && node.children.length > 0) {
+        node = this.selectBestUCTChild(node);
+        if (node.move) {
+          const res = GoCore.playMove(simState, node.move, node.color, options.captureTarget);
+          simState = res.nextState;
+        }
+      }
+
+      // 2. Expansion
+      if (node.untriedMoves.length > 0) {
+        const move = node.untriedMoves.shift()!;
+        const nextColor = node.color === 'black' ? 'white' : 'black';
+        const res = GoCore.playMove(simState, move, nextColor, options.captureTarget);
+        simState = res.nextState;
+
+        const childLegal = this.getFastLegalMoves(simState, node.color);
+        const childNode = new MCTSNode(move, nextColor, node, childLegal);
+        node.children.push(childNode);
+        node = childNode;
+      }
+
+      // 3. Rollout / Simulation
+      const winResult = this.fastRollout(simState, node.color, aiColor, options);
+
+      // 4. Backpropagation
+      let curr: MCTSNode | null = node;
+      while (curr !== null) {
+        curr.visits++;
+        if (winResult) {
+          curr.wins += 1;
+        }
+        curr = curr.parent;
+      }
+    }
+
+    if (root.children.length === 0) return legalMoves[0];
+
+    // Pick child with highest visit count (most battle-tested move)
+    root.children.sort((a, b) => b.visits - a.visits);
+    return root.children[0].move;
+  }
+
+  private static selectBestUCTChild(node: MCTSNode): MCTSNode {
+    let best = node.children[0];
+    let maxUCT = -Infinity;
+    for (const child of node.children) {
+      const val = child.uctValue;
+      if (val > maxUCT) {
+        maxUCT = val;
+        best = child;
+      }
+    }
+    return best;
+  }
+
+  /**
+   * Fast Heuristic-Guided Rollout
+   */
+  private static fastRollout(
+    startState: BoardState,
+    currentColor: Color,
+    aiColor: Color,
+    options: AIMoveOptions
+  ): boolean {
+    let state = startState;
+    let turn: Color = currentColor === 'black' ? 'white' : 'black';
+    const maxPlayoutSteps = 16;
+
+    for (let step = 0; step < maxPlayoutSteps; step++) {
+      if (state.isGameOver) break;
+
+      const opp: Color = turn === 'black' ? 'white' : 'black';
+      const legal = this.getFastLegalMoves(state, turn);
+      if (legal.length === 0) break;
+
+      // Heuristic pick: instant capture or save
+      let chosen: Point = legal[0];
+      const captures = this.findImmediateCaptures(state, turn, legal);
+      if (captures.length > 0) {
+        chosen = captures[0];
+      } else {
+        // Pick best of 3 random moves
+        let bestVal = -Infinity;
+        const candidates = legal.length <= 3 ? legal : [
+          legal[Math.floor(Math.random() * legal.length)],
+          legal[Math.floor(Math.random() * legal.length)],
+          legal[Math.floor(Math.random() * legal.length)],
+        ];
+
+        for (const cand of candidates) {
+          const val = this.quickEval(state, cand, turn, opp);
+          if (val > bestVal) {
+            bestVal = val;
+            chosen = cand;
+          }
+        }
+      }
+
+      const res = GoCore.playMove(state, chosen, turn, options.captureTarget);
+      state = res.nextState;
+      turn = opp;
+    }
+
+    // Score evaluation
+    if (options.captureTarget) {
+      const myCaps = state.captures[aiColor];
+      const oppColor: Color = aiColor === 'black' ? 'white' : 'black';
+      const oppCaps = state.captures[oppColor];
+      return myCaps >= options.captureTarget || myCaps > oppCaps;
+    }
+
+    const est = GoCore.estimateTerritory(state);
+    const komi = state.size === 19 ? 7.5 : state.size === 13 ? 5.5 : 3.5;
+    const aiScore = aiColor === 'black' ? est.black : est.white + komi;
+    const oppScore = aiColor === 'black' ? est.white + komi : est.black;
+    return aiScore > oppScore;
+  }
+
+  /**
+   * ==========================================
+   * 2. DEEP TACTICAL COMBAT ENGINE (CLUB LEVEL)
+   * ==========================================
+   */
+  private static getTacticalHeuristicMove(
     state: BoardState,
     color: Color,
     opponentColor: Color,
     legalMoves: Point[],
     options: AIMoveOptions
   ): Point | null {
-    const diff = options.difficulty || 'beginner';
-    if (diff === 'beginner' && Math.random() < 0.4) {
-      return legalMoves[Math.floor(Math.random() * legalMoves.length)];
+    const size = state.size;
+
+    // 1. Immediate Double Atari (双打吃 - One stone threatens two separate groups)
+    const doubleAtaris = this.findDoubleAtariMoves(state, color, legalMoves);
+    if (doubleAtaris.length > 0) {
+      return doubleAtaris[0];
     }
 
-    let bestMove: Point | null = null;
-    let highestScore = -Infinity;
-    const shuffled = [...legalMoves].sort(() => Math.random() - 0.5);
+    // 2. Urgent rescue: Save friendly groups in Atari
+    const rescues = this.findEscapeAtariMoves(state, color, legalMoves);
+    if (rescues.length > 0) {
+      return rescues[0];
+    }
 
-    for (const move of shuffled) {
-      const score = this.evaluateCaptureMove(state, move, color, opponentColor, options);
-      if (score > highestScore) {
-        highestScore = score;
+    // 3. Opening Book if early game and no emergency
+    const hasEmergency = this.hasUrgentAtari(state, color, opponentColor);
+    if (!hasEmergency && !options.captureTarget && state.moveHistory.length < (size === 9 ? 6 : 14)) {
+      const opening = this.getOpeningBookMove(state, legalMoves);
+      if (opening) return opening;
+    }
+
+    // 4. Score all legal moves with rich tactical weights
+    let bestMove: Point | null = null;
+    let maxScore = -Infinity;
+
+    for (const move of legalMoves) {
+      const score = this.evaluateDeepTactics(state, move, color, opponentColor, options);
+      if (score > maxScore) {
+        maxScore = score;
         bestMove = move;
       }
     }
 
-    return bestMove ?? shuffled[0];
+    return bestMove ?? legalMoves[0];
   }
 
   /**
-   * Full Game Go Sparring Heuristic Engine (急所大于大场，兼顾布局与局部杀气)
+   * Deep Tactical Evaluation
    */
-  private static getFullGameMove(
+  private static evaluateDeepTactics(
+    state: BoardState,
+    move: Point,
+    color: Color,
+    oppColor: Color,
+    options: AIMoveOptions
+  ): number {
+    let score = 0;
+    const size = state.size;
+
+    const sim = GoCore.playMove(state, move, color, options.captureTarget);
+    if (sim.error) return -99999;
+
+    const captured = sim.captured.length;
+    if (captured > 0) {
+      score += captured * 700;
+      if (options.captureTarget && sim.nextState.captures[color] >= options.captureTarget) {
+        return 1000000; // Immediate win in capture mode
+      }
+    }
+
+    const myGroup = GoCore.findGroup(sim.nextState.grid, move);
+    if (!myGroup) return -99999;
+    const myLibs = myGroup.liberties.length;
+
+    // Self-Atari penalty
+    if (myLibs === 1 && captured === 0) {
+      return -12000;
+    } else if (myLibs === 2) {
+      score += 40;
+    } else if (myLibs >= 3) {
+      score += Math.min(myLibs, 5) * 60;
+    }
+
+    // Rescuing stones in Atari
+    const neighborsFriendly = GoCore.getNeighbors(move, size).filter(
+      (n) => state.grid[n.y][n.x] === color
+    );
+    for (const fn of neighborsFriendly) {
+      const orig = GoCore.findGroup(state.grid, fn);
+      if (orig && orig.liberties.length === 1) {
+        score += orig.points.length * 1000;
+      }
+    }
+
+    // Threatening opponent stones (Atari & Semiai tightening)
+    const neighborsOpp = GoCore.getNeighbors(move, size).filter(
+      (n) => sim.nextState.grid[n.y][n.x] === oppColor
+    );
+    for (const on of neighborsOpp) {
+      const oppGrp = GoCore.findGroup(sim.nextState.grid, on);
+      if (oppGrp) {
+        if (oppGrp.liberties.length === 1) {
+          score += oppGrp.points.length * 600;
+        } else if (oppGrp.liberties.length === 2) {
+          score += 180;
+        }
+      }
+    }
+
+    // Cutting and connecting
+    if (neighborsFriendly.length >= 2) score += 220; // Bamboo / solid connection
+    if (neighborsOpp.length >= 2) score += 280; // Powerful cutting move!
+
+    // Line 3 (Territory) & Line 4 (Influence)
+    const dEdge = Math.min(move.x, size - 1 - move.x, move.y, size - 1 - move.y);
+    if (dEdge === 2 || dEdge === 3) {
+      score += 100;
+    } else if (dEdge === 0 && captured === 0 && state.moveHistory.length < size * 3) {
+      score -= 300; // Death line
+    }
+
+    // Eye shape creation (两眼活棋)
+    const diagonals = [
+      { x: move.x - 1, y: move.y - 1 },
+      { x: move.x + 1, y: move.y - 1 },
+      { x: move.x - 1, y: move.y + 1 },
+      { x: move.x + 1, y: move.y + 1 },
+    ].filter((p) => GoCore.isInside(p, size));
+
+    let diagFriendly = 0;
+    for (const d of diagonals) {
+      if (sim.nextState.grid[d.y][d.x] === color) diagFriendly++;
+    }
+    if (diagFriendly >= 2) score += 80;
+
+    return score;
+  }
+
+  /**
+   * Fast evaluation for rollout selection
+   */
+  private static quickEval(state: BoardState, move: Point, color: Color, oppColor: Color): number {
+    let score = 0;
+    const sim = GoCore.playMove(state, move, color);
+    if (sim.error) return -9999;
+    if (sim.captured.length > 0) score += sim.captured.length * 400;
+
+    const grp = GoCore.findGroup(sim.nextState.grid, move);
+    if (grp) {
+      if (grp.liberties.length === 1 && sim.captured.length === 0) return -8000;
+      score += grp.liberties.length * 20;
+    }
+    return score;
+  }
+
+  /**
+   * Helper: Find immediate captures of 1-liberty groups
+   */
+  private static findImmediateCaptures(
     state: BoardState,
     color: Color,
-    opponentColor: Color,
-    legalMoves: Point[],
-    level: AISparringLevel
-  ): Point | null {
-    const size = state.size;
-    const moveNumber = state.moveHistory.length;
+    legalMoves: Point[]
+  ): Point[] {
+    const list: Point[] = [];
+    const oppColor: Color = color === 'black' ? 'white' : 'black';
 
-    // Check if there is an immediate tactical emergency (stones in Atari)
-    const hasEmergency = this.hasUrgentAtari(state, color, opponentColor);
-
-    // A. Early Fuseki / Opening Book (开局占角：仅在无局部紧急战斗时使用)
-    if (!hasEmergency && moveNumber < (size === 9 ? 6 : size === 13 ? 12 : 20)) {
-      const openingMove = this.getOpeningBookMove(state, color, legalMoves);
-      if (openingMove && (level !== 'novice' || Math.random() < 0.6)) {
-        return openingMove;
-      }
-    }
-
-    // B. Novice level: occasionally makes intuitive light mistakes
-    if (level === 'novice' && !hasEmergency && Math.random() < 0.35) {
-      const safeMoves = legalMoves.filter(
-        (m) => m.x > 0 && m.x < size - 1 && m.y > 0 && m.y < size - 1
-      );
-      if (safeMoves.length > 0) {
-        return safeMoves[Math.floor(Math.random() * safeMoves.length)];
-      }
-    }
-
-    // C. Candidate Move Scoring
-    const candidatesWithScore = legalMoves.map((m) => ({
-      point: m,
-      score: this.evaluateFullGameMove(state, m, color, opponentColor, level),
-    }));
-
-    candidatesWithScore.sort((a, b) => b.score - a.score);
-
-    // If best move has negative score and borders are closed in endgame, AI passes
-    if (candidatesWithScore[0].score < -500 && moveNumber > size * size * 0.4) {
-      return null; // Pass
-    }
-
-    // For Master level: 2-ply mini-max lookahead on top 5 moves
-    if (level === 'master') {
-      const topCandidates = candidatesWithScore.slice(0, 6);
-      let bestLookaheadScore = -Infinity;
-      let bestLookaheadMove: Point = topCandidates[0].point;
-
-      for (const cand of topCandidates) {
-        const sim = GoCore.playMove(state, cand.point, color);
-        if (sim.error) continue;
-
-        let worstOpponentReply = -Infinity;
-        const oppLegal = this.getFastLegalMoves(sim.nextState, opponentColor);
-
-        for (const oppMove of oppLegal) {
-          const oppScore = this.evaluateFullGameMove(
-            sim.nextState,
-            oppMove,
-            opponentColor,
-            color,
-            'club'
-          );
-          if (oppScore > worstOpponentReply) {
-            worstOpponentReply = oppScore;
+    for (const move of legalMoves) {
+      for (const n of GoCore.getNeighbors(move, state.size)) {
+        if (state.grid[n.y][n.x] === oppColor) {
+          const group = GoCore.findGroup(state.grid, n);
+          if (group && group.liberties.length === 1 && GoCore.pointsEqual(group.liberties[0], move)) {
+            list.push(move);
+            break;
           }
         }
-
-        const netScore = cand.score - worstOpponentReply * 0.7;
-        if (netScore > bestLookaheadScore) {
-          bestLookaheadScore = netScore;
-          bestLookaheadMove = cand.point;
-        }
       }
-
-      return bestLookaheadMove;
     }
-
-    return candidatesWithScore[0].point;
+    return list;
   }
 
   /**
-   * Detect if any friendly group or opponent group is in Atari (1 liberty)
+   * Helper: Find double atari moves (simultaneously putting 2 opponent groups into Atari)
+   */
+  private static findDoubleAtariMoves(
+    state: BoardState,
+    color: Color,
+    legalMoves: Point[]
+  ): Point[] {
+    const oppColor: Color = color === 'black' ? 'white' : 'black';
+    const list: Point[] = [];
+
+    for (const move of legalMoves) {
+      const sim = GoCore.playMove(state, move, color);
+      if (sim.error) continue;
+
+      let atariCount = 0;
+      const checked = new Set<string>();
+      for (const n of GoCore.getNeighbors(move, state.size)) {
+        if (sim.nextState.grid[n.y][n.x] === oppColor) {
+          const grp = GoCore.findGroup(sim.nextState.grid, n);
+          if (grp && grp.liberties.length === 1) {
+            const key = `${grp.points[0].x},${grp.points[0].y}`;
+            if (!checked.has(key)) {
+              checked.add(key);
+              atariCount++;
+            }
+          }
+        }
+      }
+
+      if (atariCount >= 2) {
+        list.push(move);
+      }
+    }
+    return list;
+  }
+
+  /**
+   * Helper: Find moves that rescue friendly groups in Atari
+   */
+  private static findEscapeAtariMoves(
+    state: BoardState,
+    color: Color,
+    legalMoves: Point[]
+  ): Point[] {
+    const list: Point[] = [];
+    const size = state.size;
+
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        if (state.grid[y][x] === color) {
+          const group = GoCore.findGroup(state.grid, { x, y });
+          if (group && group.liberties.length === 1) {
+            const escapePoint = group.liberties[0];
+            // Check if playing escape point gives at least 2 liberties or captures opponent
+            if (legalMoves.some((m) => GoCore.pointsEqual(m, escapePoint))) {
+              const sim = GoCore.playMove(state, escapePoint, color);
+              if (!sim.error) {
+                const escapedGroup = GoCore.findGroup(sim.nextState.grid, escapePoint);
+                if (escapedGroup && (escapedGroup.liberties.length >= 2 || sim.captured.length > 0)) {
+                  list.push(escapePoint);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    return list;
+  }
+
+  /**
+   * Helper: Check if any group is in Atari
    */
   private static hasUrgentAtari(state: BoardState, color: Color, oppColor: Color): boolean {
     const size = state.size;
@@ -177,12 +527,8 @@ export class GoAI {
         if (c !== null && !checked.has(`${x},${y}`)) {
           const group = GoCore.findGroup(state.grid, { x, y });
           if (group) {
-            for (const p of group.points) {
-              checked.add(`${p.x},${p.y}`);
-            }
-            if (group.liberties.length === 1) {
-              return true;
-            }
+            for (const p of group.points) checked.add(`${p.x},${p.y}`);
+            if (group.liberties.length === 1) return true;
           }
         }
       }
@@ -191,9 +537,9 @@ export class GoAI {
   }
 
   /**
-   * Fast legal moves generator without full allocations
+   * Fast legal moves generator
    */
-  private static getFastLegalMoves(state: BoardState, color: Color): Point[] {
+  static getFastLegalMoves(state: BoardState, color: Color): Point[] {
     const list: Point[] = [];
     const size = state.size;
     for (let y = 0; y < size; y++) {
@@ -207,18 +553,14 @@ export class GoAI {
   }
 
   /**
-   * Opening Book: Prefer corners (3-4, 4-4, 3-3) and center
+   * Opening Book: Corner stars and center points
    */
-  private static getOpeningBookMove(
-    state: BoardState,
-    color: Color,
-    legalMoves: Point[]
-  ): Point | null {
+  private static getOpeningBookMove(state: BoardState, legalMoves: Point[]): Point | null {
     const size = state.size;
-    const cornerStars: Point[] = [];
+    const stars: Point[] = [];
 
     if (size === 9) {
-      cornerStars.push(
+      stars.push(
         { x: 4, y: 4 },
         { x: 2, y: 2 },
         { x: 6, y: 2 },
@@ -230,7 +572,7 @@ export class GoAI {
         { x: 4, y: 6 }
       );
     } else if (size === 13) {
-      cornerStars.push(
+      stars.push(
         { x: 3, y: 3 },
         { x: 9, y: 3 },
         { x: 3, y: 9 },
@@ -242,7 +584,7 @@ export class GoAI {
         { x: 4, y: 9 }
       );
     } else if (size === 19) {
-      cornerStars.push(
+      stars.push(
         { x: 3, y: 3 },
         { x: 15, y: 3 },
         { x: 3, y: 15 },
@@ -259,161 +601,11 @@ export class GoAI {
       );
     }
 
-    for (const pt of cornerStars) {
+    for (const pt of stars) {
       if (state.grid[pt.y][pt.x] === null && legalMoves.some((m) => GoCore.pointsEqual(m, pt))) {
         return pt;
       }
     }
-
     return null;
-  }
-
-  /**
-   * Deep evaluation of a full game move
-   */
-  private static evaluateFullGameMove(
-    state: BoardState,
-    move: Point,
-    color: Color,
-    opponentColor: Color,
-    level: AISparringLevel
-  ): number {
-    let score = 0;
-    const size = state.size;
-
-    // 1. Simulate Move
-    const sim = GoCore.playMove(state, move, color);
-    if (sim.error) return -99999;
-
-    const capturedCount = sim.captured.length;
-    if (capturedCount > 0) {
-      score += capturedCount * 600;
-    }
-
-    // 2. Liberty Safety of Placed Stone's Group
-    const myGroup = GoCore.findGroup(sim.nextState.grid, move);
-    if (!myGroup) return -99999;
-
-    const myLibs = myGroup.liberties.length;
-    if (myLibs === 1 && capturedCount === 0) {
-      return -8000; // Immediate suicide or self-atari is terrible
-    } else if (myLibs === 2) {
-      score += 40;
-    } else if (myLibs >= 3) {
-      score += Math.min(myLibs, 5) * 50;
-    }
-
-    // 3. Rescuing own stones in Atari (救子最优先)
-    const originalNeighborFriendly = GoCore.getNeighbors(move, size).filter(
-      (n) => state.grid[n.y][n.x] === color
-    );
-    for (const fn of originalNeighborFriendly) {
-      const origGroup = GoCore.findGroup(state.grid, fn);
-      if (origGroup && origGroup.liberties.length === 1) {
-        score += origGroup.points.length * 800; // Major reward for saving stones in Atari
-      }
-    }
-
-    // 4. Putting opponent into Atari or reducing opponent liberties
-    const oppNeighbors = GoCore.getNeighbors(move, size).filter(
-      (n) => sim.nextState.grid[n.y][n.x] === opponentColor
-    );
-    for (const on of oppNeighbors) {
-      const oppGroup = GoCore.findGroup(sim.nextState.grid, on);
-      if (oppGroup) {
-        if (oppGroup.liberties.length === 1) {
-          score += oppGroup.points.length * 500;
-        } else if (oppGroup.liberties.length === 2) {
-          score += 150;
-        }
-      }
-    }
-
-    // 5. Tactical Cut & Connect (分断与连接)
-    if (originalNeighborFriendly.length >= 2) {
-      score += 200;
-    }
-    if (oppNeighbors.length >= 2) {
-      score += 260;
-    }
-
-    // 6. Eye Shape Creation & Territory
-    const dEdgeX = Math.min(move.x, size - 1 - move.x);
-    const dEdgeY = Math.min(move.y, size - 1 - move.y);
-    const minEdgeDist = Math.min(dEdgeX, dEdgeY);
-
-    if (minEdgeDist === 2 || minEdgeDist === 3) {
-      score += 90;
-    } else if (minEdgeDist === 0) {
-      if (state.moveHistory.length < size * 3 && capturedCount === 0) {
-        score -= 250;
-      } else {
-        score += 20;
-      }
-    }
-
-    // 7. Eye Shape / Diagonal stones
-    const diagonals = [
-      { x: move.x - 1, y: move.y - 1 },
-      { x: move.x + 1, y: move.y - 1 },
-      { x: move.x - 1, y: move.y + 1 },
-      { x: move.x + 1, y: move.y + 1 },
-    ].filter((p) => GoCore.isInside(p, size));
-
-    let friendlyDiag = 0;
-    for (const d of diagonals) {
-      if (sim.nextState.grid[d.y][d.x] === color) friendlyDiag++;
-    }
-    if (friendlyDiag >= 2) {
-      score += 70;
-    }
-
-    return score;
-  }
-
-  /**
-   * Fast evaluation for Capture Go
-   */
-  private static evaluateCaptureMove(
-    state: BoardState,
-    move: Point,
-    color: Color,
-    opponentColor: Color,
-    options: AIMoveOptions
-  ): number {
-    let score = 0;
-    const size = state.size;
-    const sim = GoCore.playMove(state, move, color, options.captureTarget);
-    if (sim.error) return -9999;
-
-    const capturedCount = sim.captured.length;
-    if (capturedCount > 0) {
-      score += capturedCount * 600;
-      if (options.captureTarget && sim.nextState.captures[color] >= options.captureTarget) {
-        return 100000;
-      }
-    }
-
-    const myGroupAfter = GoCore.findGroup(sim.nextState.grid, move);
-    if (myGroupAfter) {
-      const libertiesAfter = myGroupAfter.liberties.length;
-      if (libertiesAfter === 1 && capturedCount === 0) {
-        score -= 400;
-      } else {
-        score += libertiesAfter * 30;
-      }
-    }
-
-    const opponentNeighbors = GoCore.getNeighbors(move, size).filter(
-      (n) => sim.nextState.grid[n.y][n.x] === opponentColor
-    );
-    for (const opp of opponentNeighbors) {
-      const oppGroup = GoCore.findGroup(sim.nextState.grid, opp);
-      if (oppGroup && oppGroup.liberties.length === 1) {
-        score += 200;
-      }
-    }
-
-    return score;
   }
 }
