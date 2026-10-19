@@ -26,6 +26,11 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
   const [isAiThinking, setIsAiThinking] = useState<boolean>(false);
   const [isWinModalOpen, setIsWinModalOpen] = useState<boolean>(false);
 
+  // Undo limit rules (每局最多 3 次，每次只能悔 1 次)
+  const MAX_UNDOS_PER_GAME = 3;
+  const [undosRemaining, setUndosRemaining] = useState<number>(MAX_UNDOS_PER_GAME);
+  const [canUndoTurn, setCanUndoTurn] = useState<boolean>(false);
+
   const updateDialogue = useCallback((text: string) => {
     setAnimalDialogue(text);
     SoundEngine.speakText(text);
@@ -38,6 +43,8 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
     updateDialogue(animal.intro);
     setIsWinModalOpen(false);
     setIsAiThinking(false);
+    setUndosRemaining(MAX_UNDOS_PER_GAME);
+    setCanUndoTurn(false);
   }, [selectedAnimal, updateDialogue]);
 
   // Handle Player (Black) Move
@@ -51,6 +58,7 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
     }
 
     setBoardState(result.nextState);
+    setCanUndoTurn(true);
 
     // If player captured stones
     if (result.captured.length > 0) {
@@ -134,16 +142,34 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
     }
   }, [boardState.turn, boardState.isGameOver, selectedAnimal, onWinRecord, updateDialogue]);
 
-  // Undo Move (Take back 2 moves: player + AI)
+  // Undo Move (Take back 2 moves: player + AI) - 每局最多 3 次，每次只能悔 1 次
   const handleUndo = () => {
-    if (boardState.moveHistory.length < 2 || isAiThinking) return;
+    if (
+      boardState.moveHistory.length < 2 ||
+      isAiThinking ||
+      boardState.isGameOver ||
+      undosRemaining <= 0 ||
+      !canUndoTurn
+    ) {
+      return;
+    }
+
     let reverted = GoCore.createEmptyBoard(selectedAnimal.boardSize);
     const movesToReplay = boardState.moveHistory.slice(0, -2);
     for (const m of movesToReplay) {
       reverted = GoCore.playMove(reverted, { x: m.x, y: m.y }, m.color, selectedAnimal.captureTarget).nextState;
     }
     setBoardState(reverted);
-    setAnimalDialogue('没关系，悔一步棋再仔细想想看！');
+
+    const nextRemaining = undosRemaining - 1;
+    setUndosRemaining(nextRemaining);
+    setCanUndoTurn(false);
+
+    const msg =
+      nextRemaining > 0
+        ? `没关系，悔一步棋再仔细想想看！本局还剩 ${nextRemaining} 次悔棋机会～`
+        : '没关系，悔一步棋！这是本局最后一次悔棋机会啦，仔细看清气数再下哦！';
+    updateDialogue(msg);
   };
 
   return (
@@ -262,11 +288,24 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
         <div className="grid grid-cols-3 gap-1.5 shrink-0 pt-0.5 pb-1">
           <button
             onClick={handleUndo}
-            disabled={boardState.moveHistory.length < 2 || isAiThinking}
+            disabled={
+              boardState.moveHistory.length < 2 ||
+              isAiThinking ||
+              boardState.isGameOver ||
+              undosRemaining <= 0 ||
+              !canUndoTurn
+            }
             className="flex items-center justify-center gap-1 py-2 px-2 bg-white hover:bg-gray-50 disabled:opacity-40 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs shadow-sm transition active:scale-95"
+            title={
+              undosRemaining <= 0
+                ? '本局 3 次悔棋机会已用完'
+                : !canUndoTurn && boardState.moveHistory.length >= 2
+                ? '每次只能悔棋一次，请重新落子'
+                : `悔棋（本局剩 ${undosRemaining} 次）`
+            }
           >
             <Undo2 className="w-3.5 h-3.5" />
-            <span>悔棋</span>
+            <span>悔棋 ({undosRemaining}/3)</span>
           </button>
 
           <button

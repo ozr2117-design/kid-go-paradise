@@ -91,6 +91,11 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
   // Restart Double-Insurance Modal (防误触双保险)
   const [isRestartConfirmOpen, setIsRestartConfirmOpen] = useState<boolean>(false);
 
+  // Undo limit rules (每局最多 3 次，每次只能悔 1 次)
+  const MAX_UNDOS_PER_GAME = 3;
+  const [undosRemaining, setUndosRemaining] = useState<number>(MAX_UNDOS_PER_GAME);
+  const [canUndoTurn, setCanUndoTurn] = useState<boolean>(false);
+
   const activeProfile = SPARRING_PROFILES.find((p) => p.id === aiLevel) || SPARRING_PROFILES[1];
   const aiColor: Color = playerColor === 'black' ? 'white' : 'black';
 
@@ -162,6 +167,8 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
       setIsReviewMode(false);
       setReviewStep(0);
       setTimeLeft(30);
+      setUndosRemaining(MAX_UNDOS_PER_GAME);
+      setCanUndoTurn(false);
 
       if (rule === 'capture') {
         const msg = `本盘规则：先吃满 ${target} 颗棋子获胜！看看谁的手法更敏锐～`;
@@ -274,6 +281,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
     }
 
     setBoardState(res.nextState);
+    setCanUndoTurn(true);
 
     // Dynamic positive audio & visual reaction
     if (res.captured.length > 0) {
@@ -383,15 +391,25 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
     if (boardState.isGameOver || boardState.turn !== playerColor || isAiThinking) return;
     const next = GoCore.pass(boardState);
     setBoardState(next);
+    setCanUndoTurn(true);
     setStatusMessage('你选择停一手 (Pass)');
     if (next.isGameOver) {
       triggerEndGame(next);
     }
   };
 
-  // Undo (Take back 2 moves)
+  // Undo (Take back 2 moves: player + AI) - 每局最多 3 次，每次只能悔 1 次
   const handleUndo = () => {
-    if (boardState.moveHistory.length < 2 || isAiThinking) return;
+    if (
+      boardState.moveHistory.length < 2 ||
+      isAiThinking ||
+      isReviewMode ||
+      undosRemaining <= 0 ||
+      !canUndoTurn
+    ) {
+      return;
+    }
+
     let reverted = GoCore.createEmptyBoard(boardSize);
     const targetRule = winRule === 'capture' ? captureTarget : undefined;
     const moves = boardState.moveHistory.slice(0, -2);
@@ -399,8 +417,17 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
       reverted = GoCore.playMove(reverted, { x: m.x, y: m.y }, m.color, targetRule).nextState;
     }
     setBoardState(reverted);
-    setAiDialogue('没关系，悔棋重来，再看清气数再下！');
-    setStatusMessage('已悔棋回上一个回合');
+
+    const nextRemaining = undosRemaining - 1;
+    setUndosRemaining(nextRemaining);
+    setCanUndoTurn(false); // 每次只能悔一次，重下后才能再悔
+
+    const dialogueText =
+      nextRemaining > 0
+        ? `没关系，悔棋重来！本局还剩 ${nextRemaining} 次悔棋机会，看清气数再下！`
+        : '没关系，悔棋重来！这是本局最后一次悔棋机会啦，接下来要仔细思考哦！';
+    updateAiDialogue(dialogueText);
+    setStatusMessage(`已悔棋回上一个回合 (本局还剩 ${nextRemaining} 次悔棋机会)`);
   };
 
   // Calculate live capture progress & energy bar
@@ -794,12 +821,24 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
         <div className="grid grid-cols-3 gap-1.5 shrink-0 pt-0.5">
           <button
             onClick={handleUndo}
-            disabled={boardState.moveHistory.length < 2 || isAiThinking || isReviewMode}
+            disabled={
+              boardState.moveHistory.length < 2 ||
+              isAiThinking ||
+              isReviewMode ||
+              undosRemaining <= 0 ||
+              !canUndoTurn
+            }
             className="flex items-center justify-center gap-1 py-2 px-1 bg-white hover:bg-amber-50 disabled:opacity-40 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs shadow-xs transition active:scale-95"
-            title="悔棋一步"
+            title={
+              undosRemaining <= 0
+                ? '本局 3 次悔棋机会已用完'
+                : !canUndoTurn && boardState.moveHistory.length >= 2
+                ? '每次只能悔棋一次，请重新落子'
+                : `悔棋一步（本局剩 ${undosRemaining} 次）`
+            }
           >
             <Undo2 className="w-3.5 h-3.5 text-amber-700" />
-            <span>悔棋一步</span>
+            <span>悔棋 ({undosRemaining}/3)</span>
           </button>
 
           <button
