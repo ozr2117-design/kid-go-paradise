@@ -179,6 +179,13 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
         <GoBoard
           state={boardState}
           onPlayMove={handlePlayerMove}
+          onIllegalMove={(reason) => {
+            if (reason.includes('打劫')) {
+              updateDialogue('此处正在打劫中 🔒，请先在别处落子（找劫材）再来提回～');
+            } else if (reason.includes('自杀')) {
+              updateDialogue('这里没有气，属于禁着点，不能下在这里哦！');
+            }
+          }}
           disabled={boardState.turn !== 'black' || isAiThinking || boardState.isGameOver}
           showCoordinates={showCoordinates}
           showLibertiesHelper={showLiberties}

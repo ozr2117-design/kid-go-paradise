@@ -512,6 +512,14 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
         <GoBoard
           state={isReviewMode ? reviewState : boardState}
           onPlayMove={handlePlayerMove}
+          onIllegalMove={(reason) => {
+            setStatusMessage(`❌ ${reason}`);
+            if (reason.includes('打劫')) {
+              updateAiDialogue('此处正在打劫中 🔒，刚被吃不能立刻回提，请先在别处落子（找劫材）哦！');
+            } else if (reason.includes('自杀')) {
+              updateAiDialogue('这里落子没有气，属于自杀禁着点，不能下在这里哦！');
+            }
+          }}
           disabled={isReviewMode || boardState.turn !== playerColor || isAiThinking || boardState.isGameOver}
           showCoordinates={showCoordinates}
           showLibertiesHelper={showLiberties && !isReviewMode}

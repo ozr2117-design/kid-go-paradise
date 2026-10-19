@@ -24,6 +24,7 @@ interface GoBoardProps {
   highlightPoints?: Point[];
   dangerPoints?: Point[];
   singleTapToPlay?: boolean;
+  onIllegalMove?: (reason: string) => void;
 }
 
 export const GoBoard: React.FC<GoBoardProps> = ({
@@ -35,6 +36,7 @@ export const GoBoard: React.FC<GoBoardProps> = ({
   highlightPoints = [],
   dangerPoints = [],
   singleTapToPlay = false,
+  onIllegalMove,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -398,6 +400,48 @@ export const GoBoard: React.FC<GoBoardProps> = ({
       }
     }
 
+    // 7.3 Draw Ko Rule Indicator (打劫禁着小锁头 🔒)
+    if (state.koPoint && state.grid[state.koPoint.y][state.koPoint.x] === null) {
+      const { px, py } = pointToPixel(state.koPoint);
+      ctx.save();
+
+      const lockRadius = Math.max(11, cellSize * 0.42);
+      // Glowing amber/gold background halo
+      ctx.beginPath();
+      ctx.arc(px, py, lockRadius, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(251, 191, 36, 0.28)';
+      ctx.fill();
+      ctx.strokeStyle = '#d97706';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([3, 3]);
+      ctx.stroke();
+
+      // Draw Lock Emoji
+      ctx.font = `${Math.max(14, Math.floor(cellSize * 0.52))}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🔒', px, py - 1);
+
+      // Mini cartoon tag "打劫" under the lock
+      if (cellSize >= 24) {
+        const tagText = '打劫';
+        ctx.font = 'bold 9px "PingFang SC", "Microsoft YaHei", sans-serif';
+        const tagWidth = ctx.measureText(tagText).width + 6;
+        const tagHeight = 12;
+        const tagY = py + lockRadius * 0.65;
+
+        ctx.fillStyle = 'rgba(217, 119, 6, 0.95)';
+        ctx.beginPath();
+        ctx.roundRect(px - tagWidth / 2, tagY, tagWidth, tagHeight, 4);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(tagText, px, tagY + tagHeight / 2 + 0.5);
+      }
+
+      ctx.restore();
+    }
+
     // 8. Draw Ghost Stone on Hover or Selected Point
     const activePreview = selectedPoint || hoverPoint;
     if (activePreview && !disabled && state.grid[activePreview.y][activePreview.x] === null) {
@@ -513,6 +557,9 @@ export const GoBoard: React.FC<GoBoardProps> = ({
         setSelectedPoint(null);
       } else {
         SoundEngine.playErrorSound();
+        if (onIllegalMove && check.reason) {
+          onIllegalMove(check.reason);
+        }
       }
     } else {
       // Large boards (13x13 / 19x19): first tap previews, second tap confirms!
@@ -525,6 +572,9 @@ export const GoBoard: React.FC<GoBoardProps> = ({
           setSelectedPoint(null);
         } else {
           SoundEngine.playErrorSound();
+          if (onIllegalMove && check.reason) {
+            onIllegalMove(check.reason);
+          }
         }
       } else {
         // Select & preview
@@ -566,9 +616,17 @@ export const GoBoard: React.FC<GoBoardProps> = ({
             </span>
             <button
               onClick={() => {
-                SoundEngine.playStoneSound();
-                onPlayMove(selectedPoint);
-                setSelectedPoint(null);
+                const check = GoCore.isLegalMove(state, selectedPoint);
+                if (check.legal) {
+                  SoundEngine.playStoneSound();
+                  onPlayMove(selectedPoint);
+                  setSelectedPoint(null);
+                } else {
+                  SoundEngine.playErrorSound();
+                  if (onIllegalMove && check.reason) {
+                    onIllegalMove(check.reason);
+                  }
+                }
               }}
               className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white font-bold text-sm rounded-full shadow"
             >
