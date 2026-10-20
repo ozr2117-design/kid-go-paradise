@@ -78,6 +78,7 @@ export interface PuzzleData {
   boardSize: BoardSize;
   initialTurn: Color;
   description: string;
+  voicePrompt?: string; // Kid-friendly colloquial voice reading text
   hint: string;
   initialBoard: {
     black: Point[];

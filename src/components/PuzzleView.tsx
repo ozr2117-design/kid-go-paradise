@@ -17,6 +17,7 @@ import {
   Sparkles,
   Award,
   Layers,
+  Volume2,
 } from 'lucide-react';
 
 interface PuzzleViewProps {
@@ -129,6 +130,14 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({
     setUsedHint(false);
     setShowInsight(false);
     setIsDemoing(false);
+
+    // Auto-read puzzle question in cheerful kid tone when entering new puzzle
+    const timer = setTimeout(() => {
+      const speech = puzzle.voicePrompt || puzzle.description;
+      SoundEngine.speakText(speech);
+    }, 380);
+
+    return () => clearTimeout(timer);
   }, [puzzle, resetPuzzle]);
 
   // Level 1: Toggle Hint with speech
@@ -327,14 +336,30 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({
               <HelpCircle className="w-4 h-4 text-amber-600" />
               <span>闯关任务</span>
             </h3>
-            {/* Proposal 3: Open Report Card Button */}
-            <button
-              onClick={() => setIsReportCardOpen(true)}
-              className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-orange-100 text-orange-900 border border-orange-300 hover:bg-orange-200 flex items-center gap-0.5 active:scale-95 transition"
-            >
-              <Award className="w-3 h-3 text-orange-600" />
-              <span>打卡成绩单</span>
-            </button>
+
+            <div className="flex items-center gap-1.5">
+              {/* 🔊 语音读题 / 重听按钮（儿童无障碍） */}
+              <button
+                onClick={() => {
+                  const speech = puzzle.voicePrompt || puzzle.description;
+                  SoundEngine.speakText(speech);
+                }}
+                className="text-[11px] font-black px-2.5 py-1 rounded-xl bg-amber-400 hover:bg-amber-500 text-amber-950 border border-amber-500 shadow-xs flex items-center gap-1 active:scale-95 transition"
+                title="用语音把题目读给我听"
+              >
+                <Volume2 className="w-3.5 h-3.5 text-amber-950" />
+                <span>听题目</span>
+              </button>
+
+              {/* Proposal 3: Open Report Card Button */}
+              <button
+                onClick={() => setIsReportCardOpen(true)}
+                className="text-[10px] font-bold px-2 py-1 rounded-xl bg-orange-100 text-orange-900 border border-orange-300 hover:bg-orange-200 flex items-center gap-0.5 active:scale-95 transition"
+              >
+                <Award className="w-3 h-3 text-orange-600" />
+                <span>成绩单</span>
+              </button>
+            </div>
           </div>
 
           <p className="text-xs sm:text-sm font-bold text-amber-900 leading-relaxed bg-amber-50 p-2 rounded-xl border border-amber-200">

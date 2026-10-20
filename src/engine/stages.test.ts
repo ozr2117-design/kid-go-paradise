@@ -7,10 +7,10 @@ describe('Adventure Stages Validation (All 6 Chapters & 24 Puzzles)', () => {
     expect(ADVENTURE_STAGES.length).toBe(6);
   });
 
-  it('Chapter 1 should contain the 6 real digitized homework problems', () => {
+  it('Chapter 1 should contain the 8 digitized ladder homework & mastery problems', () => {
     const ch1 = ADVENTURE_STAGES[0];
     expect(ch1.id).toBe(1);
-    expect(ch1.puzzles.length).toBe(6);
+    expect(ch1.puzzles.length).toBe(8);
   });
 
   ADVENTURE_STAGES.forEach((stage) => {
