@@ -4,6 +4,9 @@ on:
   schedule:
     # 每 6 小时自动巡检一次（UTC 01:00, 07:00, 13:00, 19:00 -> 北京时间 09:00, 15:00, 21:00, 03:00）
     - cron: '0 1,7,13,19 * * *'
+  push:
+    paths:
+      - '.github/workflows/keep_alive.yml'
   workflow_dispatch: # 随时可在 GitHub 页面或命令行一键手动唤醒
 
 jobs:
