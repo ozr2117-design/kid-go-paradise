@@ -2,22 +2,32 @@ name: Keep Streamlit Apps Awake
 
 on:
   schedule:
-    # 每 6 小时自动巡检一次（UTC 01:00, 07:00, 13:00, 19:00 -> 北京时间 09:00, 15:00, 21:00, 03:00）
+    # 每天早中晚深四次定期巡检保活 (UTC 01:00, 07:00, 13:00, 19:00 -> 北京时间 09:00, 15:00, 21:00, 03:00)
     - cron: '0 1,7,13,19 * * *'
   push:
     paths:
       - '.github/workflows/keep_alive.yml'
+      - 'scripts/keep_streamlit_alive.py'
   workflow_dispatch: # 随时可在 GitHub 页面或命令行一键手动唤醒
 
 jobs:
   keep-alive:
     runs-on: ubuntu-latest
     steps:
-      - name: Wake up Streamlit Apps using Headless Browser
-        uses: gpenessot/streamlit-keep-alive@v1
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          app-urls: |
-            https://weiqi-kids.streamlit.app
-            https://rqehmildgsfhedt39krz7a.streamlit.app
-            https://qdii-quota-monitor.streamlit.app
-          timeout: 90
+          python-version: '3.11'
+
+      - name: Install Playwright & Chromium
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright
+          playwright install --with-deps chromium
+
+      - name: Run Streamlit Headless Browser Keep-Alive
+        run: |
+          python scripts/keep_streamlit_alive.py
