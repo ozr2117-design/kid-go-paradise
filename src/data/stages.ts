@@ -2,25 +2,25 @@ import { StageInfo } from '../types/go';
 
 export const ADVENTURE_STAGES: StageInfo[] = [
   // ==========================================
-  // 第一章：神奇扭羊头·走楼梯大追捕（最新课后作业真题）
+  // 第一章：神奇扭羊头·走楼梯大追捕（征子与防守实战关卡）
   // ==========================================
   {
     id: 1,
     title: '第一章：扭羊头·走楼梯大追捕',
-    subtitle: '最新围棋作业真题：看清前方有没有白棋救兵，能扭羊头打✔，不能打❌！',
+    subtitle: '看清前方有没有白棋引征救兵，判断征子是否成立！征吃成立果断追击，征子不利稳健防守！',
     icon: '🪜',
     themeColor: 'from-amber-400 to-orange-500',
     puzzles: [
       {
         id: '1-1',
-        title: '作业第1题：空旷大草地（能打✔）',
+        title: '第1关：空旷大草地（征吃成立）',
         category: 'tactics',
         difficulty: 'easy',
         boardSize: 9,
         initialTurn: 'black',
-        description: '小黑羊包围了小白羊！前面是一大片空草地，没有白棋救兵！轮到黑棋，能扭羊头打✔！快走出下一步打吃，走楼梯吃掉它！',
-        voicePrompt: '小黑羊包围了小白羊！前面是一大片空草地，没有白棋救兵，能扭羊头打！快走楼梯追着吃吧！',
-        hint: '看准白棋逃跑的方向，下在 (3, 2) 封门打吃，像走楼梯一样逼死它！',
+        description: '小黑羊包围了小白羊！前面是一大片空旷草地，没有白棋引征救兵！轮到黑棋，征吃成立！快走出关键打吃，像走楼梯一样连续征吃它！',
+        voicePrompt: '小黑羊包围了小白羊！前面是一大片空草地，没有白棋救兵，征吃成立！快走楼梯追着吃吧！',
+        hint: '看准白棋逃跑的方向，下在 (3, 2) 封门打吃，像走楼梯一样征吃到底！',
         initialBoard: {
           black: [
             { x: 5, y: 1 },
@@ -35,19 +35,19 @@ export const ADVENTURE_STAGES: StageInfo[] = [
         solutionTree: {
           move: { x: 3, y: 2 },
           isCorrect: true,
-          comment: '太棒了！像走楼梯一样一左一右，白棋根本逃不掉，直接通关！',
+          comment: '太棒了！像走楼梯一样一左一右连续打吃，白棋根本逃不掉，征吃大获全胜！',
         },
       },
       {
         id: '1-2',
-        title: '作业第2题：前面有白棋救兵（不能打❌）',
+        title: '第2关：前方白棋引征（征子不利）',
         category: 'tactics',
         difficulty: 'easy',
         boardSize: 9,
         initialTurn: 'black',
-        description: '危险！快看左下方！那里坐着一颗白棋救兵！如果黑棋走楼梯追过去，就会撞上救兵被反杀！这道题不能打❌！我们要稳稳防守！',
-        voicePrompt: '危险！快看左下方！那里有一颗白棋救兵在等它，追过去会撞上，不能扭羊头打哦！',
-        hint: '前面有敌人埋伏，千万别盲目走楼梯追打！下在 (4, 3) 扎实加固自己的大门！',
+        description: '危险！快看左下方！那里坐着一颗白棋引征救兵！如果黑棋走楼梯追过去，就会撞上救兵被反杀！征子不利！黑棋必须稳健防守，扎实加固自家大门！',
+        voicePrompt: '危险！快看左下方！那里有一颗白棋引征救兵在等它，追过去会撞上，征子不利！先扎实防守吧！',
+        hint: '前面有白棋引征接应，千万别盲目走楼梯追打！下在 (4, 3) 扎实加固自己的大门！',
         initialBoard: {
           black: [
             { x: 5, y: 1 },
@@ -63,18 +63,18 @@ export const ADVENTURE_STAGES: StageInfo[] = [
         solutionTree: {
           move: { x: 4, y: 3 },
           isCorrect: true,
-          comment: '太聪明了！识破了白棋的救兵诡计，稳稳补好自己，避免了崩盘！',
+          comment: '太聪明了！识破了白棋的引征诡计，稳稳补好自身缺陷，避免了崩盘！',
         },
       },
       {
         id: '1-3',
-        title: '作业第3题：我们有伏兵把守（能打✔）',
+        title: '第3关：己方伏兵接应（征吃成立）',
         category: 'tactics',
         difficulty: 'easy',
         boardSize: 9,
         initialTurn: 'black',
-        description: '哈哈！看左下方！我们黑棋的好朋友早就拉起大网在等它啦！白棋逃过去就会直接撞网上！能扭羊头打✔！放心往前追！',
-        voicePrompt: '哈哈！看左下方，我们黑棋的好朋友在路口站岗，白棋逃不掉的，放心走楼梯追吃吧！',
+        description: '哈哈！看左下方！我们黑棋的好朋友早就拉起大网在等它啦！白棋逃过去就会直接撞网上！征吃成立！放心走楼梯向前追击！',
+        voicePrompt: '哈哈！看左下方，我们黑棋的好朋友在路口接应，白棋逃不掉的，征吃成立，放心走楼梯追吃吧！',
         hint: '白棋逃跑路上全是黑棋的伏兵，大胆下在 (3, 2) 走楼梯打吃！',
         initialBoard: {
           black: [
@@ -92,19 +92,19 @@ export const ADVENTURE_STAGES: StageInfo[] = [
         solutionTree: {
           move: { x: 3, y: 2 },
           isCorrect: true,
-          comment: '精准命中！白棋一头撞进黑棋的伏击网，全军覆没！',
+          comment: '精准命中！白棋一头撞进黑棋的伏击网，征吃大获全胜！',
         },
       },
       {
         id: '1-4',
-        title: '作业第4题：楼梯进行中·顺畅追击（能打✔）',
+        title: '第4关：楼梯进行中·顺畅追击（征吃成立）',
         category: 'tactics',
         difficulty: 'medium',
         boardSize: 9,
         initialTurn: 'black',
-        description: '楼梯已经爬了一半啦！顺着节奏一左一右，前面畅通无阻，能扭羊头打✔！快走出下一步，把白棋赶到悬崖边！',
-        voicePrompt: '楼梯已经搭了一半啦！顺着节奏一左一右，前面没有阻碍，能扭羊头打！接着追吧！',
-        hint: '保持走楼梯的节奏，下在 (3, 4) 紧贴白棋再叫吃！',
+        description: '楼梯已经爬了一半啦！顺着节奏一左一右，前面畅通无阻，征吃成立！快走出下一步连续打吃，把白棋赶到死路！',
+        voicePrompt: '楼梯已经搭了一半啦！顺着节奏一左一右，前面没有阻碍，征吃成立！接着连续打吃吧！',
+        hint: '保持走楼梯的节奏，下在 (3, 4) 紧贴白棋继续叫吃！',
         initialBoard: {
           black: [
             { x: 5, y: 1 },
@@ -129,14 +129,14 @@ export const ADVENTURE_STAGES: StageInfo[] = [
       },
       {
         id: '1-5',
-        title: '作业第5题：半路杀出白救兵（不能打❌）',
+        title: '第5关：半路引征接应（征子不利）',
         category: 'tactics',
         difficulty: 'medium',
         boardSize: 9,
         initialTurn: 'black',
-        description: '快踩刹车！仔细看楼梯旁边，不知道什么时候多了一颗白棋在接应！再追下去白棋连成一大片就要反扑啦！这道题不能打❌！',
-        voicePrompt: '快踩刹车！仔细看楼梯旁边多了一颗白棋在接应，千万不能硬追，这道题不能打哦！',
-        hint: '救兵就在前方，硬追自己浑身是破绽！下在 (2, 2) 稳守阵地，绝不上当！',
+        description: '快踩刹车！仔细看楼梯旁边，不知道什么时候多了一颗白棋在接应引征！再硬追下去白棋连成一大片就要反扑啦！征子不利！我们要下在要害稳守阵地！',
+        voicePrompt: '快踩刹车！仔细看楼梯旁边多了一颗白棋在接应引征，征子不利，千万不能硬追，稳守阵地！',
+        hint: '白棋引征救兵就在前方，硬追自己浑身是破绽！下在 (2, 2) 稳守阵地，绝不上当！',
         initialBoard: {
           black: [
             { x: 5, y: 1 },
@@ -157,19 +157,19 @@ export const ADVENTURE_STAGES: StageInfo[] = [
         solutionTree: {
           move: { x: 2, y: 2 },
           isCorrect: true,
-          comment: '火眼金睛！及时刹车稳住胜局，真正的实战高手就该这么下！',
+          comment: '火眼金睛！及时刹车稳住局势，真正的围棋高手就该这么下！',
         },
       },
       {
         id: '1-6',
-        title: '作业第6题：双白子筑起大高墙（不能打❌）',
+        title: '第6关：双白子筑起铁壁（征子不利）',
         category: 'tactics',
         difficulty: 'medium',
         boardSize: 9,
         initialTurn: 'black',
-        description: '快看左下角！两颗白棋手拉手筑起了一道大墙！白棋跑过去就会和它们抱在一起变成大怪兽！这道题不能打❌！',
-        voicePrompt: '快看左下角！两颗白棋手拉手筑起了大墙，跑过去就会连成一大片，不能扭羊头打哦！',
-        hint: '白棋的大墙太厚啦！千万不能扭羊头打！下在 (4, 3) 关紧自家大门！',
+        description: '快看左下角！两颗白棋手拉手筑起了一道大铁壁！白棋跑过去就会和它们抱在一起变成大怪兽！征子不利！千万不能硬征！我们要关紧大门防守！',
+        voicePrompt: '快看左下角！两颗白棋手拉手筑起了大铁壁，跑过去就会连成一大片，征子不利，先关紧大门防守！',
+        hint: '白棋的铁壁太厚啦！征子不利千万不能硬征！下在 (4, 3) 关紧自家大门！',
         initialBoard: {
           black: [
             { x: 5, y: 1 },
@@ -186,17 +186,17 @@ export const ADVENTURE_STAGES: StageInfo[] = [
         solutionTree: {
           move: { x: 4, y: 3 },
           isCorrect: true,
-          comment: '太棒了！一眼识破白棋的坚固防线，落子沉稳，大师风范！',
+          comment: '太棒了！一眼识破白棋的坚固防线，落子沉稳防守，大师风范！',
         },
       },
       {
         id: '1-7',
-        title: '拓展第7题：一路悬崖大跳水（能打✔）',
+        title: '第7关：一路悬崖大跳水（征吃提子）',
         category: 'tactics',
         difficulty: 'hard',
         boardSize: 9,
         initialTurn: 'black',
-        description: '大决战！白棋已经被我们一路走楼梯追到了第一线悬崖边！只剩最后一步，下在最后一阶楼梯，把整条白龙一口气提吃光！',
+        description: '大决战！白棋已经被我们一路走楼梯征吃赶到了第一线悬崖边！只剩最后一步，下在最后一阶楼梯，把整条白龙一口气提吃光！',
         voicePrompt: '大决战！白棋已经被赶到悬崖边啦，走出最后一阶楼梯，把大白龙全部提光吧！',
         hint: '下在边线最后一口气 (0, 6)，大白龙瞬间被全部提吃！',
         initialBoard: {
@@ -215,18 +215,18 @@ export const ADVENTURE_STAGES: StageInfo[] = [
         solutionTree: {
           move: { x: 0, y: 6 },
           isCorrect: true,
-          comment: '🎉 轰！大白龙全部被提吃！扭羊头终极奥义大功告成！',
+          comment: '🎉 轰！大白龙全部被提吃！扭羊头征吃终极奥义大功告成！',
         },
       },
       {
         id: '1-8',
-        title: '拓展第8题：釜底抽薪·破解引征（能打✔）',
+        title: '第8关：釜底抽薪·化解引征（分断要害）',
         category: 'tactics',
         difficulty: 'hard',
         boardSize: 9,
         initialTurn: 'black',
-        description: '白棋以为有救兵很得意！看我们黑棋一招切断它的救兵线，白棋吓得哇哇叫！下在关键分断点，直接破掉白棋的引征！',
-        voicePrompt: '白棋以为有救兵很得意！看黑棋一招切断它的救兵，下在分断点，破掉白棋的引征！',
+        description: '白棋以为有救兵引征很得意！看我们黑棋一招切断它的接应线，破除引征！下在关键分断要害，直接破掉白棋的引征美梦！',
+        voicePrompt: '白棋以为有救兵很得意！看黑棋一招切断它的救兵，下在分断要点，破除引征！',
         hint: '下在 (2, 4) 抢先卡住白棋的接应线路！',
         initialBoard: {
           black: [
@@ -244,7 +244,7 @@ export const ADVENTURE_STAGES: StageInfo[] = [
         solutionTree: {
           move: { x: 2, y: 4 },
           isCorrect: true,
-          comment: '神来之笔！一刀两断，切断了白棋的所有希望！',
+          comment: '神来之笔！一刀两断破除引征，切断了白棋的所有希望！',
         },
       },
     ],

@@ -18,6 +18,8 @@ import {
   Award,
   Layers,
   Volume2,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 interface PuzzleViewProps {
@@ -55,6 +57,9 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({
   const [showInsight, setShowInsight] = useState<boolean>(false);
   // Level 3: Teacher Demo
   const [isDemoing, setIsDemoing] = useState<boolean>(false);
+  // Collapsible Scaffolding Toolbox (Hidden by default so kids focus on thinking first)
+  const [isHelperOpen, setIsHelperOpen] = useState<boolean>(false);
+  const [confirmDemoOpen, setConfirmDemoOpen] = useState<boolean>(false);
   // Proposal 4: Board Mirroring Toggle
   const [isMirrored, setIsMirrored] = useState<boolean>(false);
   // Proposal 3: Weekly Check-in Report Card Modal
@@ -122,10 +127,13 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({
     setFeedback('');
     setIsWinModalOpen(false);
     setIsDemoing(false);
+    setConfirmDemoOpen(false);
   }, [puzzle, mapPoint]);
 
   useEffect(() => {
     resetPuzzle();
+    setIsHelperOpen(false);
+    setConfirmDemoOpen(false);
     setHintVisible(false);
     setUsedHint(false);
     setShowInsight(false);
@@ -164,8 +172,8 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({
     }
   };
 
-  // Level 3: Teacher Demo & Imitation Scaffolding
-  const handleTeacherDemo = () => {
+  // Level 3: Teacher Demo & Imitation Scaffolding Execution
+  const executeTeacherDemo = () => {
     if (isDemoing || !activeSolutionMove) return;
     setIsDemoing(true);
     setUsedHint(true);
@@ -190,6 +198,13 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({
       setFeedback('👉 现在换你来走一次！记住刚才老师下的位置哦！');
       SoundEngine.speakText('现在换你来走一次！快快下子吧！');
     }, 2600);
+  };
+
+  const handleTeacherDemoClick = () => {
+    if (isDemoing) return;
+    // Show gentle confirmation to guide child to think independently first
+    setConfirmDemoOpen(true);
+    SoundEngine.speakText('自己做出来能得三颗星哦！真的要看老师示范吗？');
   };
 
   // Proposal 4: Toggle Mirror
@@ -381,65 +396,135 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({
           )}
         </div>
 
-        {/* Level 1: Hint Card */}
-        {hintVisible && (
-          <div className="bg-yellow-100/95 rounded-2xl p-2.5 shadow-xs border-2 border-yellow-400 animate-pop-in shrink-0">
-            <div className="flex items-center gap-1.5 text-amber-900 font-black text-xs mb-0.5">
-              <Lightbulb className="w-3.5 h-3.5 text-amber-700" />
-              <span>💡 灵感锦囊：</span>
+        {/* 3-Tier Scaffolding Toolbox: Collapsed by default to prevent kids clicking immediately */}
+        {!isHelperOpen ? (
+          <div className="shrink-0">
+            <button
+              onClick={() => {
+                setIsHelperOpen(true);
+                SoundEngine.speakText('辅导锦囊已开启，如果卡住了可以查看提示哦！');
+              }}
+              className="w-full py-2 px-3 rounded-2xl bg-amber-50 hover:bg-amber-100/90 text-amber-900 border border-amber-300/80 text-xs font-bold flex items-center justify-between transition shadow-xs active:scale-98 group"
+              title="遇到困难做不出？点击展开启发式教学辅导"
+            >
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-amber-600 group-hover:scale-110 transition" />
+                <span className="font-cartoon text-amber-950 font-black">遇到困难？点击求助锦囊</span>
+              </div>
+              <div className="flex items-center gap-1 text-[11px] text-amber-800 bg-amber-200/70 px-2.5 py-0.5 rounded-full font-bold">
+                <span>展开辅导</span>
+                <ChevronDown className="w-3.5 h-3.5" />
+              </div>
+            </button>
+          </div>
+        ) : (
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl p-2.5 border-2 border-amber-300 flex flex-col gap-2 shrink-0 shadow-xs animate-pop-in">
+            {/* Header with Title and Collapse Button */}
+            <div className="flex items-center justify-between">
+              <div className="text-[11px] font-black text-amber-950 flex items-center gap-1 font-cartoon">
+                <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                <span>三级启发式教学辅导：</span>
+              </div>
+              <button
+                onClick={() => {
+                  setIsHelperOpen(false);
+                  setConfirmDemoOpen(false);
+                }}
+                className="text-[10px] font-bold text-amber-800 bg-amber-200/70 hover:bg-amber-200 px-2 py-0.5 rounded-full flex items-center gap-0.5 transition active:scale-95"
+                title="收起辅导窗口，专注棋盘思考"
+              >
+                <span>收起</span>
+                <ChevronUp className="w-3 h-3" />
+              </button>
             </div>
-            <p className="text-xs font-bold text-amber-900 leading-relaxed">{puzzle.hint}</p>
+
+            {/* Motivational Star Rule Badge */}
+            <div className="text-[10px] font-bold text-amber-800 bg-white/80 px-2.5 py-1 rounded-xl border border-amber-200/80 flex items-center justify-between">
+              <span>🌟 自己独立下对得 3 星</span>
+              <span className="text-amber-400 font-normal">|</span>
+              <span>💡 辅导通关得 2 星</span>
+            </div>
+
+            {/* 3-Tier Tool Buttons */}
+            <div className="grid grid-cols-3 gap-1.5">
+              {/* Level 1: Hint */}
+              <button
+                onClick={handleToggleHint}
+                className={`py-2 px-1 rounded-xl text-xs font-black flex flex-col items-center justify-center gap-1 border transition active:scale-95 ${
+                  hintVisible
+                    ? 'bg-yellow-400 text-amber-950 border-yellow-500 shadow-xs'
+                    : 'bg-white hover:bg-yellow-50 text-amber-900 border-amber-300'
+                }`}
+                title="第一级：文字与语音锦囊提示，启发思路"
+              >
+                <Lightbulb className="w-4 h-4 text-amber-700" />
+                <span className="text-[11px]">{hintVisible ? '收起提示' : '💡 锦囊'}</span>
+              </button>
+
+              {/* Level 2: Weakness Insight */}
+              <button
+                onClick={handleToggleInsight}
+                className={`py-2 px-1 rounded-xl text-xs font-black flex flex-col items-center justify-center gap-1 border transition active:scale-95 ${
+                  showInsight
+                    ? 'bg-amber-400 text-amber-950 border-amber-500 ring-2 ring-amber-300 shadow-xs'
+                    : 'bg-white hover:bg-amber-50 text-amber-900 border-amber-300'
+                }`}
+                title="第二级：弱点透视高亮光圈"
+              >
+                <Eye className="w-4 h-4 text-amber-700" />
+                <span className="text-[11px]">{showInsight ? '隐藏透视' : '👁️ 透视'}</span>
+              </button>
+
+              {/* Level 3: Teacher Demo */}
+              <button
+                onClick={handleTeacherDemoClick}
+                disabled={isDemoing}
+                className="py-2 px-1 rounded-xl text-xs font-black flex flex-col items-center justify-center gap-1 bg-white hover:bg-orange-50 text-amber-950 border border-amber-300 shadow-xs transition active:scale-95 disabled:opacity-50"
+                title="第三级：围棋老师示范走法（实在想不出再看）"
+              >
+                <GraduationCap className="w-4 h-4 text-amber-700" />
+                <span className="text-[11px]">👨‍🏫 示范</span>
+              </button>
+            </div>
+
+            {/* Teacher Demo Confirmation Guardrail (Breaks impulsive reflex) */}
+            {confirmDemoOpen && (
+              <div className="p-2 rounded-xl bg-orange-100 border border-orange-300 flex flex-col gap-1.5 animate-pop-in">
+                <span className="text-[11px] font-black text-amber-950 leading-tight">
+                  🌟 自己想出来能得 3 颗星！确定要老师示范吗？
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setConfirmDemoOpen(false)}
+                    className="flex-1 py-1 px-2 rounded-lg bg-amber-400 hover:bg-amber-500 text-amber-950 text-xs font-black shadow-xs active:scale-95 transition"
+                  >
+                    💪 我再想想！
+                  </button>
+                  <button
+                    onClick={() => {
+                      setConfirmDemoOpen(false);
+                      executeTeacherDemo();
+                    }}
+                    className="py-1 px-2.5 rounded-lg bg-white hover:bg-orange-50 text-amber-900 border border-orange-300 text-xs font-bold active:scale-95 transition"
+                  >
+                    看示范 👨‍🏫
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Level 1: Hint Card expanded inside */}
+            {hintVisible && (
+              <div className="bg-yellow-100/95 rounded-xl p-2 shadow-xs border border-yellow-400 animate-pop-in">
+                <div className="flex items-center gap-1 text-amber-900 font-black text-xs mb-0.5">
+                  <Lightbulb className="w-3.5 h-3.5 text-amber-700" />
+                  <span>💡 灵感锦囊：</span>
+                </div>
+                <p className="text-xs font-bold text-amber-900 leading-relaxed">{puzzle.hint}</p>
+              </div>
+            )}
           </div>
         )}
-
-        {/* 3-Tier Scaffolding Contingency Toolbox */}
-        <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl p-2.5 border-2 border-amber-300 flex flex-col gap-1.5 shrink-0 shadow-xs">
-          <div className="text-[11px] font-black text-amber-900 flex items-center gap-1 font-cartoon">
-            <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-            <span>三级启发式教学辅导（做不出点这里）：</span>
-          </div>
-
-          <div className="grid grid-cols-3 gap-1.5">
-            {/* Level 1: Hint */}
-            <button
-              onClick={handleToggleHint}
-              className={`py-2 px-1 rounded-xl text-xs font-black flex flex-col items-center justify-center gap-1 border transition active:scale-95 ${
-                hintVisible
-                  ? 'bg-yellow-400 text-amber-950 border-yellow-500'
-                  : 'bg-white hover:bg-yellow-50 text-amber-900 border-amber-300'
-              }`}
-              title="第一级：文字与语音锦囊提示"
-            >
-              <Lightbulb className="w-4 h-4 text-amber-700" />
-              <span className="text-[11px]">{hintVisible ? '收起提示' : '💡 锦囊'}</span>
-            </button>
-
-            {/* Level 2: Weakness Insight */}
-            <button
-              onClick={handleToggleInsight}
-              className={`py-2 px-1 rounded-xl text-xs font-black flex flex-col items-center justify-center gap-1 border transition active:scale-95 ${
-                showInsight
-                  ? 'bg-amber-400 text-amber-950 border-amber-500 ring-2 ring-amber-300'
-                  : 'bg-white hover:bg-amber-50 text-amber-900 border-amber-300'
-              }`}
-              title="第二级：弱点透视高亮光圈"
-            >
-              <Eye className="w-4 h-4 text-amber-700" />
-              <span className="text-[11px]">{showInsight ? '隐藏透视' : '👁️ 透视'}</span>
-            </button>
-
-            {/* Level 3: Teacher Demo */}
-            <button
-              onClick={handleTeacherDemo}
-              disabled={isDemoing}
-              className="py-2 px-1 rounded-xl text-xs font-black flex flex-col items-center justify-center gap-1 bg-gradient-to-r from-orange-400 to-amber-400 hover:from-orange-500 hover:to-amber-500 text-amber-950 border border-orange-400 shadow-xs transition active:scale-95 disabled:opacity-50"
-              title="第三级：围棋老师示范走法与模仿跟练"
-            >
-              <GraduationCap className="w-4 h-4 text-amber-950" />
-              <span className="text-[11px]">👨‍🏫 示范</span>
-            </button>
-          </div>
-        </div>
 
         {/* Bottom: Reset Action Button */}
         <div className="pt-0.5 shrink-0">
