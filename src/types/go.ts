@@ -100,10 +100,10 @@ export interface AnimalOpponent {
   id: string;
   name: string;
   avatar: string;
-  rank: string; // e.g. "25K (萌萌兔)"
-  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  rank: string; // e.g. "1D~2D 强力鹰王"
+  difficulty: 'beginner' | 'intermediate' | 'advanced' | 'master' | 'grandmaster';
   boardSize: BoardSize;
-  captureTarget: number; // e.g. first to 1, 3, or 5 captures
+  captureTarget: number; // e.g. first to 5, 8, 12, 15, 20 captures
   intro: string;
   taunts: string[];
   praises: string[];

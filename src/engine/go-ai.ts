@@ -1,8 +1,8 @@
 import { BoardSize, BoardState, Color, Point } from '../types/go';
 import { GoCore } from './go-core';
 
-export type AIDifficulty = 'beginner' | 'intermediate' | 'advanced';
-export type AISparringLevel = 'novice' | 'club' | 'master';
+export type AIDifficulty = 'beginner' | 'intermediate' | 'advanced' | 'master' | 'grandmaster';
+export type AISparringLevel = 'novice' | 'club' | 'master' | 'grandmaster';
 
 export interface AIMoveOptions {
   difficulty?: AIDifficulty;
@@ -70,25 +70,32 @@ export class GoAI {
     }
 
     // 3. Level-specific Routing:
-    const level: AISparringLevel =
-      options.sparringLevel ||
-      (options.difficulty === 'advanced'
-        ? 'master'
-        : options.difficulty === 'intermediate'
-        ? 'club'
-        : 'novice');
+    const isGrandmaster =
+      options.difficulty === 'grandmaster' || options.sparringLevel === 'grandmaster';
+    const isMaster =
+      options.difficulty === 'master' ||
+      options.difficulty === 'advanced' ||
+      options.sparringLevel === 'master';
+    const isClub =
+      options.difficulty === 'intermediate' || options.sparringLevel === 'club';
 
     // Level A: Novice (~15K) - Inherits standard tactical engine (No random blunders, steady sparring)
-    if (level === 'novice') {
+    if (!isGrandmaster && !isMaster && !isClub) {
       return this.getTacticalHeuristicMove(state, color, opponentColor, legalMoves, options);
     }
 
     // Level B: Club (~10K) - Advanced Tactical Engine with 2-ply Counter-attack & Double-Atari Defense
-    if (level === 'club') {
+    if (isClub) {
       return this.getAdvancedClubTacticalMove(state, color, opponentColor, legalMoves, options);
     }
 
-    // Level C: Master (5K ~ 1D) - High Performance MCTS (Monte Carlo Tree Search)
+    // Level C: Grandmaster (3D ~ 5D 棋道龙神) - Super Deep MCTS + Tactical Pruning
+    if (isGrandmaster) {
+      const mctsIterations = size === 9 ? 650 : size === 13 ? 420 : 220;
+      return this.runMCTS(state, color, opponentColor, legalMoves, mctsIterations, options);
+    }
+
+    // Level D: Master (1D ~ 2D 傲天鹰 / 老鸟 / 聪聪狐) - High Performance MCTS (280/450 iter)
     const mctsIterations = size === 9 ? 450 : size === 13 ? 280 : 140;
     return this.runMCTS(state, color, opponentColor, legalMoves, mctsIterations, options);
   }
