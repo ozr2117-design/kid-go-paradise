@@ -84,7 +84,13 @@ export const App: React.FC = () => {
       {/* Top Navbar */}
       <KidNavbar
         currentMode={currentMode}
-        onSelectMode={(mode) => setCurrentMode(mode)}
+        onSelectMode={(mode) => {
+          if (mode === 'adventure' && currentMode === 'puzzle') {
+            setCurrentMode('adventure');
+          } else {
+            setCurrentMode(mode);
+          }
+        }}
         totalStars={totalStars}
         soundMuted={progress.soundMuted}
         onToggleSound={handleToggleSound}

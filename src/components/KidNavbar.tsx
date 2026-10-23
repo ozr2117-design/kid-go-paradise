@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { GameMode } from '../types/go';
-import { Volume2, VolumeX, Sparkles, Map, Swords, Puzzle, Grid, Bot, Maximize, Minimize } from 'lucide-react';
+import { Volume2, VolumeX, Sparkles, Map, Swords, Grid, Bot, Maximize, Minimize } from 'lucide-react';
 
 interface KidNavbarProps {
   currentMode: GameMode;
@@ -61,10 +61,11 @@ export const KidNavbar: React.FC<KidNavbarProps> = ({
         <button
           onClick={() => onSelectMode('adventure')}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-sm transition-all ${
-            currentMode === 'adventure'
+            currentMode === 'adventure' || currentMode === 'puzzle'
               ? 'bg-yellow-400 text-amber-950 shadow-md scale-105'
               : 'hover:bg-amber-500/50 text-amber-100'
           }`}
+          title="冒险闯关模式（包含关卡地图与做题挑战）"
         >
           <Map className="w-4 h-4" />
           <span>冒险闯关</span>
@@ -92,18 +93,6 @@ export const KidNavbar: React.FC<KidNavbarProps> = ({
         >
           <Bot className="w-4 h-4" />
           <span>AI全盘对弈</span>
-        </button>
-
-        <button
-          onClick={() => onSelectMode('puzzle')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-sm transition-all ${
-            currentMode === 'puzzle'
-              ? 'bg-yellow-400 text-amber-950 shadow-md scale-105'
-              : 'hover:bg-amber-500/50 text-amber-100'
-          }`}
-        >
-          <Puzzle className="w-4 h-4" />
-          <span>做题精练</span>
         </button>
 
         <button
