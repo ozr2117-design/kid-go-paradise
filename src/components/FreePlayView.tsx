@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BoardSize, BoardState, Point } from '../types/go';
 import { GoCore } from '../engine/go-core';
+import { SoundEngine } from '../engine/sound-engine';
 import { GoBoard } from './GoBoard';
 import { RotateCcw, Undo2, BarChart2, CheckCircle2, Swords, Compass } from 'lucide-react';
 
@@ -72,6 +73,10 @@ export const FreePlayView: React.FC<FreePlayViewProps> = ({ showCoordinates }) =
         <GoBoard
           state={boardState}
           onPlayMove={handlePlayMove}
+          onIllegalMove={(reason) => {
+            setStatusMessage(`❌ ${reason}`);
+            SoundEngine.speakText(reason);
+          }}
           disabled={boardState.isGameOver}
           showCoordinates={showCoordinates}
         />
