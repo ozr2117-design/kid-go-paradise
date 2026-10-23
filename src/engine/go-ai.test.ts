@@ -64,4 +64,25 @@ describe('GoAI Kid-Friendly Sparring Engine', () => {
       expect(GoCore.isLegalMove(board, move, 'white').legal).toBe(true);
     }
   });
+
+  it('runs Eagle and Dragon tactical engines in capture battle and executes valid captures', () => {
+    let board = GoCore.createEmptyBoard(13);
+    board = GoCore.playMove(board, { x: 3, y: 3 }, 'black').nextState;
+    board = GoCore.playMove(board, { x: 4, y: 3 }, 'white').nextState;
+    board = GoCore.playMove(board, { x: 2, y: 3 }, 'white').nextState;
+    board = GoCore.playMove(board, { x: 3, y: 2 }, 'white').nextState;
+    // Black at (3,3) is in atari, only liberty is (3,4)
+
+    const eagleMove = GoAI.getBestMove(board, 'white', {
+      difficulty: 'master',
+      captureTarget: 15,
+    });
+    expect(eagleMove).toEqual({ x: 3, y: 4 });
+
+    const dragonMove = GoAI.getBestMove(board, 'white', {
+      difficulty: 'grandmaster',
+      captureTarget: 20,
+    });
+    expect(dragonMove).toEqual({ x: 3, y: 4 });
+  });
 });
