@@ -28,6 +28,7 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
   const [showLiberties, setShowLiberties] = useState<boolean>(true);
   const [isAiThinking, setIsAiThinking] = useState<boolean>(false);
   const [isWinModalOpen, setIsWinModalOpen] = useState<boolean>(false);
+  const [isDefeatModalOpen, setIsDefeatModalOpen] = useState<boolean>(false);
 
   // Undo limit rules (每局最多 3 次，每次只能悔 1 次)
   const MAX_UNDOS_PER_GAME = 3;
@@ -48,6 +49,7 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
       setBoardState(GoCore.createEmptyBoard(animal.boardSize));
       updateDialogue(animal.intro);
       setIsWinModalOpen(false);
+      setIsDefeatModalOpen(false);
       setIsAiThinking(false);
       setUndosRemaining(MAX_UNDOS_PER_GAME);
       setCanUndoTurn(false);
@@ -137,10 +139,16 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
             }
           }
 
-          if (aiResult.nextState.isGameOver && aiResult.nextState.winner === 'black') {
-            SoundEngine.playVictoryFanfare();
-            onWinRecord(selectedAnimal.id);
-            setIsWinModalOpen(true);
+          if (aiResult.nextState.isGameOver) {
+            if (aiResult.nextState.winner === 'black') {
+              SoundEngine.playVictoryFanfare();
+              onWinRecord(selectedAnimal.id);
+              setIsWinModalOpen(true);
+            } else if (aiResult.nextState.winner === 'white') {
+              SoundEngine.playErrorSound();
+              setIsDefeatModalOpen(true);
+              updateDialogue(`哎呀，我先吃满 ${effectiveTarget} 颗子啦！不过你包围的大龙太惊险了！`);
+            }
           }
         } else {
           // AI passes
@@ -161,9 +169,8 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
     if (
       boardState.moveHistory.length < 2 ||
       isAiThinking ||
-      boardState.isGameOver ||
       undosRemaining <= 0 ||
-      !canUndoTurn
+      (!canUndoTurn && !boardState.isGameOver)
     ) {
       return;
     }
@@ -174,6 +181,7 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
       reverted = GoCore.playMove(reverted, { x: m.x, y: m.y }, m.color, effectiveTarget).nextState;
     }
     setBoardState(reverted);
+    setIsDefeatModalOpen(false);
 
     const nextRemaining = undosRemaining - 1;
     setUndosRemaining(nextRemaining);
@@ -181,8 +189,8 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
 
     const msg =
       nextRemaining > 0
-        ? `没关系，悔一步棋再仔细想想看！本局还剩 ${nextRemaining} 次悔棋机会～`
-        : '没关系，悔一步棋！这是本局最后一次悔棋机会啦，仔细看清气数再下哦！';
+        ? `悔棋成功！看准大龙最后一口气，快提吃它吧！本局还剩 ${nextRemaining} 次悔棋机会～`
+        : '悔棋成功！快提吃大龙！这是本局最后一次悔棋机会啦！';
     updateDialogue(msg);
   };
 
@@ -411,6 +419,64 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
         onBackToMap={() => setIsWinModalOpen(false)}
         hasNext={false}
       />
+
+      {/* Defeat / Game Over Modal */}
+      {isDefeatModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-pop-in">
+          <div className="bg-gradient-to-b from-amber-50 to-orange-100 rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl border-4 border-amber-400 relative overflow-hidden">
+            <div className="text-4xl mb-2">🐾</div>
+            <h2 className="text-2xl font-black text-amber-950 font-cartoon">
+              哎呀，差一点点就翻盘啦！
+            </h2>
+            <div className="text-xs sm:text-sm font-bold text-amber-900 mt-2.5 px-3 py-2 bg-yellow-200/60 rounded-xl leading-relaxed text-left border border-yellow-300">
+              <p>
+                {selectedAnimal.name} 率先吃满了 <strong className="text-red-600 font-cartoon text-sm">{effectiveTarget}</strong> 颗子，本局比赛结束啦！
+              </p>
+              <p className="mt-1.5 text-emerald-900 text-xs">
+                💡 <strong>小教练提示</strong>：你包围大龙的战术非常惊艳！只要点击【悔一步棋】，就能立刻下在空位把整条大龙一口气全部提光！
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 mt-5">
+              {undosRemaining > 0 && (
+                <button
+                  onClick={() => {
+                    setIsDefeatModalOpen(false);
+                    handleUndo();
+                  }}
+                  className="w-full py-3 px-4 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-black rounded-2xl flex items-center justify-center gap-2 shadow-md text-sm active:scale-95 transition"
+                >
+                  <Undo2 className="w-4 h-4" />
+                  <span>悔一步棋，提掉大龙！({undosRemaining}/3)</span>
+                </button>
+              )}
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setIsDefeatModalOpen(false);
+                    initGame(selectedAnimal, effectiveTarget);
+                  }}
+                  className="flex-1 py-2.5 px-3 bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-500 hover:to-yellow-500 text-amber-950 font-black rounded-2xl shadow-xs flex items-center justify-center gap-1.5 text-xs sm:text-sm active:scale-95 transition"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  <span>再来一局</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsDefeatModalOpen(false);
+                    handleSelectTarget(15);
+                  }}
+                  className="flex-1 py-2.5 px-3 bg-white hover:bg-orange-50 text-amber-900 font-bold rounded-2xl border-2 border-amber-300 flex items-center justify-center gap-1.5 text-xs sm:text-sm active:scale-95 transition"
+                >
+                  <span>战 15 子大对决 🔥</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
