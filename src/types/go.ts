@@ -35,7 +35,7 @@ export interface BoardState {
   winReason?: string;
 }
 
-export type GameMode = 'adventure' | 'battle' | 'sparring' | 'puzzle' | 'sandbox';
+export type GameMode = 'adventure' | 'battle' | 'sparring' | 'puzzle' | 'sandbox' | 'daily';
 
 export type WinRuleMode = 'capture' | 'territory';
 

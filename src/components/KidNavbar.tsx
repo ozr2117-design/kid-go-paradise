@@ -72,6 +72,19 @@ export const KidNavbar: React.FC<KidNavbarProps> = ({
         </button>
 
         <button
+          onClick={() => onSelectMode('daily')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-sm transition-all ${
+            currentMode === 'daily'
+              ? 'bg-yellow-400 text-amber-950 shadow-md scale-105'
+              : 'hover:bg-amber-500/50 text-amber-100'
+          }`}
+          title="每日15题死活特训打卡"
+        >
+          <Sparkles className="w-4 h-4 text-yellow-300 fill-yellow-300" />
+          <span>每日打卡⭐</span>
+        </button>
+
+        <button
           onClick={() => onSelectMode('battle')}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-sm transition-all ${
             currentMode === 'battle'

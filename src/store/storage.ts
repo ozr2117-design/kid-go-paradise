@@ -1,3 +1,10 @@
+export interface DailyChallengeRecord {
+  lastCompletedDate: string; // YYYY-MM-DD
+  streak: number; // consecutive days
+  todaySolvedIds: string[]; // solved today
+  todayDate: string; // YYYY-MM-DD
+}
+
 export interface UserProgress {
   stars: Record<string, number>; // puzzleId -> stars (1-3)
   completedPuzzles: string[];
@@ -6,6 +13,7 @@ export interface UserProgress {
   showCoordinates: boolean;
   battleWins: Record<string, number>; // animalId -> wins
   mistakePuzzles: string[]; // puzzleId list of mistakes to eliminate
+  dailyChallenge?: DailyChallengeRecord;
 }
 
 const STORAGE_KEY = 'kid_go_user_progress_v1';
@@ -95,5 +103,63 @@ export class ProgressStore {
     p.battleWins[animalId] = (p.battleWins[animalId] || 0) + 1;
     this.save(p);
     return p;
+  }
+
+  static getTodayDateString(): string {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  static getDailyRecord(): DailyChallengeRecord {
+    const p = this.load();
+    const today = this.getTodayDateString();
+    if (!p.dailyChallenge || p.dailyChallenge.todayDate !== today) {
+      return {
+        lastCompletedDate: p.dailyChallenge?.lastCompletedDate || '',
+        streak: p.dailyChallenge?.streak || 0,
+        todaySolvedIds: [],
+        todayDate: today,
+      };
+    }
+    return p.dailyChallenge;
+  }
+
+  static recordDailySolve(puzzleId: string): { record: DailyChallengeRecord; isNewlyCompletedAll: boolean } {
+    const p = this.load();
+    const today = this.getTodayDateString();
+    let current = p.dailyChallenge;
+    if (!current || current.todayDate !== today) {
+      current = {
+        lastCompletedDate: current?.lastCompletedDate || '',
+        streak: current?.streak || 0,
+        todaySolvedIds: [],
+        todayDate: today,
+      };
+    }
+
+    if (!current.todaySolvedIds.includes(puzzleId)) {
+      current.todaySolvedIds.push(puzzleId);
+    }
+
+    let isNewlyCompletedAll = false;
+    if (current.todaySolvedIds.length >= 15 && current.lastCompletedDate !== today) {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+      if (current.lastCompletedDate === yStr) {
+        current.streak += 1;
+      } else {
+        current.streak = 1;
+      }
+      current.lastCompletedDate = today;
+      isNewlyCompletedAll = true;
+    }
+
+    p.dailyChallenge = current;
+    this.save(p);
+    return { record: current, isNewlyCompletedAll };
   }
 }

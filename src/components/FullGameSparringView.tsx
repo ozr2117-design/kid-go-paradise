@@ -31,6 +31,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   X,
+  Map,
 } from 'lucide-react';
 
 const SPARRING_PROFILES: SparringProfile[] = [
@@ -68,6 +69,8 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
   const [aiLevel, setAiLevel] = useState<AISparringLevel>('club');
   const [winRule, setWinRule] = useState<WinRuleMode>('capture'); // Default to Kid-Friendly Capture Race!
   const [captureTarget, setCaptureTarget] = useState<number>(5); // Default: First to capture 5 stones wins!
+  const [handicapCount, setHandicapCount] = useState<number>(0); // 0 = even game (分先), 2, 3, 4, 9 stones
+  const [showTerritoryHeatmap, setShowTerritoryHeatmap] = useState<boolean>(false); // 势力地图 / 看地盘视界
 
   // Runtime Game State
   const [boardState, setBoardState] = useState<BoardState>(() => GoCore.createEmptyBoard(13));
@@ -136,13 +139,13 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
   // Calculate board state at review step
   const reviewState = useMemo(() => {
     if (!isReviewMode) return boardState;
-    let b = GoCore.createEmptyBoard(boardSize);
+    let b = handicapCount > 0 ? GoCore.createHandicapBoard(boardSize, handicapCount) : GoCore.createEmptyBoard(boardSize);
     const subMoves = boardState.moveHistory.slice(0, reviewStep);
     for (const m of subMoves) {
       b = GoCore.playMove(b, { x: m.x, y: m.y }, m.color).nextState;
     }
     return b;
-  }, [isReviewMode, boardState, boardSize, reviewStep]);
+  }, [isReviewMode, boardState, boardSize, reviewStep, handicapCount]);
 
   // Start fresh game
   const startNewGame = useCallback(
@@ -151,16 +154,18 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
       pColor: Color = playerColor,
       lvl: AISparringLevel = aiLevel,
       rule: WinRuleMode = winRule,
-      target: number = captureTarget
+      target: number = captureTarget,
+      handicap: number = handicapCount
     ) => {
       setBoardSize(sz);
       setPlayerColor(pColor);
       setAiLevel(lvl);
       setWinRule(rule);
       setCaptureTarget(target);
+      setHandicapCount(handicap);
 
-      const empty = GoCore.createEmptyBoard(sz);
-      setBoardState(empty);
+      const initialBoard = handicap > 0 ? GoCore.createHandicapBoard(sz, handicap) : GoCore.createEmptyBoard(sz);
+      setBoardState(initialBoard);
       setIsAiThinking(false);
       setIsSettlementOpen(false);
       setSettlementData(null);
@@ -170,24 +175,39 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
       setUndosRemaining(MAX_UNDOS_PER_GAME);
       setCanUndoTurn(false);
 
-      if (rule === 'capture') {
+      if (handicap > 0) {
+        const msg = `让 ${handicap} 子开局！黑棋稳固占领星位，看白棋如何突围～`;
+        setAiDialogue(msg);
+        SoundEngine.speakText(msg);
+        if (pColor === 'black') {
+          setStatusMessage(`让 ${handicap} 子已就位，AI（白棋）先行，正在思考...`);
+          setIsAiThinking(true);
+        } else {
+          setStatusMessage('让子已就位，轮到白棋先行，请落子！');
+        }
+      } else if (rule === 'capture') {
         const msg = `本盘规则：先吃满 ${target} 颗棋子获胜！看看谁的手法更敏锐～`;
         setAiDialogue(msg);
         SoundEngine.speakText(msg);
+        if (pColor === 'white') {
+          setStatusMessage('你执白后行，AI 正在思考第一手开局...');
+          setIsAiThinking(true);
+        } else {
+          setStatusMessage('你执黑先行，请占角开局！');
+        }
       } else {
         const msg = '本盘规则：正规围地盘点目！金角银边，占领更多地盘就能赢！';
         setAiDialogue(msg);
         SoundEngine.speakText(msg);
-      }
-
-      if (pColor === 'white') {
-        setStatusMessage('你执白后行，AI 正在思考第一手开局...');
-        setIsAiThinking(true);
-      } else {
-        setStatusMessage('你执黑先行，请占角开局！');
+        if (pColor === 'white') {
+          setStatusMessage('你执白后行，AI 正在思考第一手开局...');
+          setIsAiThinking(true);
+        } else {
+          setStatusMessage('你执黑先行，请占角开局！');
+        }
       }
     },
-    [boardSize, playerColor, aiLevel, winRule, captureTarget]
+    [boardSize, playerColor, aiLevel, winRule, captureTarget, handicapCount]
   );
 
   // Handle Restart with Double-Insurance Guard (防手滑误触)
@@ -523,6 +543,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
           disabled={isReviewMode || boardState.turn !== playerColor || isAiThinking || boardState.isGameOver}
           showCoordinates={showCoordinates}
           showLibertiesHelper={showLiberties && !isReviewMode}
+          showTerritoryHeatmap={showTerritoryHeatmap && !isReviewMode}
         />
       </div>
 
@@ -771,6 +792,27 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
             </div>
           </div>
 
+          {/* Handicap Setting (让子) */}
+          <div className="flex items-center gap-1 bg-amber-50 px-2 py-1 rounded-xl border border-amber-200 justify-between text-xs">
+            <span className="text-[11px] font-bold text-amber-900">让子:</span>
+            <div className="flex gap-1">
+              {[0, 2, 3, 4].concat(boardSize === 19 ? [9] : []).map((h) => (
+                <button
+                  key={h}
+                  onClick={() => startNewGame(boardSize, playerColor, aiLevel, winRule, captureTarget, h)}
+                  className={`px-1.5 py-0.5 rounded-lg font-black text-[10px] transition ${
+                    handicapCount === h
+                      ? 'bg-amber-600 text-white shadow-xs'
+                      : 'bg-white hover:bg-amber-100 text-amber-900 border border-amber-200'
+                  }`}
+                  title={h === 0 ? '分先（不让子）' : `让 ${h} 子对弈`}
+                >
+                  {h === 0 ? '分先' : `${h}子`}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* AI Difficulty Selection */}
           <div className="flex items-center gap-1 pt-0.5">
             {SPARRING_PROFILES.map((p) => {
@@ -825,8 +867,8 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
           </div>
         </div>
 
-        {/* Bottom Section: In-Game Action Controls (3 Equal Columns, zero destructive buttons) */}
-        <div className="grid grid-cols-3 gap-1.5 shrink-0 pt-0.5">
+        {/* Bottom Section: In-Game Action Controls (4 Balanced Action Buttons) */}
+        <div className="grid grid-cols-4 gap-1 shrink-0 pt-0.5">
           <button
             onClick={handleUndo}
             disabled={
@@ -836,7 +878,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
               undosRemaining <= 0 ||
               !canUndoTurn
             }
-            className="flex items-center justify-center gap-1 py-2 px-1 bg-white hover:bg-amber-50 disabled:opacity-40 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs shadow-xs transition active:scale-95"
+            className="flex items-center justify-center gap-0.5 py-2 px-0.5 bg-white hover:bg-amber-50 disabled:opacity-40 text-amber-900 font-bold rounded-xl border border-amber-300 text-[11px] shadow-xs transition active:scale-95"
             title={
               undosRemaining <= 0
                 ? '本局 3 次悔棋机会已用完'
@@ -845,32 +887,53 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
                 : `悔棋一步（本局剩 ${undosRemaining} 次）`
             }
           >
-            <Undo2 className="w-3.5 h-3.5 text-amber-700" />
-            <span>悔棋 ({undosRemaining}/3)</span>
+            <Undo2 className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+            <span className="truncate">悔棋({undosRemaining})</span>
           </button>
 
           <button
             onClick={handlePass}
             disabled={boardState.turn !== playerColor || isAiThinking || isReviewMode}
-            className="flex items-center justify-center gap-1 py-2 px-1 bg-white hover:bg-amber-50 disabled:opacity-40 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs shadow-xs transition active:scale-95"
+            className="flex items-center justify-center gap-0.5 py-2 px-0.5 bg-white hover:bg-amber-50 disabled:opacity-40 text-amber-900 font-bold rounded-xl border border-amber-300 text-[11px] shadow-xs transition active:scale-95"
             title="放弃本手（停一手）"
           >
-            <CheckCircle2 className="w-3.5 h-3.5 text-amber-700" />
-            <span>停一手(Pass)</span>
+            <CheckCircle2 className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+            <span>停一手</span>
           </button>
 
           <button
             onClick={() => setShowLiberties(!showLiberties)}
             disabled={isReviewMode}
-            className={`flex items-center justify-center gap-1 py-2 px-1 font-bold rounded-xl border text-xs shadow-xs transition active:scale-95 ${
+            className={`flex items-center justify-center gap-0.5 py-2 px-0.5 font-bold rounded-xl border text-[11px] shadow-xs transition active:scale-95 ${
               showLiberties
                 ? 'bg-emerald-500 text-white border-emerald-600 shadow-xs'
                 : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
             }`}
             title="数气辅助光圈"
           >
-            <Eye className="w-3.5 h-3.5" />
-            <span>数气光点</span>
+            <Eye className="w-3.5 h-3.5 shrink-0" />
+            <span>数气点</span>
+          </button>
+
+          <button
+            onClick={() => {
+              const next = !showTerritoryHeatmap;
+              setShowTerritoryHeatmap(next);
+              if (next) {
+                SoundEngine.playSuccessSound();
+                updateAiDialogue('地盘视界已开启！绿区是你的大本营，橙区是我的地盘哦！');
+              }
+            }}
+            disabled={isReviewMode}
+            className={`flex items-center justify-center gap-0.5 py-2 px-0.5 font-bold rounded-xl border text-[11px] shadow-xs transition active:scale-95 ${
+              showTerritoryHeatmap
+                ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-emerald-600 shadow-xs'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            }`}
+            title="地盘势力范围视界（绿区黑地，橙区白地）"
+          >
+            <Map className="w-3.5 h-3.5 shrink-0" />
+            <span>看地盘</span>
           </button>
         </div>
       </div>

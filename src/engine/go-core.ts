@@ -352,4 +352,113 @@ export class GoCore {
 
     return { black: blackTerritory, white: whiteTerritory, neutral: neutralTerritory };
   }
+
+  /**
+   * Detailed territory mapping for visual influence/territory heatmap
+   */
+  static getTerritoryMap(state: BoardState): {
+    blackPoints: Point[];
+    whitePoints: Point[];
+    neutralPoints: Point[];
+  } {
+    const size = state.size;
+    const visited = Array.from({ length: size }, () => Array(size).fill(false));
+    const blackPoints: Point[] = [];
+    const whitePoints: Point[] = [];
+    const neutralPoints: Point[] = [];
+
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        if (state.grid[y][x] === null && !visited[y][x]) {
+          const region: Point[] = [];
+          const queue: Point[] = [{ x, y }];
+          visited[y][x] = true;
+          let touchesBlack = false;
+          let touchesWhite = false;
+
+          while (queue.length > 0) {
+            const curr = queue.shift()!;
+            region.push(curr);
+
+            for (const n of this.getNeighbors(curr, size)) {
+              const stone = state.grid[n.y][n.x];
+              if (stone === 'black') touchesBlack = true;
+              else if (stone === 'white') touchesWhite = true;
+              else if (!visited[n.y][n.x]) {
+                visited[n.y][n.x] = true;
+                queue.push(n);
+              }
+            }
+          }
+
+          if (touchesBlack && !touchesWhite) {
+            blackPoints.push(...region);
+          } else if (touchesWhite && !touchesBlack) {
+            whitePoints.push(...region);
+          } else {
+            neutralPoints.push(...region);
+          }
+        }
+      }
+    }
+
+    return { blackPoints, whitePoints, neutralPoints };
+  }
+
+  /**
+   * Standard handicap star points for 13x13 and 19x19 boards
+   */
+  static getHandicapPoints(size: BoardSize, count: number): Point[] {
+    if (size === 13) {
+      const p = [
+        { x: 9, y: 3 }, // 0: top-right
+        { x: 3, y: 9 }, // 1: bottom-left
+        { x: 9, y: 9 }, // 2: bottom-right
+        { x: 3, y: 3 }, // 3: top-left
+        { x: 6, y: 6 }, // 4: tengen
+      ];
+      if (count === 2) return [p[0], p[1]];
+      if (count === 3) return [p[0], p[1], p[2]];
+      if (count === 4) return [p[3], p[0], p[1], p[2]];
+      if (count >= 5) return [p[3], p[0], p[1], p[2], p[4]];
+      return [];
+    } else if (size === 19) {
+      const p = [
+        { x: 15, y: 3 },  // 0: top-right
+        { x: 3, y: 15 },  // 1: bottom-left
+        { x: 15, y: 15 }, // 2: bottom-right
+        { x: 3, y: 3 },   // 3: top-left
+        { x: 9, y: 9 },   // 4: tengen
+        { x: 3, y: 9 },   // 5: left side
+        { x: 15, y: 9 },  // 6: right side
+        { x: 9, y: 3 },   // 7: top side
+        { x: 9, y: 15 },  // 8: bottom side
+      ];
+      if (count === 2) return [p[0], p[1]];
+      if (count === 3) return [p[0], p[1], p[2]];
+      if (count === 4) return [p[3], p[0], p[1], p[2]];
+      if (count === 5) return [p[3], p[0], p[1], p[2], p[4]];
+      if (count === 6) return [p[3], p[0], p[1], p[2], p[5], p[6]];
+      if (count === 7) return [p[3], p[0], p[1], p[2], p[4], p[5], p[6]];
+      if (count === 8) return [p[3], p[0], p[1], p[2], p[5], p[6], p[7], p[8]];
+      if (count >= 9) return [p[3], p[0], p[1], p[2], p[4], p[5], p[6], p[7], p[8]];
+      return [];
+    }
+    return [];
+  }
+
+  /**
+   * Initialize a handicap board state with pre-placed Black stones
+   */
+  static createHandicapBoard(size: BoardSize, handicapCount: number): BoardState {
+    const state = this.createEmptyBoard(size);
+    if (handicapCount <= 0) return state;
+    const pts = this.getHandicapPoints(size, handicapCount);
+    for (const pt of pts) {
+      state.grid[pt.y][pt.x] = 'black';
+    }
+    // In handicap Go, White makes the first move
+    state.turn = 'white';
+    return state;
+  }
 }

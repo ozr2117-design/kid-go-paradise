@@ -167,6 +167,40 @@ export class SoundEngine {
   }
 
   /**
+   * Fanfare alias for celebration
+   */
+  static playFanfareSound() {
+    this.playVictoryFanfare();
+  }
+
+  /**
+   * Pleasant short chime for correct move
+   */
+  static playSuccessSound() {
+    if (this.isMuted) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    const notes = [
+      { freq: 587.33, delay: 0 },
+      { freq: 880.0, delay: 0.1 },
+    ];
+    notes.forEach(({ freq, delay }) => {
+      const t = ctx.currentTime + delay;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, t);
+      gain.gain.setValueAtTime(0.3, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.38);
+    });
+  }
+
+  /**
    * Gentle error thud (禁着点提示音)
    */
   static playErrorSound() {

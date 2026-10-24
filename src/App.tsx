@@ -9,6 +9,7 @@ import { CaptureBattleView } from './components/CaptureBattleView';
 import { FullGameSparringView } from './components/FullGameSparringView';
 import { PuzzleView } from './components/PuzzleView';
 import { FreePlayView } from './components/FreePlayView';
+import { DailyChallengeView } from './components/DailyChallengeView';
 
 export const App: React.FC = () => {
   const [currentMode, setCurrentMode] = useState<GameMode>('adventure');
@@ -120,6 +121,14 @@ export const App: React.FC = () => {
           <CaptureBattleView
             onWinRecord={handleBattleWin}
             showCoordinates={progress.showCoordinates}
+          />
+        )}
+
+        {currentMode === 'daily' && (
+          <DailyChallengeView
+            showCoordinates={progress.showCoordinates}
+            onGoToSparring={() => setCurrentMode('sparring')}
+            onBackToAdventure={() => setCurrentMode('adventure')}
           />
         )}
 

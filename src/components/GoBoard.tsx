@@ -20,6 +20,7 @@ interface GoBoardProps {
   disabled?: boolean;
   showCoordinates?: boolean;
   showLibertiesHelper?: boolean;
+  showTerritoryHeatmap?: boolean;
   captureTarget?: number;
   highlightPoints?: Point[];
   dangerPoints?: Point[];
@@ -33,6 +34,7 @@ export const GoBoard: React.FC<GoBoardProps> = ({
   disabled = false,
   showCoordinates = true,
   showLibertiesHelper = false,
+  showTerritoryHeatmap = false,
   highlightPoints = [],
   dangerPoints = [],
   singleTapToPlay = false,
@@ -269,6 +271,52 @@ export const GoBoard: React.FC<GoBoardProps> = ({
       }
     }
 
+    // 4.5 Draw Territory / Influence Heatmap (地盘视界)
+    if (showTerritoryHeatmap) {
+      const territoryMap = GoCore.getTerritoryMap(state);
+      const halfCell = cellSize * 0.42;
+
+      // Draw Black territory (soft friendly green/emerald tint)
+      for (const pt of territoryMap.blackPoints) {
+        const { px, py } = pointToPixel(pt);
+        ctx.save();
+        ctx.fillStyle = 'rgba(34, 197, 94, 0.28)';
+        ctx.beginPath();
+        if (typeof ctx.roundRect === 'function') {
+          ctx.roundRect(px - halfCell, py - halfCell, halfCell * 2, halfCell * 2, 4);
+        } else {
+          ctx.rect(px - halfCell, py - halfCell, halfCell * 2, halfCell * 2);
+        }
+        ctx.fill();
+        // Little black territory marker in center
+        ctx.fillStyle = '#15803d';
+        ctx.beginPath();
+        ctx.arc(px, py, Math.max(2.5, cellSize * 0.08), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Draw White territory (soft warm orange tint)
+      for (const pt of territoryMap.whitePoints) {
+        const { px, py } = pointToPixel(pt);
+        ctx.save();
+        ctx.fillStyle = 'rgba(249, 115, 22, 0.28)';
+        ctx.beginPath();
+        if (typeof ctx.roundRect === 'function') {
+          ctx.roundRect(px - halfCell, py - halfCell, halfCell * 2, halfCell * 2, 4);
+        } else {
+          ctx.rect(px - halfCell, py - halfCell, halfCell * 2, halfCell * 2);
+        }
+        ctx.fill();
+        // Little white territory marker in center
+        ctx.fillStyle = '#ea580c';
+        ctx.beginPath();
+        ctx.arc(px, py, Math.max(2.5, cellSize * 0.08), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
     // 5. Draw Stones with 3D gradient & shadow
     const stoneRadius = cellSize * 0.44;
 
@@ -502,6 +550,7 @@ export const GoBoard: React.FC<GoBoardProps> = ({
     disabled,
     showCoordinates,
     showLibertiesHelper,
+    showTerritoryHeatmap,
     dangerPoints,
     highlightPoints,
     size,
