@@ -254,6 +254,134 @@ export const SUPPLEMENTARY_DAILY_PUZZLES: PuzzleData[] = [
       comment: '倒脱靴回提！出其不意反戈一击，白棋全军覆没！',
     },
   },
+
+  // 9. 直四分眼做活
+  {
+    id: 'daily-c9',
+    title: '直四分眼·两眼成活',
+    category: 'life-and-death',
+    difficulty: 'medium',
+    boardSize: 9,
+    initialTurn: 'black',
+    description: '黑棋的大眼形排成一条直四！抢占中间关键点，一分为二，做成两只明亮的大真眼！',
+    voicePrompt: '直四两边通！抢占中间核心点，分成两只活眼！',
+    hint: '在 (2, 1) 点分两半！',
+    initialBoard: {
+      black: [
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+        { x: 2, y: 0 },
+        { x: 3, y: 0 },
+        { x: 4, y: 0 },
+        { x: 5, y: 0 },
+        { x: 0, y: 1 },
+        { x: 5, y: 1 },
+        { x: 0, y: 2 },
+        { x: 1, y: 2 },
+        { x: 2, y: 2 },
+        { x: 3, y: 2 },
+        { x: 4, y: 2 },
+        { x: 5, y: 2 },
+      ],
+      white: [],
+    },
+    solutionTree: {
+      move: { x: 2, y: 1 },
+      isCorrect: true,
+      comment: '直四分眼中！两只大真眼稳稳做成，黑棋净活！',
+    },
+  },
+
+  // 10. 跨断分断要害
+  {
+    id: 'daily-c10',
+    title: '跨断要害·分断对手',
+    category: 'tactics',
+    difficulty: 'medium',
+    boardSize: 9,
+    initialTurn: 'black',
+    description: '白棋两颗子连得不结实！黑棋瞅准中间缝隙一刀切入，分断白棋！',
+    voicePrompt: '看准白棋的虚弱缝隙，一刀跨断切开它！',
+    hint: '在 (3, 2) 跨断切入！',
+    initialBoard: {
+      black: [
+        { x: 2, y: 1 },
+        { x: 4, y: 3 },
+      ],
+      white: [
+        { x: 3, y: 1 },
+        { x: 2, y: 2 },
+      ],
+    },
+    solutionTree: {
+      move: { x: 3, y: 2 },
+      isCorrect: true,
+      comment: '跨断漂亮！白棋联络被彻底切断，两边不能相顾！',
+    },
+  },
+
+  // 11. 虎口点杀破眼
+  {
+    id: 'daily-c11',
+    title: '虎口点眼·致命一击',
+    category: 'life-and-death',
+    difficulty: 'hard',
+    boardSize: 9,
+    initialTurn: 'black',
+    description: '白棋想在角落做眼，黑棋抢先点入白棋虎口，破坏白棋眼位！',
+    voicePrompt: '直插白棋心脏！抢先点入虎口破眼！',
+    hint: '在 (1, 1) 直点要害！',
+    initialBoard: {
+      black: [
+        { x: 0, y: 0 },
+        { x: 2, y: 0 },
+        { x: 3, y: 1 },
+        { x: 2, y: 2 },
+      ],
+      white: [
+        { x: 1, y: 0 },
+        { x: 0, y: 1 },
+        { x: 2, y: 1 },
+        { x: 1, y: 2 },
+      ],
+    },
+    solutionTree: {
+      move: { x: 1, y: 1 },
+      isCorrect: true,
+      comment: '虎口点杀！正中要害，白棋眼形瞬间化为乌有！',
+    },
+  },
+
+  // 12. 有眼杀无眼
+  {
+    id: 'daily-c12',
+    title: '有眼杀无眼·大破僵局',
+    category: 'liberties',
+    difficulty: 'medium',
+    boardSize: 9,
+    initialTurn: 'black',
+    description: '双方都在对杀！黑棋有一只完整的真眼，白棋没有眼！黑棋沉着收白棋外气！',
+    voicePrompt: '有眼杀无眼是铁律！从外围收紧白棋的外气！',
+    hint: '在 (4, 1) 收白棋外气！',
+    initialBoard: {
+      black: [
+        { x: 1, y: 0 },
+        { x: 0, y: 1 },
+        { x: 2, y: 1 },
+        { x: 1, y: 2 },
+      ],
+      white: [
+        { x: 2, y: 0 },
+        { x: 3, y: 1 },
+        { x: 2, y: 2 },
+      ],
+    },
+    solutionTree: {
+      move: { x: 4, y: 1 },
+      isCorrect: true,
+      comment: '有眼杀无眼！白棋气短无法入公气，黑棋大获全胜！',
+    },
+  },
 ];
 
 // Combine all puzzle sources
