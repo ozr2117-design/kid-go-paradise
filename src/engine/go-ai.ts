@@ -444,8 +444,227 @@ export class GoAI {
   }
 
   /**
+   * Helper: Checks if move is an unprovoked second-line crawl extending an existing line-2 stone
+   */
+  private static isSecondLineCrawl(state: BoardState, move: Point, color: Color): boolean {
+    const size = state.size;
+    const distToEdgeX = Math.min(move.x, size - 1 - move.x);
+    const distToEdgeY = Math.min(move.y, size - 1 - move.y);
+    const line = Math.min(distToEdgeX, distToEdgeY) + 1;
+    if (line !== 2) return false;
+
+    // Check if it extends an adjacent friendly stone along the SAME edge
+    // Top or bottom edge (y is 1 or size-2)
+    if (distToEdgeY === 1) {
+      for (const dx of [-1, 1]) {
+        const nx = move.x + dx;
+        if (nx >= 0 && nx < size && state.grid[move.y][nx] === color) {
+          return true;
+        }
+      }
+    }
+    // Left or right edge (x is 1 or size-2)
+    if (distToEdgeX === 1) {
+      for (const dy of [-1, 1]) {
+        const ny = move.y + dy;
+        if (ny >= 0 && ny < size && state.grid[ny][move.x] === color) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Helper: Checks if placing a stone creates a solid 2x2 clump (4-stone dumpling)
+   */
+  private static isSolidSquareClump(
+    grid: (Color | null)[][],
+    move: Point,
+    color: Color,
+    size: number
+  ): boolean {
+    const offsets = [
+      [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }, { dx: 0, dy: 1 }, { dx: 1, dy: 1 }],
+      [{ dx: -1, dy: 0 }, { dx: 0, dy: 0 }, { dx: -1, dy: 1 }, { dx: 0, dy: 1 }],
+      [{ dx: 0, dy: -1 }, { dx: 1, dy: -1 }, { dx: 0, dy: 0 }, { dx: 1, dy: 0 }],
+      [{ dx: -1, dy: -1 }, { dx: 0, dy: -1 }, { dx: -1, dy: 0 }, { dx: 0, dy: 0 }]
+    ];
+
+    for (const sq of offsets) {
+      let isSquare = true;
+      for (const o of sq) {
+        const x = move.x + o.dx;
+        const y = move.y + o.dy;
+        if (x < 0 || x >= size || y < 0 || y >= size || grid[y][x] !== color) {
+          isSquare = false;
+          break;
+        }
+      }
+      if (isSquare) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Helper: Evaluates cutting and separating opponent groups, cross-cuts, and double ataris
+   */
+  private static evaluateCutsAndPunish(
+    state: BoardState,
+    sim: { nextState: BoardState; captured: Point[] },
+    move: Point,
+    color: Color,
+    oppColor: Color
+  ): number {
+    const size = state.size;
+    let bonus = 0;
+
+    // 1. Splitting distinct opponent groups
+    const oppNeighbors = GoCore.getNeighbors(move, size).filter(
+      (n) => state.grid[n.y][n.x] === oppColor
+    );
+    const splitOppGroups = new Map<string, { size: number; liberties: number }>();
+    for (const on of oppNeighbors) {
+      const g = GoCore.findGroup(state.grid, on);
+      if (g) {
+        const key = `${g.points[0].x},${g.points[0].y}`;
+        if (!splitOppGroups.has(key)) {
+          splitOppGroups.set(key, { size: g.points.length, liberties: g.liberties.length });
+        }
+      }
+    }
+
+    if (splitOppGroups.size >= 2) {
+      const groups = Array.from(splitOppGroups.values());
+      const minLibs = Math.min(...groups.map((g) => g.liberties));
+      if (minLibs <= 2) {
+        bonus += 420; // Critical cut: separating groups where at least one is in immediate peril
+      } else if (minLibs <= 3) {
+        bonus += 340; // Severe cut splitting two weak groups
+      } else {
+        bonus += 220; // Standard cut splitting two groups
+      }
+    }
+
+    // 2. Cross-cut / diagonal cutting through enemy stones
+    const diagonals = [
+      { d1: { x: -1, y: 0 }, d2: { x: 0, y: -1 } },
+      { d1: { x: 1, y: 0 }, d2: { x: 0, y: -1 } },
+      { d1: { x: -1, y: 0 }, d2: { x: 0, y: 1 } },
+      { d1: { x: 1, y: 0 }, d2: { x: 0, y: 1 } }
+    ];
+
+    for (const pair of diagonals) {
+      const p1 = { x: move.x + pair.d1.x, y: move.y + pair.d1.y };
+      const p2 = { x: move.x + pair.d2.x, y: move.y + pair.d2.y };
+      if (GoCore.isInside(p1, size) && GoCore.isInside(p2, size)) {
+        if (state.grid[p1.y][p1.x] === oppColor && state.grid[p2.y][p2.x] === oppColor) {
+          const diagCorner = { x: move.x + pair.d1.x, y: move.y + pair.d2.y };
+          if (GoCore.isInside(diagCorner, size) && state.grid[diagCorner.y][diagCorner.x] !== oppColor) {
+            bonus += 180;
+          }
+        }
+      }
+    }
+
+    // 3. Double Atari creation
+    let atariCount = 0;
+    const checkedAtari = new Set<string>();
+    for (const on of oppNeighbors) {
+      const simGroup = GoCore.findGroup(sim.nextState.grid, on);
+      if (simGroup && simGroup.liberties.length === 1) {
+        const key = `${simGroup.points[0].x},${simGroup.points[0].y}`;
+        if (!checkedAtari.has(key)) {
+          checkedAtari.add(key);
+          atariCount++;
+        }
+      }
+    }
+    if (atariCount >= 2) {
+      bonus += 380;
+    }
+
+    return bonus;
+  }
+
+  /**
+   * Comprehensive Board Control & Influence for MCTS Rollout Evaluation
+   */
+  private static evaluateBoardControl(state: BoardState, aiColor: Color): number {
+    const oppColor: Color = aiColor === 'black' ? 'white' : 'black';
+    const size = state.size;
+
+    // 1. Captures differential (weight 3.0 per stone)
+    let scoreDiff = (state.captures[aiColor] - state.captures[oppColor]) * 3.0;
+
+    // 2. Komi
+    const komi = size === 19 ? 7.5 : size === 13 ? 5.5 : 3.5;
+    scoreDiff += (aiColor === 'white' ? komi : -komi);
+
+    // 3. Enclosed territory
+    const est = GoCore.estimateTerritory(state);
+    scoreDiff += (est[aiColor] - est[oppColor]);
+
+    // 4. Group health & presence
+    const visited = new Set<string>();
+    let aiAliveStones = 0;
+    let oppAliveStones = 0;
+    let aiLibBonus = 0;
+    let oppLibBonus = 0;
+
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const c = state.grid[y][x];
+        if (c !== null) {
+          const key = `${x},${y}`;
+          if (!visited.has(key)) {
+            const grp = GoCore.findGroup(state.grid, { x, y });
+            if (grp) {
+              for (const p of grp.points) visited.add(`${p.x},${p.y}`);
+              const libs = grp.liberties.length;
+              if (c === aiColor) {
+                if (libs === 1) {
+                  scoreDiff -= grp.points.length * 2.0;
+                } else {
+                  aiAliveStones += grp.points.length;
+                  aiLibBonus += Math.min(libs, 5) * 0.4;
+                }
+              } else {
+                if (libs === 1) {
+                  scoreDiff += grp.points.length * 2.0;
+                } else {
+                  oppAliveStones += grp.points.length;
+                  oppLibBonus += Math.min(libs, 5) * 0.4;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    scoreDiff += (aiAliveStones - oppAliveStones) * 1.2;
+    scoreDiff += (aiLibBonus - oppLibBonus);
+
+    // 5. Corner control bonus
+    const cornerChecks = size === 9
+      ? [{ x: 2, y: 2 }, { x: 6, y: 2 }, { x: 2, y: 6 }, { x: 6, y: 6 }]
+      : size === 13
+      ? [{ x: 3, y: 3 }, { x: 9, y: 3 }, { x: 3, y: 9 }, { x: 9, y: 9 }]
+      : [{ x: 3, y: 3 }, { x: 15, y: 3 }, { x: 3, y: 15 }, { x: 15, y: 15 }];
+
+    for (const cp of cornerChecks) {
+      const stone = state.grid[cp.y][cp.x];
+      if (stone === aiColor) scoreDiff += 3.5;
+      else if (stone === oppColor) scoreDiff -= 3.5;
+    }
+
+    return scoreDiff;
+  }
+
+  /**
    * Deep Neural-Style Policy Evaluation for 龙尊 (Dragon Sovereign)
-   * Evaluates shapes, 3-3 corner invasions, sabaki, cuts, tenuki, and local efficiency
+   * Evaluates shapes, empty corners, 3-3 invasions, sharp cuts, tenuki, and anti-crawling
    */
   private static evaluateDragonPolicy(
     state: BoardState,
@@ -479,46 +698,104 @@ export class GoAI {
     const distToEdgeY = Math.min(move.y, size - 1 - move.y);
     const line = Math.min(distToEdgeX, distToEdgeY) + 1; // 1 to 5+
 
-    // 1st line (一路): usually endgame or death, penalize early on unless it captures or connects
+    // Line 1 (一路 - 死亡线)
     if (line === 1) {
       if (sim.captured.length === 0 && state.moveHistory.length < size * 3) {
-        score -= 150;
+        score -= 260;
       }
     } else if (line === 3) {
-      // 3rd line: Territory line (实地线), optimal for base making & solid territory
-      score += 65;
+      // 3rd line: Territory line (实地线)
+      score += 75;
     } else if (line === 4) {
-      // 4th line: Influence line (势力线), great for framework & attacks
-      score += 60;
+      // 4th line: Influence line (势力线)
+      score += 70;
     } else if (line === 2) {
-      // 2nd line: Endgame or slide (飞渡/侵入/滑进角部)
-      score += 20;
+      // 2nd line: Check for unprovoked crawl along the edge!
+      const isCrawl = this.isSecondLineCrawl(state, move, color);
+      if (isCrawl && sim.captured.length === 0) {
+        const adjFriendly = GoCore.getNeighbors(move, size).filter(
+          (n) => state.grid[n.y][n.x] === color
+        );
+        let maxExistingLibs = 0;
+        for (const fn of adjFriendly) {
+          const g = GoCore.findGroup(state.grid, fn);
+          if (g && g.liberties.length > maxExistingLibs) maxExistingLibs = g.liberties.length;
+        }
+        if (maxExistingLibs >= 3) {
+          score -= 280; // Severe crawl penalty! Tenuki to open big points!
+        } else {
+          score -= 160; // Crawl penalty
+        }
+      } else {
+        score += 20;
+      }
     }
 
-    // 5. 3-3 Corner Invasions & Star Points (点三三 / 占角)
-    // Famous AI signature: In modern Go AI, 3-3 corner invasion is extremely potent
-    const isCornerPoint33 =
-      (distToEdgeX === 2 && distToEdgeY === 2) || (size === 9 && distToEdgeX === 2 && distToEdgeY === 2);
-    if (isCornerPoint33) {
-      score += 90;
-    }
-    const isStarPoint =
-      (distToEdgeX === 3 && distToEdgeY === 3) || (size === 9 && distToEdgeX === 2 && distToEdgeY === 2);
-    if (isStarPoint && state.moveHistory.length < 12) {
-      score += 85;
+    // 5. Macro Corner Prior (金角银边): Empty corners, approach & 3-3 invasion
+    const cornerStartX = move.x < size / 2 ? 0 : size === 9 ? 5 : size === 13 ? 8 : 13;
+    const cornerEndX = move.x < size / 2 ? (size === 9 ? 3 : size === 13 ? 4 : 5) : size - 1;
+    const cornerStartY = move.y < size / 2 ? 0 : size === 9 ? 5 : size === 13 ? 8 : 13;
+    const cornerEndY = move.y < size / 2 ? (size === 9 ? 3 : size === 13 ? 4 : 5) : size - 1;
+
+    let stonesInCornerSector = 0;
+    let oppStonesInSector = 0;
+    for (let cy = cornerStartY; cy <= cornerEndY; cy++) {
+      for (let cx = cornerStartX; cx <= cornerEndX; cx++) {
+        const sc = state.grid[cy][cx];
+        if (sc !== null) {
+          stonesInCornerSector++;
+          if (sc === oppColor) oppStonesInSector++;
+        }
+      }
     }
 
-    // 6. Sabaki & Invasion into opponent's giant territory (反包围与深入敌阵腾挪)
+    const isCornerPoint =
+      (distToEdgeX === 2 || distToEdgeX === 3) && (distToEdgeY === 2 || distToEdgeY === 3);
+
+    if (stonesInCornerSector === 0) {
+      if (isCornerPoint) {
+        score += 340; // Massive opening prior for empty corners (金角)
+      } else if (line === 3 || line === 4) {
+        score += 220;
+      }
+    } else if (stonesInCornerSector === 1 && oppStonesInSector === 1) {
+      const is33 = distToEdgeX === 2 && distToEdgeY === 2;
+      if (is33) {
+        score += 260; // 3-3 invasion
+      } else if (isCornerPoint) {
+        score += 230; // Approach
+      }
+    }
+
+    // 6. Turning Head towards Center (二路拐头出头 / 一间跳)
+    if (line === 3 || line === 4) {
+      const neighbors = GoCore.getNeighbors(move, size);
+      const connectsToLine2Friendly = neighbors.some((n) => {
+        if (state.grid[n.y][n.x] !== color) return false;
+        const ndX = Math.min(n.x, size - 1 - n.x);
+        const ndY = Math.min(n.y, size - 1 - n.y);
+        return Math.min(ndX, ndY) + 1 === 2;
+      });
+      if (connectsToLine2Friendly) {
+        score += 140; // Turning head to center instead of crawling along edge!
+      }
+    }
+
+    // 7. Sabaki & Invasion into opponent's giant territory (反包围与深入敌阵腾挪)
     const territoryEst = GoCore.estimateTerritory(state);
     const oppTerritory = oppColor === 'black' ? territoryEst.black : territoryEst.white;
     if (oppTerritory > (size * size) * 0.35) {
       // Opponent is growing huge! 龙尊 actively dives into open spaces (3rd line) to make bases!
       if (line === 3 && distToEdgeX >= 2 && distToEdgeY >= 2) {
-        score += 80;
+        score += 90;
       }
     }
 
-    // 7. Shape Quality (好形识别)
+    // 8. Shape Quality & Anti-Dumpling (好形识别与拒绝实心愚形)
+    if (this.isSolidSquareClump(sim.nextState.grid, move, color, size)) {
+      score -= 240; // Heavy dumpling shape!
+    }
+
     const neighbors = GoCore.getNeighbors(move, size);
     let friendlyNeighbors = 0;
     let enemyNeighbors = 0;
@@ -529,7 +806,7 @@ export class GoAI {
 
     // Tiger's mouth formation (surrounded by 3 friendly stones, making an eye)
     if (friendlyNeighbors === 3 && enemyNeighbors === 0) {
-      score += 50; // Beautiful eye formation!
+      score += 110; // Beautiful eye formation!
     }
 
     // Empty triangle penalty (愚形空心三角)
@@ -544,33 +821,17 @@ export class GoAI {
               state.grid[ny][move.x] === color &&
               state.grid[ny][nx] === null
             ) {
-              score -= 35; // Empty triangle penalty!
+              score -= 80; // Empty triangle penalty!
             }
           }
         }
       }
     }
 
-    // 8. Cutting & Connecting (断与粘)
-    let cutGroups = 0;
-    const oppGroupIds = new Set<string>();
-    for (const n of neighbors) {
-      if (state.grid[n.y][n.x] === oppColor) {
-        const g = GoCore.findGroup(state.grid, n);
-        if (g) {
-          const gKey = `${g.points[0].x},${g.points[0].y}`;
-          if (!oppGroupIds.has(gKey)) {
-            oppGroupIds.add(gKey);
-            cutGroups++;
-          }
-        }
-      }
-    }
-    if (cutGroups >= 2) {
-      score += 110; // Splitting/cutting 2 enemy groups is massive!
-    }
+    // 9. Cutting & Connecting with Punish (严厉切断与分割弱棋)
+    score += this.evaluateCutsAndPunish(state, sim, move, color, oppColor);
 
-    // 9. Putting opponent into Atari (叫吃)
+    // 10. Putting opponent into Atari (叫吃)
     for (const n of neighbors) {
       if (sim.nextState.grid[n.y][n.x] === oppColor) {
         const g = GoCore.findGroup(sim.nextState.grid, n);
@@ -580,7 +841,7 @@ export class GoAI {
       }
     }
 
-    // 10. Tenuki / Wide Side Bonus (开辟大场)
+    // 11. Tenuki / Wide Side Bonus (开辟大场)
     let stonesNearby = 0;
     for (let dy = -2; dy <= 2; dy++) {
       for (let dx = -2; dx <= 2; dx++) {
@@ -592,7 +853,7 @@ export class GoAI {
       }
     }
     if (stonesNearby === 0 && line === 3 && state.moveHistory.length < size * 2) {
-      score += 70;
+      score += 120;
     }
 
     return score;
@@ -637,15 +898,19 @@ export class GoAI {
       }
     }
 
-    // 2. Opening variety: In the first few moves, play modern diverse openings
-    if (state.moveHistory.length < (size === 9 ? 3 : 6)) {
+    // 2. Opening variety: In the opening phase, pick from top high-macro moves
+    const openingLimit = size === 9 ? 8 : size === 13 ? 24 : 40;
+    if (state.moveHistory.length < openingLimit) {
       const candidates = legalMoves
         .map((m) => ({ move: m, score: this.evaluateDragonPolicy(state, m, color, oppColor) }))
         .sort((a, b) => b.score - a.score);
 
-      const topOpenings = candidates.slice(0, 3).filter((c) => c.score > 50);
-      if (topOpenings.length > 0) {
-        return topOpenings[Math.floor(Math.random() * topOpenings.length)].move;
+      const topScore = candidates[0]?.score ?? 0;
+      if (topScore >= 180) {
+        const topPool = candidates.filter((c) => c.score >= topScore - 40);
+        if (topPool.length > 0) {
+          return topPool[Math.floor(Math.random() * topPool.length)].move;
+        }
       }
     }
 
@@ -736,7 +1001,7 @@ export class GoAI {
     // Prioritize high-value opening book if early in the game on standard board
     const moveNumber = rootState.moveHistory.length;
     const hasEmergency = this.hasUrgentAtari(rootState, aiColor, oppColor);
-    if (!hasEmergency && !options.captureTarget && moveNumber < (rootState.size === 9 ? 6 : 14)) {
+    if (!hasEmergency && !options.captureTarget && moveNumber < (rootState.size === 9 ? 8 : rootState.size === 13 ? 20 : 36)) {
       const opening = this.getOpeningBookMove(rootState, legalMoves);
       if (opening) return opening;
     }
@@ -869,11 +1134,7 @@ export class GoAI {
       return myCaps >= options.captureTarget || myCaps > oppCaps;
     }
 
-    const est = GoCore.estimateTerritory(state);
-    const komi = state.size === 19 ? 7.5 : state.size === 13 ? 5.5 : 3.5;
-    const aiScore = aiColor === 'black' ? est.black : est.white + komi;
-    const oppScore = aiColor === 'black' ? est.white + komi : est.black;
-    return aiScore > oppScore;
+    return this.evaluateBoardControl(state, aiColor) > 0;
   }
 
   /**
@@ -1095,6 +1356,12 @@ export class GoAI {
       score += 100;
     } else if (dEdge === 0 && captured === 0 && state.moveHistory.length < size * 3) {
       score -= 300; // Death line
+    } else if (dEdge === 1 && this.isSecondLineCrawl(state, move, color) && captured === 0) {
+      score -= 220; // 2nd line crawl penalty
+    }
+
+    if (this.isSolidSquareClump(sim.nextState.grid, move, color, size)) {
+      score -= 200; // 2x2 clump penalty
     }
 
     // Eye shape creation (两眼活棋)
@@ -1121,13 +1388,50 @@ export class GoAI {
     let score = 0;
     const sim = GoCore.playMove(state, move, color);
     if (sim.error) return -9999;
-    if (sim.captured.length > 0) score += sim.captured.length * 400;
+    if (sim.captured.length > 0) score += sim.captured.length * 450;
 
     const grp = GoCore.findGroup(sim.nextState.grid, move);
     if (grp) {
       if (grp.liberties.length === 1 && sim.captured.length === 0) return -8000;
-      score += grp.liberties.length * 20;
+      score += Math.min(grp.liberties.length, 5) * 20;
     }
+
+    const size = state.size;
+    const distToEdgeX = Math.min(move.x, size - 1 - move.x);
+    const distToEdgeY = Math.min(move.y, size - 1 - move.y);
+    const line = Math.min(distToEdgeX, distToEdgeY) + 1;
+
+    // Line 1 penalty
+    if (line === 1 && sim.captured.length === 0) score -= 200;
+
+    // Line 2 crawl penalty
+    if (line === 2 && this.isSecondLineCrawl(state, move, color) && sim.captured.length === 0) {
+      score -= 220;
+    }
+
+    // 2x2 clump penalty
+    if (this.isSolidSquareClump(sim.nextState.grid, move, color, size)) {
+      score -= 200;
+    }
+
+    // 3rd & 4th line efficiency
+    if (line === 3 || line === 4) score += 60;
+
+    // Empty corner bonus
+    const isCornerPoint =
+      (distToEdgeX === 2 || distToEdgeX === 3) && (distToEdgeY === 2 || distToEdgeY === 3);
+    if (isCornerPoint && state.moveHistory.length < (size === 9 ? 12 : 28)) {
+      score += 160;
+    }
+
+    // Cut bonus: touching 2 opponent groups
+    const oppNbs = GoCore.getNeighbors(move, size).filter(
+      (n) => state.grid[n.y][n.x] === oppColor
+    );
+    if (oppNbs.length >= 2) {
+      score += 220;
+    }
+
     return score;
   }
 
@@ -1278,11 +1582,7 @@ export class GoAI {
         { x: 2, y: 2 },
         { x: 6, y: 2 },
         { x: 2, y: 6 },
-        { x: 6, y: 6 },
-        { x: 4, y: 2 },
-        { x: 2, y: 4 },
-        { x: 6, y: 4 },
-        { x: 4, y: 6 }
+        { x: 6, y: 6 }
       );
     } else if (size === 13) {
       stars.push(
@@ -1314,11 +1614,27 @@ export class GoAI {
       );
     }
 
-    for (const pt of stars) {
-      if (state.grid[pt.y][pt.x] === null && legalMoves.some((m) => GoCore.pointsEqual(m, pt))) {
-        return pt;
+    const available = stars.filter(
+      (pt) => state.grid[pt.y][pt.x] === null && legalMoves.some((m) => GoCore.pointsEqual(m, pt))
+    );
+    if (available.length === 0) return null;
+
+    // Prioritize corners that are completely empty (no stones in 3x3 radius)
+    const trulyEmpty = available.filter((pt) => {
+      let count = 0;
+      for (let dy = -2; dy <= 2; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          const cx = pt.x + dx;
+          const cy = pt.y + dy;
+          if (cx >= 0 && cx < size && cy >= 0 && cy < size && (dx !== 0 || dy !== 0)) {
+            if (state.grid[cy][cx] !== null) count++;
+          }
+        }
       }
-    }
-    return null;
+      return count === 0;
+    });
+
+    const pool = trulyEmpty.length > 0 ? trulyEmpty : available;
+    return pool[Math.floor(Math.random() * pool.length)];
   }
 }

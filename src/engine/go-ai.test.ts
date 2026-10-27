@@ -109,4 +109,50 @@ describe('GoAI Kid-Friendly Sparring Engine', () => {
       expect(GoCore.isLegalMove(board19, move19, 'white').legal).toBe(true);
     }
   });
+
+  it('penalizes 2nd-line crawl and plays tenuki to open big points on 13x13', () => {
+    let board = GoCore.createEmptyBoard(13);
+    // White stone on 2nd line: (3, 1) [D12]
+    board.grid[1][3] = 'white';
+    board.grid[1][4] = 'white'; // White has two stones on 2nd line with 4 liberties
+    // Black plays nearby on 3rd line: (3, 2)
+    board.grid[2][3] = 'black';
+    board.turn = 'white';
+    board.moveHistory = [
+      { x: 3, y: 1, color: 'white' },
+      { x: 3, y: 2, color: 'black' },
+      { x: 4, y: 1, color: 'white' },
+    ];
+
+    const move = GoAI.getBestMove(board, 'white', {
+      sparringLevel: 'grandmaster',
+      isFullGame: true,
+    });
+
+    expect(move).not.toBeNull();
+    // Move should NOT continue crawling horizontally along y=1 at (2,1) or (5,1)
+    const isCrawl = (move?.y === 1 && (move?.x === 2 || move?.x === 5));
+    expect(isCrawl).toBe(false);
+  });
+
+  it('aggressively cuts disconnected opponent groups', () => {
+    let board = GoCore.createEmptyBoard(13);
+    // Black has two separate stones with a cut point at (4, 4)
+    board.grid[4][3] = 'black'; // (3, 4)
+    board.grid[3][4] = 'black'; // (4, 3)
+    board.turn = 'white';
+    board.moveHistory = [
+      { x: 3, y: 4, color: 'black' },
+      { x: 4, y: 3, color: 'black' },
+    ];
+
+    const move = GoAI.getBestMove(board, 'white', {
+      sparringLevel: 'grandmaster',
+      isFullGame: true,
+    });
+
+    expect(move).not.toBeNull();
+    // White should target cuts, corners or contact pressure rather than suicidal moves
+    expect(GoCore.isLegalMove(board, move!, 'white').legal).toBe(true);
+  });
 });
