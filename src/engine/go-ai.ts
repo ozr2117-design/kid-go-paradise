@@ -415,6 +415,14 @@ export class GoAI {
     options: AIMoveOptions
   ): Point | null {
     const size = state.size;
+    const isGrandmaster =
+      options.difficulty === 'grandmaster' || options.sparringLevel === 'grandmaster';
+
+    // 1. 🐲 龙尊 (Dragon Sovereign - Neural-Style Policy Priors + Deep MCTS + Sabaki Tenuki)
+    if (isGrandmaster) {
+      return this.getDragonSovereignFullGameMove(state, color, opponentColor, legalMoves, options);
+    }
+
     const isMaster =
       options.difficulty === 'master' ||
       options.difficulty === 'advanced' ||
@@ -433,6 +441,280 @@ export class GoAI {
     // Master Full Game Sparring uses MCTS
     const mctsIterations = size === 9 ? 450 : size === 13 ? 280 : 140;
     return this.runMCTS(state, color, opponentColor, legalMoves, mctsIterations, options);
+  }
+
+  /**
+   * Deep Neural-Style Policy Evaluation for 龙尊 (Dragon Sovereign)
+   * Evaluates shapes, 3-3 corner invasions, sabaki, cuts, tenuki, and local efficiency
+   */
+  private static evaluateDragonPolicy(
+    state: BoardState,
+    move: Point,
+    color: Color,
+    oppColor: Color
+  ): number {
+    const size = state.size;
+    let score = 0;
+
+    // 1. Quick simulation check
+    const sim = GoCore.playMove(state, move, color);
+    if (sim.error) return -99999;
+
+    // 2. Immediate capture reward (scales with captured stones)
+    if (sim.captured.length > 0) {
+      score += sim.captured.length * 350;
+    }
+
+    // 3. Self-Atari / shortage of liberties safety penalty
+    const grp = GoCore.findGroup(sim.nextState.grid, move);
+    if (grp) {
+      if (grp.liberties.length === 1 && sim.captured.length === 0) {
+        return -50000;
+      }
+      score += Math.min(grp.liberties.length, 5) * 25;
+    }
+
+    // 4. Line position evaluation (金角银边草肚皮)
+    const distToEdgeX = Math.min(move.x, size - 1 - move.x);
+    const distToEdgeY = Math.min(move.y, size - 1 - move.y);
+    const line = Math.min(distToEdgeX, distToEdgeY) + 1; // 1 to 5+
+
+    // 1st line (一路): usually endgame or death, penalize early on unless it captures or connects
+    if (line === 1) {
+      if (sim.captured.length === 0 && state.moveHistory.length < size * 3) {
+        score -= 150;
+      }
+    } else if (line === 3) {
+      // 3rd line: Territory line (实地线), optimal for base making & solid territory
+      score += 65;
+    } else if (line === 4) {
+      // 4th line: Influence line (势力线), great for framework & attacks
+      score += 60;
+    } else if (line === 2) {
+      // 2nd line: Endgame or slide (飞渡/侵入/滑进角部)
+      score += 20;
+    }
+
+    // 5. 3-3 Corner Invasions & Star Points (点三三 / 占角)
+    // Famous AI signature: In modern Go AI, 3-3 corner invasion is extremely potent
+    const isCornerPoint33 =
+      (distToEdgeX === 2 && distToEdgeY === 2) || (size === 9 && distToEdgeX === 2 && distToEdgeY === 2);
+    if (isCornerPoint33) {
+      score += 90;
+    }
+    const isStarPoint =
+      (distToEdgeX === 3 && distToEdgeY === 3) || (size === 9 && distToEdgeX === 2 && distToEdgeY === 2);
+    if (isStarPoint && state.moveHistory.length < 12) {
+      score += 85;
+    }
+
+    // 6. Sabaki & Invasion into opponent's giant territory (反包围与深入敌阵腾挪)
+    const territoryEst = GoCore.estimateTerritory(state);
+    const oppTerritory = oppColor === 'black' ? territoryEst.black : territoryEst.white;
+    if (oppTerritory > (size * size) * 0.35) {
+      // Opponent is growing huge! 龙尊 actively dives into open spaces (3rd line) to make bases!
+      if (line === 3 && distToEdgeX >= 2 && distToEdgeY >= 2) {
+        score += 80;
+      }
+    }
+
+    // 7. Shape Quality (好形识别)
+    const neighbors = GoCore.getNeighbors(move, size);
+    let friendlyNeighbors = 0;
+    let enemyNeighbors = 0;
+    for (const n of neighbors) {
+      if (state.grid[n.y][n.x] === color) friendlyNeighbors++;
+      else if (state.grid[n.y][n.x] === oppColor) enemyNeighbors++;
+    }
+
+    // Tiger's mouth formation (surrounded by 3 friendly stones, making an eye)
+    if (friendlyNeighbors === 3 && enemyNeighbors === 0) {
+      score += 50; // Beautiful eye formation!
+    }
+
+    // Empty triangle penalty (愚形空心三角)
+    if (friendlyNeighbors === 2) {
+      for (const dx of [-1, 1]) {
+        for (const dy of [-1, 1]) {
+          const nx = move.x + dx;
+          const ny = move.y + dy;
+          if (nx >= 0 && nx < size && ny >= 0 && ny < size) {
+            if (
+              state.grid[move.y][nx] === color &&
+              state.grid[ny][move.x] === color &&
+              state.grid[ny][nx] === null
+            ) {
+              score -= 35; // Empty triangle penalty!
+            }
+          }
+        }
+      }
+    }
+
+    // 8. Cutting & Connecting (断与粘)
+    let cutGroups = 0;
+    const oppGroupIds = new Set<string>();
+    for (const n of neighbors) {
+      if (state.grid[n.y][n.x] === oppColor) {
+        const g = GoCore.findGroup(state.grid, n);
+        if (g) {
+          const gKey = `${g.points[0].x},${g.points[0].y}`;
+          if (!oppGroupIds.has(gKey)) {
+            oppGroupIds.add(gKey);
+            cutGroups++;
+          }
+        }
+      }
+    }
+    if (cutGroups >= 2) {
+      score += 110; // Splitting/cutting 2 enemy groups is massive!
+    }
+
+    // 9. Putting opponent into Atari (叫吃)
+    for (const n of neighbors) {
+      if (sim.nextState.grid[n.y][n.x] === oppColor) {
+        const g = GoCore.findGroup(sim.nextState.grid, n);
+        if (g && g.liberties.length === 1) {
+          score += 130;
+        }
+      }
+    }
+
+    // 10. Tenuki / Wide Side Bonus (开辟大场)
+    let stonesNearby = 0;
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        const cx = move.x + dx;
+        const cy = move.y + dy;
+        if (cx >= 0 && cx < size && cy >= 0 && cy < size && (dx !== 0 || dy !== 0)) {
+          if (state.grid[cy][cx] !== null) stonesNearby++;
+        }
+      }
+    }
+    if (stonesNearby === 0 && line === 3 && state.moveHistory.length < size * 2) {
+      score += 70;
+    }
+
+    return score;
+  }
+
+  /**
+   * 🐲 神级龙尊 (Dragon Sovereign) Full Game Sparring AI
+   * Combines Neural-Style Policy Priors + Deep MCTS + Sabaki Tenuki + Stochastic Variety
+   */
+  private static getDragonSovereignFullGameMove(
+    state: BoardState,
+    color: Color,
+    oppColor: Color,
+    legalMoves: Point[],
+    options: AIMoveOptions
+  ): Point | null {
+    const size = state.size;
+
+    // 1. Immediate high-value tactical emergencies
+    const escapes = this.findEscapeAtariMoves(state, color, legalMoves);
+    if (escapes.length > 0) {
+      const bestEscape = escapes.sort(
+        (a, b) =>
+          this.evaluateDragonPolicy(state, b, color, oppColor) -
+          this.evaluateDragonPolicy(state, a, color, oppColor)
+      )[0];
+      if (this.evaluateDragonPolicy(state, bestEscape, color, oppColor) > 0) {
+        return bestEscape;
+      }
+    }
+
+    const captures = this.findImmediateCaptures(state, color, legalMoves);
+    if (captures.length > 0) {
+      const bestCap = captures.sort((a, b) => {
+        const simA = GoCore.playMove(state, a, color).captured.length;
+        const simB = GoCore.playMove(state, b, color).captured.length;
+        return simB - simA;
+      })[0];
+      const capCount = GoCore.playMove(state, bestCap, color).captured.length;
+      if (capCount >= 2) {
+        return bestCap;
+      }
+    }
+
+    // 2. Opening variety: In the first few moves, play modern diverse openings
+    if (state.moveHistory.length < (size === 9 ? 3 : 6)) {
+      const candidates = legalMoves
+        .map((m) => ({ move: m, score: this.evaluateDragonPolicy(state, m, color, oppColor) }))
+        .sort((a, b) => b.score - a.score);
+
+      const topOpenings = candidates.slice(0, 3).filter((c) => c.score > 50);
+      if (topOpenings.length > 0) {
+        return topOpenings[Math.floor(Math.random() * topOpenings.length)].move;
+      }
+    }
+
+    // 3. Deep MCTS guided by Dragon Policy Prior
+    const mctsIterations = size === 9 ? 550 : size === 13 ? 360 : 180;
+    const sortedUntried = [...legalMoves].sort((a, b) => {
+      return (
+        this.evaluateDragonPolicy(state, b, color, oppColor) -
+        this.evaluateDragonPolicy(state, a, color, oppColor)
+      );
+    });
+
+    const startTime = Date.now();
+    const maxTimeMs = 480;
+    const root = new MCTSNode(null, oppColor, null, sortedUntried);
+
+    for (let iter = 0; iter < mctsIterations; iter++) {
+      if (Date.now() - startTime > maxTimeMs) break;
+
+      let node = root;
+      let simState = GoCore.cloneState(state);
+
+      while (node.untriedMoves.length === 0 && node.children.length > 0) {
+        node = this.selectBestUCTChild(node);
+        if (node.move) {
+          const res = GoCore.playMove(simState, node.move, node.color, options.captureTarget);
+          simState = res.nextState;
+        }
+      }
+
+      if (node.untriedMoves.length > 0) {
+        const move = node.untriedMoves.shift()!;
+        const nextColor = node.color === 'black' ? 'white' : 'black';
+        const res = GoCore.playMove(simState, move, nextColor, options.captureTarget);
+        simState = res.nextState;
+
+        const childLegal = this.getFastLegalMoves(simState, simState.turn);
+        const childNode = new MCTSNode(move, nextColor, node, childLegal);
+        node.children.push(childNode);
+        node = childNode;
+      }
+
+      const winResult = this.fastRollout(simState, simState.turn, color, options);
+
+      let curr: MCTSNode | null = node;
+      while (curr !== null) {
+        curr.visits++;
+        if (winResult) {
+          curr.wins += 1;
+        }
+        curr = curr.parent;
+      }
+    }
+
+    if (root.children.length === 0) {
+      return sortedUntried[0] || legalMoves[0];
+    }
+
+    root.children.sort((a, b) => b.visits - a.visits);
+
+    // Among top moves with close visits (within 12%), pick with subtle temperature for true master unpredictability
+    const topVisits = root.children[0].visits;
+    const topTier = root.children.filter((c) => c.visits >= topVisits * 0.88);
+    if (topTier.length > 1 && Math.random() < 0.35) {
+      const pickedChild = topTier[Math.floor(Math.random() * topTier.length)];
+      return pickedChild.move;
+    }
+
+    return root.children[0].move;
   }
 
   /**

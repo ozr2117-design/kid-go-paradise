@@ -39,7 +39,7 @@ export type GameMode = 'adventure' | 'battle' | 'sparring' | 'puzzle' | 'sandbox
 
 export type WinRuleMode = 'capture' | 'territory';
 
-export type AISparringLevel = 'novice' | 'club' | 'master';
+export type AISparringLevel = 'novice' | 'club' | 'master' | 'grandmaster';
 
 export interface SparringProfile {
   id: AISparringLevel;

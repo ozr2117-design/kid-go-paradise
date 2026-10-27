@@ -85,4 +85,28 @@ describe('GoAI Kid-Friendly Sparring Engine', () => {
     });
     expect(dragonMove).toEqual({ x: 3, y: 4 });
   });
+
+  it('runs Dragon Sovereign (龙尊) Grandmaster sparring AI on 13x13 and 19x19 with legal policy moves', () => {
+    // 13x13
+    const board13 = GoCore.createEmptyBoard(13);
+    const move13 = GoAI.getBestMove(board13, 'black', {
+      sparringLevel: 'grandmaster',
+      isFullGame: true,
+    });
+    expect(move13).not.toBeNull();
+    if (move13) {
+      expect(GoCore.isLegalMove(board13, move13, 'black').legal).toBe(true);
+    }
+
+    // 19x19 with stones
+    let board19 = GoCore.createHandicapBoard(19, 4);
+    const move19 = GoAI.getBestMove(board19, 'white', {
+      sparringLevel: 'grandmaster',
+      isFullGame: true,
+    });
+    expect(move19).not.toBeNull();
+    if (move19) {
+      expect(GoCore.isLegalMove(board19, move19, 'white').legal).toBe(true);
+    }
+  });
 });

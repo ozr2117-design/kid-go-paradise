@@ -56,6 +56,13 @@ const SPARRING_PROFILES: SparringProfile[] = [
     rank: '5K~1D MCTS老手',
     description: '搭载蒙特卡洛树搜寻 (MCTS) 深度推演，算气严密、大局观强，24子长局极具压迫感！',
   },
+  {
+    id: 'grandmaster',
+    name: '龙尊',
+    avatar: '🐲',
+    rank: '业余段位·神经大脑',
+    description: '神级龙尊！深谙金角银边、大局腾挪与虚实转换，绝不抱团等死，盘盘招法不重样！',
+  },
 ];
 
 interface FullGameSparringViewProps {
@@ -196,7 +203,10 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
           setStatusMessage('你执黑先行，请占角开局！');
         }
       } else {
-        const msg = '本盘规则：正规围地盘点目！金角银边，占领更多地盘就能赢！';
+        const msg =
+          lvl === 'grandmaster'
+            ? '吾乃龙尊！金角银边，全盘虚实皆通，就让我见识一下你的大局观！🐲'
+            : '本盘规则：正规围地盘点目！金角银边，占领更多地盘就能赢！';
         setAiDialogue(msg);
         SoundEngine.speakText(msg);
         if (pColor === 'white') {
@@ -821,13 +831,17 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
                 <button
                   key={p.id}
                   onClick={() => startNewGame(boardSize, playerColor, p.id, winRule, captureTarget)}
-                  className={`flex-1 py-1.5 px-1 rounded-xl text-[11px] font-black transition flex items-center justify-center gap-0.5 ${
+                  className={`flex-1 py-1.5 px-0.5 rounded-xl text-[11px] font-black transition flex items-center justify-center gap-0.5 ${
                     isSelected
-                      ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow'
+                      ? p.id === 'grandmaster'
+                        ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-amber-500 text-white shadow-md ring-2 ring-yellow-400'
+                        : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow'
+                      : p.id === 'grandmaster'
+                      ? 'bg-gradient-to-r from-purple-100 to-indigo-100 hover:from-purple-200 hover:to-indigo-200 text-purple-950 border border-purple-300'
                       : 'bg-amber-100/70 hover:bg-amber-200 text-amber-900 border border-amber-300'
                   }`}
                 >
-                  <span>{p.avatar}</span>
+                  <span className={p.id === 'grandmaster' ? 'animate-pulse' : ''}>{p.avatar}</span>
                   <span>{p.name}</span>
                 </button>
               );
