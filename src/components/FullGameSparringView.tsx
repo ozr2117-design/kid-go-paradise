@@ -193,7 +193,10 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
           setStatusMessage('让子已就位，轮到白棋先行，请落子！');
         }
       } else if (rule === 'capture') {
-        const msg = `本盘规则：先吃满 ${target} 颗棋子获胜！看看谁的手法更敏锐～`;
+        const msg =
+          lvl === 'grandmaster'
+            ? '吾乃龙尊！吃子决战与虚实腾挪双绝，先吃满 5 颗子获胜，拿出全部实力吧！🐲'
+            : `本盘规则：先吃满 ${target} 颗棋子获胜！看看谁的手法更敏锐～`;
         setAiDialogue(msg);
         SoundEngine.speakText(msg);
         if (pColor === 'white') {
@@ -218,6 +221,22 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
       }
     },
     [boardSize, playerColor, aiLevel, winRule, captureTarget, handicapCount]
+  );
+
+  // Directly switch AI Opponent level with immediate voice and audio feedback
+  const handleSelectLevel = useCallback(
+    (level: AISparringLevel) => {
+      SoundEngine.playStoneSound();
+      setAiLevel(level);
+      const isGrandmaster = level === 'grandmaster';
+      const msg = isGrandmaster
+        ? '吾乃龙尊！金角银边，全盘虚实皆通，就让我见识一下你的大局观！🐲'
+        : `${SPARRING_PROFILES.find((p) => p.id === level)?.name || 'AI'} 已就位，请落子！`;
+      setAiDialogue(msg);
+      SoundEngine.speakText(msg);
+      startNewGame(boardSize, playerColor, level, winRule, captureTarget, handicapCount);
+    },
+    [boardSize, playerColor, winRule, captureTarget, handicapCount, startNewGame]
   );
 
   // Handle Restart with Double-Insurance Guard (防手滑误触)
@@ -558,8 +577,50 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
       </div>
 
       {/* 2. RIGHT SIDEBAR: ALL STATS, CAPTURE FEEDBACK & OPTIONS */}
-      <div className="w-full md:w-80 lg:w-84 xl:w-88 h-full flex flex-col justify-start gap-2.5 overflow-y-auto pr-0.5 shrink-0">
-        {/* Top Section: AI Avatar, Profile & Live Dialogue */}
+      <div className="w-full md:w-80 lg:w-84 xl:w-88 h-full flex flex-col justify-start gap-2 sm:gap-2.5 overflow-y-auto pr-0.5 shrink-0">
+        {/* Top: 4 AI Opponents Quick Switcher (与吃子战完全统一，置顶直观可点) */}
+        <div className="bg-white/95 rounded-2xl p-2 sm:p-2.5 border-2 border-amber-300 shadow-xs flex flex-col gap-1.5 shrink-0">
+          <div className="flex items-center justify-between px-0.5">
+            <span className="text-xs font-black text-amber-950 font-cartoon flex items-center gap-1">
+              <span>🥋 挑选对弈对手</span>
+            </span>
+            <span className="text-[10px] font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-full">
+              当前: {activeProfile.name} ({activeProfile.rank.split(' ')[0]})
+            </span>
+          </div>
+
+          <div className="grid grid-cols-4 gap-1">
+            {SPARRING_PROFILES.map((p) => {
+              const isSelected = p.id === aiLevel;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => handleSelectLevel(p.id)}
+                  className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-xl font-bold transition-all cursor-pointer active:scale-95 ${
+                    isSelected
+                      ? p.id === 'grandmaster'
+                        ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-amber-500 text-white shadow-md scale-[1.03] ring-2 ring-yellow-400'
+                        : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md scale-[1.03] ring-2 ring-amber-300'
+                      : p.id === 'grandmaster'
+                      ? 'bg-gradient-to-r from-purple-100 to-indigo-100 hover:from-purple-200 hover:to-indigo-200 text-purple-950 border border-purple-300'
+                      : 'bg-amber-100/70 hover:bg-amber-200 text-amber-900 border border-amber-300'
+                  }`}
+                  title={`${p.name} (${p.rank})`}
+                >
+                  <span className="text-lg sm:text-xl leading-none">{p.avatar}</span>
+                  <span className="text-[11px] font-cartoon mt-0.5 truncate w-full text-center leading-tight">
+                    {p.name}
+                  </span>
+                  <span className="text-[9px] opacity-90 truncate leading-tight font-normal">
+                    {p.rank.split(' ')[0]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Top Section 2: AI Avatar, Profile & Live Dialogue */}
         <div className="bg-white/95 rounded-2xl p-2.5 sm:p-3 border-2 border-amber-300 shadow-xs flex flex-col gap-2 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-amber-100 to-yellow-200 border-2 border-amber-400 flex items-center justify-center text-xl shadow-inner shrink-0">
@@ -830,10 +891,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
               return (
                 <button
                   key={p.id}
-                  onClick={() => {
-                    SoundEngine.playStoneSound();
-                    startNewGame(boardSize, playerColor, p.id, winRule, captureTarget, handicapCount);
-                  }}
+                  onClick={() => handleSelectLevel(p.id)}
                   className={`flex-1 py-1.5 px-0.5 rounded-xl text-[11px] font-black transition flex items-center justify-center gap-0.5 cursor-pointer active:scale-95 ${
                     isSelected
                       ? p.id === 'grandmaster'
