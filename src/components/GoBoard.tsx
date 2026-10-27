@@ -94,11 +94,12 @@ export const GoBoard: React.FC<GoBoardProps> = ({
     };
   }, []);
 
-  // Compute geometry
+  // Compute geometry dynamically so stones NEVER overflow board edge and coordinates NEVER overlap stones
   const size = state.size;
-  const padding = showCoordinates ? 20 : 12;
-  const boardAreaSize = displaySize - padding * 2;
-  const cellSize = boardAreaSize / (size - 1);
+  const coordRatio = showCoordinates ? (size <= 9 ? 0.90 : size <= 13 ? 0.80 : 0.72) : 0.52;
+  const cellSize = displaySize / (size - 1 + 2 * coordRatio);
+  const padding = Math.round(coordRatio * cellSize);
+  const stoneRadius = cellSize * 0.44;
 
   // Convert board grid point (x, y) to canvas pixel coordinates
   const pointToPixel = useCallback(
@@ -256,18 +257,22 @@ export const GoBoard: React.FC<GoBoardProps> = ({
 
     // 4. Draw Coordinates (A B C / 1 2 3)
     if (showCoordinates) {
-      ctx.font = `bold ${Math.max(10, Math.floor(cellSize * 0.32))}px "PingFang SC", sans-serif`;
-      ctx.fillStyle = '#8f5c35';
+      const coordFontSize = Math.max(9, Math.min(13, Math.floor(cellSize * 0.28)));
+      ctx.font = `bold ${coordFontSize}px "PingFang SC", "Microsoft YaHei", sans-serif`;
+      ctx.fillStyle = '#78350f';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
       const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T'];
+      // Center coordinates in the comfortable margin between board wood border and outermost stone edge
+      const coordOffset = Math.max(8, Math.floor((padding - stoneRadius + 4) / 2));
+
       for (let i = 0; i < size; i++) {
         const topCoord = pointToPixel({ x: i, y: 0 });
-        ctx.fillText(letters[i], topCoord.px, Math.max(9, padding * 0.45));
+        ctx.fillText(letters[i], topCoord.px, coordOffset);
 
         const leftCoord = pointToPixel({ x: 0, y: i });
-        ctx.fillText(String(size - i), Math.max(9, padding * 0.45), leftCoord.py);
+        ctx.fillText(String(size - i), coordOffset, leftCoord.py);
       }
     }
 
@@ -318,8 +323,6 @@ export const GoBoard: React.FC<GoBoardProps> = ({
     }
 
     // 5. Draw Stones with 3D gradient & shadow
-    const stoneRadius = cellSize * 0.44;
-
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
         const stone = state.grid[y][x];
