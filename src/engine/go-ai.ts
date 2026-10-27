@@ -87,7 +87,7 @@ export class GoAI {
     legalMoves: Point[],
     options: AIMoveOptions
   ): Point | null {
-    const diff = options.difficulty || 'beginner';
+    const diff = options.difficulty || (options.sparringLevel as AIDifficulty) || 'beginner';
 
     // 1. 萌萌兔 (15K 练习练手 - 温和可爱，适度留破绽)
     if (diff === 'beginner') {

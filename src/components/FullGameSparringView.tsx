@@ -830,8 +830,11 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
               return (
                 <button
                   key={p.id}
-                  onClick={() => startNewGame(boardSize, playerColor, p.id, winRule, captureTarget)}
-                  className={`flex-1 py-1.5 px-0.5 rounded-xl text-[11px] font-black transition flex items-center justify-center gap-0.5 ${
+                  onClick={() => {
+                    SoundEngine.playStoneSound();
+                    startNewGame(boardSize, playerColor, p.id, winRule, captureTarget, handicapCount);
+                  }}
+                  className={`flex-1 py-1.5 px-0.5 rounded-xl text-[11px] font-black transition flex items-center justify-center gap-0.5 cursor-pointer active:scale-95 ${
                     isSelected
                       ? p.id === 'grandmaster'
                         ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-amber-500 text-white shadow-md ring-2 ring-yellow-400'
@@ -840,8 +843,9 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
                       ? 'bg-gradient-to-r from-purple-100 to-indigo-100 hover:from-purple-200 hover:to-indigo-200 text-purple-950 border border-purple-300'
                       : 'bg-amber-100/70 hover:bg-amber-200 text-amber-900 border border-amber-300'
                   }`}
+                  title={`${p.name} - ${p.rank}`}
                 >
-                  <span className={p.id === 'grandmaster' ? 'animate-pulse' : ''}>{p.avatar}</span>
+                  <span className={p.id === 'grandmaster' ? 'animate-pulse text-base' : 'text-sm'}>{p.avatar}</span>
                   <span>{p.name}</span>
                 </button>
               );

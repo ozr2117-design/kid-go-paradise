@@ -232,10 +232,17 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
               return (
                 <button
                   key={animal.id}
-                  onClick={() => initGame(animal, animal.captureTarget)}
-                  className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-xl font-bold transition-all ${
+                  onClick={() => {
+                    SoundEngine.playStoneSound();
+                    initGame(animal, animal.captureTarget);
+                  }}
+                  className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-xl font-bold transition-all cursor-pointer active:scale-95 ${
                     isSelected
-                      ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md scale-[1.03] ring-2 ring-amber-300'
+                      ? animal.id === 'dragon'
+                        ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-amber-500 text-white shadow-md scale-[1.03] ring-2 ring-yellow-400'
+                        : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md scale-[1.03] ring-2 ring-amber-300'
+                      : animal.id === 'dragon'
+                      ? 'bg-gradient-to-r from-purple-100 to-indigo-100 hover:from-purple-200 hover:to-indigo-200 text-purple-950 border border-purple-300'
                       : 'bg-amber-100/70 hover:bg-amber-200 text-amber-900 border border-amber-300'
                   }`}
                   title={`${animal.name} (${animal.rank})`}

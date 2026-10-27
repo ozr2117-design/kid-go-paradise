@@ -84,15 +84,15 @@ export const ANIMAL_OPPONENTS: AnimalOpponent[] = [
   },
   {
     id: 'dragon',
-    name: '棋道龙',
-    avatar: '🐉',
-    rank: '3D~5D 终极龙神',
+    name: '龙尊',
+    avatar: '🐲',
+    rank: '3D 至 5D 终极龙尊',
     difficulty: 'grandmaster',
     boardSize: 13,
     captureTarget: 20, // 13路先吃20子终极耐力与战术大对决！
-    intro: '吼！我是守护棋道的龙神！攻守兼备，大局与死活双绝！先吃满 20 颗子获胜，拿出你全部的实力吧！',
+    intro: '吼！吾乃龙尊！攻守兼备，大局与死活双绝！先吃满 20 颗子获胜，拿出你全部的实力吧！',
     taunts: [
-      '龙游深海，不惧风浪！看我这一招倒扑手筋！',
+      '龙游深海，不惧风浪！看我这一招腾挪反杀！',
       '贪吃小利可是会丢掉整条大龙的哦～',
       '棋盘如战场，每一步都要算清死活！',
       '好一手妙着，不过我早已看穿～',
