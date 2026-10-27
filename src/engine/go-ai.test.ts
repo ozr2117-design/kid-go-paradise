@@ -155,4 +155,46 @@ describe('GoAI Kid-Friendly Sparring Engine', () => {
     // White should target cuts, corners or contact pressure rather than suicidal moves
     expect(GoCore.isLegalMove(board, move!, 'white').legal).toBe(true);
   });
+
+  it('strictly forbids AI from self-filling its own true eye (自填真眼)', () => {
+    let board = GoCore.createEmptyBoard(9);
+    // Construct a friendly group with an eye at (1, 1)
+    // Stones at (1, 0), (0, 1), (2, 1), (1, 2)
+    board.grid[0][1] = 'white';
+    board.grid[1][0] = 'white';
+    board.grid[1][2] = 'white';
+    board.grid[2][1] = 'white';
+    board.turn = 'white';
+
+    const move = GoAI.getBestMove(board, 'white', {
+      sparringLevel: 'grandmaster',
+      isFullGame: true,
+    });
+
+    expect(move).not.toBeNull();
+    // Move should NOT be (1, 1) - self-filling eye!
+    expect(move).not.toEqual({ x: 1, y: 1 });
+  });
+
+  it('passes gracefully when every remaining move would be self-destructive in endgame', () => {
+    let board = GoCore.createEmptyBoard(7);
+    // Fill the 7x7 board with white stones everywhere except (3, 3)
+    for (let y = 0; y < 7; y++) {
+      for (let x = 0; x < 7; x++) {
+        board.grid[y][x] = 'white';
+      }
+    }
+    // Leave (3, 3) as a single empty true eye inside White's live group
+    board.grid[3][3] = null;
+    board.turn = 'white';
+
+    const move = GoAI.getBestMove(board, 'white', {
+      sparringLevel: 'grandmaster',
+      isFullGame: true,
+    });
+
+    // The only move is (3,3), which is a self-filling true eye (scores -80000)
+    // AI must gracefully pass (return null) instead of filling its own eye!
+    expect(move).toBeNull();
+  });
 });

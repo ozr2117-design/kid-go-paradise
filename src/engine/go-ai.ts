@@ -444,6 +444,42 @@ export class GoAI {
   }
 
   /**
+   * Helper: Detects if a point is a true eye for friendly stones (自填真眼自杀判定)
+   * True eye: All 4 orthogonal neighbors are friendly stones,
+   * and at least 3 diagonal corners (or 2 for corners/edges) are friendly or board edge.
+   */
+  private static isTrueEye(state: BoardState, move: Point, color: Color): boolean {
+    const size = state.size;
+    const neighbors = GoCore.getNeighbors(move, size);
+
+    // All orthogonal neighbors must be friendly stones
+    for (const n of neighbors) {
+      if (state.grid[n.y][n.x] !== color) return false;
+    }
+
+    // Check diagonal intersections
+    const diagonals = [
+      { x: move.x - 1, y: move.y - 1 },
+      { x: move.x + 1, y: move.y - 1 },
+      { x: move.x - 1, y: move.y + 1 },
+      { x: move.x + 1, y: move.y + 1 },
+    ];
+
+    let controlledDiagonals = 0;
+    for (const d of diagonals) {
+      if (!GoCore.isInside(d, size)) {
+        controlledDiagonals++; // Board edge counts as eye control
+      } else if (state.grid[d.y][d.x] === color) {
+        controlledDiagonals++;
+      }
+    }
+
+    // On board interior, need >= 3 controlled diagonals. On edge/corner, need >= 2.
+    const isEdge = move.x === 0 || move.x === size - 1 || move.y === 0 || move.y === size - 1;
+    return isEdge ? controlledDiagonals >= 2 : controlledDiagonals >= 3;
+  }
+
+  /**
    * Helper: Checks if move is an unprovoked second-line crawl extending an existing line-2 stone
    */
   private static isSecondLineCrawl(state: BoardState, move: Point, color: Color): boolean {
@@ -453,13 +489,17 @@ export class GoAI {
     const line = Math.min(distToEdgeX, distToEdgeY) + 1;
     if (line !== 2) return false;
 
-    // Check if it extends an adjacent friendly stone along the SAME edge
+    // Corner 2-2 point (distToEdgeX === 1 && distToEdgeY === 1) is a corner invasion/defense, not a flat crawl
+    if (distToEdgeX === 1 && distToEdgeY === 1) return false;
+
+    // Check if it extends an adjacent friendly stone along the SAME flat edge
     // Top or bottom edge (y is 1 or size-2)
     if (distToEdgeY === 1) {
       for (const dx of [-1, 1]) {
         const nx = move.x + dx;
         if (nx >= 0 && nx < size && state.grid[move.y][nx] === color) {
-          return true;
+          const nDistX = Math.min(nx, size - 1 - nx);
+          if (nDistX >= 1) return true;
         }
       }
     }
@@ -468,7 +508,8 @@ export class GoAI {
       for (const dy of [-1, 1]) {
         const ny = move.y + dy;
         if (ny >= 0 && ny < size && state.grid[ny][move.x] === color) {
-          return true;
+          const nDistY = Math.min(ny, size - 1 - ny);
+          if (nDistY >= 1) return true;
         }
       }
     }
@@ -526,8 +567,9 @@ export class GoAI {
     const splitOppGroups = new Map<string, { size: number; liberties: number }>();
     for (const on of oppNeighbors) {
       const g = GoCore.findGroup(state.grid, on);
-      if (g) {
-        const key = `${g.points[0].x},${g.points[0].y}`;
+      if (g && g.points.length > 0) {
+        const sortedPoints = [...g.points].sort((a, b) => a.x - b.x || a.y - b.y);
+        const key = `${sortedPoints[0].x},${sortedPoints[0].y}`;
         if (!splitOppGroups.has(key)) {
           splitOppGroups.set(key, { size: g.points.length, liberties: g.liberties.length });
         }
@@ -684,7 +726,10 @@ export class GoAI {
       score += sim.captured.length * 350;
     }
 
-    // 3. Self-Atari / shortage of liberties safety penalty
+    // 3. Self-Atari / shortage of liberties / True Eye safety penalty
+    if (this.isTrueEye(state, move, color) && sim.captured.length === 0) {
+      return -80000; // Strictly forbid self-filling own true eyes!
+    }
     const grp = GoCore.findGroup(sim.nextState.grid, move);
     if (grp) {
       if (grp.liberties.length === 1 && sim.captured.length === 0) {
@@ -792,7 +837,7 @@ export class GoAI {
     }
 
     // 8. Shape Quality & Anti-Dumpling (好形识别与拒绝实心愚形)
-    if (this.isSolidSquareClump(sim.nextState.grid, move, color, size)) {
+    if (this.isSolidSquareClump(sim.nextState.grid, move, color, size) && sim.captured.length === 0) {
       score -= 240; // Heavy dumpling shape!
     }
 
@@ -966,7 +1011,11 @@ export class GoAI {
     }
 
     if (root.children.length === 0) {
-      return sortedUntried[0] || legalMoves[0];
+      const fallback = sortedUntried[0] || legalMoves[0];
+      if (fallback && this.evaluateDragonPolicy(state, fallback, color, oppColor) > -10000) {
+        return fallback;
+      }
+      return null; // All remaining moves are suicidal or self-filling true eyes -> Pass!
     }
 
     root.children.sort((a, b) => b.visits - a.visits);
@@ -974,12 +1023,15 @@ export class GoAI {
     // Among top moves with close visits (within 12%), pick with subtle temperature for true master unpredictability
     const topVisits = root.children[0].visits;
     const topTier = root.children.filter((c) => c.visits >= topVisits * 0.88);
-    if (topTier.length > 1 && Math.random() < 0.35) {
-      const pickedChild = topTier[Math.floor(Math.random() * topTier.length)];
-      return pickedChild.move;
+    const chosenMove = (topTier.length > 1 && Math.random() < 0.35)
+      ? topTier[Math.floor(Math.random() * topTier.length)].move
+      : root.children[0].move;
+
+    if (chosenMove && this.evaluateDragonPolicy(state, chosenMove, color, oppColor) <= -10000) {
+      return null; // Pass!
     }
 
-    return root.children[0].move;
+    return chosenMove;
   }
 
   /**
@@ -1058,11 +1110,21 @@ export class GoAI {
       }
     }
 
-    if (root.children.length === 0) return legalMoves[0];
+    if (root.children.length === 0) {
+      const fallback = sortedUntried[0] || legalMoves[0];
+      if (fallback && this.quickEval(rootState, fallback, aiColor, oppColor) > -5000) {
+        return fallback;
+      }
+      return null;
+    }
 
     // Pick child with highest visit count (most battle-tested move)
     root.children.sort((a, b) => b.visits - a.visits);
-    return root.children[0].move;
+    const bestMove = root.children[0].move;
+    if (bestMove && this.quickEval(rootState, bestMove, aiColor, oppColor) <= -5000) {
+      return null;
+    }
+    return bestMove;
   }
 
   private static selectBestUCTChild(node: MCTSNode): MCTSNode {
@@ -1079,6 +1141,25 @@ export class GoAI {
   }
 
   /**
+   * Helper: Selects distinct random candidate moves for rollout
+   */
+  private static getRandomCandidates(legal: Point[], count: number): Point[] {
+    if (legal.length <= count) return [...legal];
+    const result: Point[] = [];
+    const used = new Set<string>();
+    while (result.length < count && used.size < legal.length) {
+      const idx = Math.floor(Math.random() * legal.length);
+      const p = legal[idx];
+      const key = `${p.x},${p.y}`;
+      if (!used.has(key)) {
+        used.add(key);
+        result.push(p);
+      }
+    }
+    return result;
+  }
+
+  /**
    * Fast Heuristic-Guided Rollout
    */
   private static fastRollout(
@@ -1090,9 +1171,20 @@ export class GoAI {
     let state = startState;
     let turn: Color = currentColor;
     const maxPlayoutSteps = 16;
+    let consecutiveKoFights = 0;
+    let lastKoPoint: Point | null = null;
 
     for (let step = 0; step < maxPlayoutSteps; step++) {
       if (state.isGameOver) break;
+
+      // Guard against potential Ko fight loops in rollout
+      if (state.koPoint && lastKoPoint && GoCore.pointsEqual(state.koPoint, lastKoPoint)) {
+        consecutiveKoFights++;
+        if (consecutiveKoFights >= 3) break;
+      } else {
+        consecutiveKoFights = 0;
+      }
+      lastKoPoint = state.koPoint ? { ...state.koPoint } : null;
 
       const opp: Color = turn === 'black' ? 'white' : 'black';
       const legal = this.getFastLegalMoves(state, turn);
@@ -1104,13 +1196,9 @@ export class GoAI {
       if (captures.length > 0) {
         chosen = captures[0];
       } else {
-        // Pick best of 3 random moves
+        // Pick best of 3 distinct random moves
         let bestVal = -Infinity;
-        const candidates = legal.length <= 3 ? legal : [
-          legal[Math.floor(Math.random() * legal.length)],
-          legal[Math.floor(Math.random() * legal.length)],
-          legal[Math.floor(Math.random() * legal.length)],
-        ];
+        const candidates = this.getRandomCandidates(legal, 3);
 
         for (const cand of candidates) {
           const val = this.quickEval(state, cand, turn, opp);
@@ -1232,6 +1320,10 @@ export class GoAI {
       }
     }
 
+    if (maxScore <= -5000) {
+      return null; // Pass
+    }
+
     return bestMove ?? legalMoves[0];
   }
 
@@ -1280,6 +1372,10 @@ export class GoAI {
       }
     }
 
+    if (maxScore <= -5000) {
+      return null; // Pass
+    }
+
     return bestMove ?? legalMoves[0];
   }
 
@@ -1310,6 +1406,11 @@ export class GoAI {
     const myGroup = GoCore.findGroup(sim.nextState.grid, move);
     if (!myGroup) return -99999;
     const myLibs = myGroup.liberties.length;
+
+    // Self-filling true eye strictly forbidden
+    if (this.isTrueEye(state, move, color) && captured === 0) {
+      return -80000;
+    }
 
     // Self-Atari penalty
     if (myLibs === 1 && captured === 0) {
@@ -1360,7 +1461,7 @@ export class GoAI {
       score -= 220; // 2nd line crawl penalty
     }
 
-    if (this.isSolidSquareClump(sim.nextState.grid, move, color, size)) {
+    if (this.isSolidSquareClump(sim.nextState.grid, move, color, size) && captured === 0) {
       score -= 200; // 2x2 clump penalty
     }
 
@@ -1390,6 +1491,11 @@ export class GoAI {
     if (sim.error) return -9999;
     if (sim.captured.length > 0) score += sim.captured.length * 450;
 
+    // True Eye safety
+    if (this.isTrueEye(state, move, color) && sim.captured.length === 0) {
+      return -80000;
+    }
+
     const grp = GoCore.findGroup(sim.nextState.grid, move);
     if (grp) {
       if (grp.liberties.length === 1 && sim.captured.length === 0) return -8000;
@@ -1410,7 +1516,7 @@ export class GoAI {
     }
 
     // 2x2 clump penalty
-    if (this.isSolidSquareClump(sim.nextState.grid, move, color, size)) {
+    if (this.isSolidSquareClump(sim.nextState.grid, move, color, size) && sim.captured.length === 0) {
       score -= 200;
     }
 
