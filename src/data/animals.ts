@@ -45,7 +45,7 @@ export const ANIMAL_OPPONENTS: AnimalOpponent[] = [
     id: 'fox',
     name: '聪聪狐',
     avatar: '🦊',
-    rank: '5K~1D 战术老手',
+    rank: '5K 至 1D 战术老手',
     difficulty: 'advanced',
     boardSize: 13,
     captureTarget: 12, // 13路先吃12子获胜
@@ -65,7 +65,7 @@ export const ANIMAL_OPPONENTS: AnimalOpponent[] = [
     id: 'eagle',
     name: '傲天鹰',
     avatar: '🦅',
-    rank: '1D~2D 强力鹰王',
+    rank: '1D 至 2D 强力鹰王',
     difficulty: 'master',
     boardSize: 13,
     captureTarget: 15, // 13路先吃15子获胜（超越老鸟）
