@@ -712,7 +712,8 @@ export class GoAI {
     state: BoardState,
     move: Point,
     color: Color,
-    oppColor: Color
+    oppColor: Color,
+    cachedTerritory?: { black: number; white: number; neutral: number }
   ): number {
     const size = state.size;
     let score = 0;
@@ -777,10 +778,11 @@ export class GoAI {
     }
 
     // 5. Macro Corner Prior (金角银边): Empty corners, approach & 3-3 invasion
-    const cornerStartX = move.x < size / 2 ? 0 : size === 9 ? 5 : size === 13 ? 8 : 13;
-    const cornerEndX = move.x < size / 2 ? (size === 9 ? 3 : size === 13 ? 4 : 5) : size - 1;
-    const cornerStartY = move.y < size / 2 ? 0 : size === 9 ? 5 : size === 13 ? 8 : 13;
-    const cornerEndY = move.y < size / 2 ? (size === 9 ? 3 : size === 13 ? 4 : 5) : size - 1;
+    const cornerSpan = size === 19 ? 6 : size === 13 ? 5 : 4;
+    const cornerStartX = move.x < size / 2 ? 0 : size - cornerSpan;
+    const cornerEndX = move.x < size / 2 ? cornerSpan - 1 : size - 1;
+    const cornerStartY = move.y < size / 2 ? 0 : size - cornerSpan;
+    const cornerEndY = move.y < size / 2 ? cornerSpan - 1 : size - 1;
 
     let stonesInCornerSector = 0;
     let oppStonesInSector = 0;
@@ -827,7 +829,7 @@ export class GoAI {
     }
 
     // 7. Sabaki & Invasion into opponent's giant territory (反包围与深入敌阵腾挪)
-    const territoryEst = GoCore.estimateTerritory(state);
+    const territoryEst = cachedTerritory || GoCore.estimateTerritory(state);
     const oppTerritory = oppColor === 'black' ? territoryEst.black : territoryEst.white;
     if (oppTerritory > (size * size) * 0.35) {
       // Opponent is growing huge! 龙尊 actively dives into open spaces (3rd line) to make bases!
@@ -917,16 +919,28 @@ export class GoAI {
   ): Point | null {
     const size = state.size;
 
+    // 0. Precompute whole-board territory flood-fill ONCE for all candidate evaluations
+    const territoryEst = GoCore.estimateTerritory(state);
+
+    // Evaluate all legal moves once with O(N) single-pass scoring
+    const scoredCandidates = legalMoves
+      .map((m) => ({
+        move: m,
+        score: this.evaluateDragonPolicy(state, m, color, oppColor, territoryEst),
+      }))
+      .sort((a, b) => b.score - a.score);
+
     // 1. Immediate high-value tactical emergencies
     const escapes = this.findEscapeAtariMoves(state, color, legalMoves);
     if (escapes.length > 0) {
-      const bestEscape = escapes.sort(
-        (a, b) =>
-          this.evaluateDragonPolicy(state, b, color, oppColor) -
-          this.evaluateDragonPolicy(state, a, color, oppColor)
-      )[0];
-      if (this.evaluateDragonPolicy(state, bestEscape, color, oppColor) > 0) {
-        return bestEscape;
+      const bestEscape = escapes
+        .map((m) => ({
+          move: m,
+          score: this.evaluateDragonPolicy(state, m, color, oppColor, territoryEst),
+        }))
+        .sort((a, b) => b.score - a.score)[0];
+      if (bestEscape && bestEscape.score > 0) {
+        return bestEscape.move;
       }
     }
 
@@ -945,14 +959,10 @@ export class GoAI {
 
     // 2. Opening variety: In the opening phase, pick from top high-macro moves
     const openingLimit = size === 9 ? 8 : size === 13 ? 24 : 40;
-    if (state.moveHistory.length < openingLimit) {
-      const candidates = legalMoves
-        .map((m) => ({ move: m, score: this.evaluateDragonPolicy(state, m, color, oppColor) }))
-        .sort((a, b) => b.score - a.score);
-
-      const topScore = candidates[0]?.score ?? 0;
+    if (state.moveHistory.length < openingLimit && scoredCandidates.length > 0) {
+      const topScore = scoredCandidates[0].score;
       if (topScore >= 180) {
-        const topPool = candidates.filter((c) => c.score >= topScore - 40);
+        const topPool = scoredCandidates.filter((c) => c.score >= topScore - 40);
         if (topPool.length > 0) {
           return topPool[Math.floor(Math.random() * topPool.length)].move;
         }
@@ -960,16 +970,13 @@ export class GoAI {
     }
 
     // 3. Deep MCTS guided by Dragon Policy Prior
-    const mctsIterations = size === 9 ? 550 : size === 13 ? 360 : 180;
-    const sortedUntried = [...legalMoves].sort((a, b) => {
-      return (
-        this.evaluateDragonPolicy(state, b, color, oppColor) -
-        this.evaluateDragonPolicy(state, a, color, oppColor)
-      );
-    });
+    // Prune untried moves on large boards (19x19 / 13x13) to concentrate search budget
+    const maxRootCandidates = size === 19 ? 36 : size === 13 ? 28 : scoredCandidates.length;
+    const sortedUntried = scoredCandidates.slice(0, maxRootCandidates).map((c) => c.move);
 
+    const mctsIterations = size === 9 ? 450 : size === 13 ? 240 : 120;
+    const maxTimeMs = size === 19 ? 260 : size === 13 ? 320 : 380;
     const startTime = Date.now();
-    const maxTimeMs = 480;
     const root = new MCTSNode(null, oppColor, null, sortedUntried);
 
     for (let iter = 0; iter < mctsIterations; iter++) {
@@ -1012,7 +1019,7 @@ export class GoAI {
 
     if (root.children.length === 0) {
       const fallback = sortedUntried[0] || legalMoves[0];
-      if (fallback && this.evaluateDragonPolicy(state, fallback, color, oppColor) > -10000) {
+      if (fallback && this.evaluateDragonPolicy(state, fallback, color, oppColor, territoryEst) > -10000) {
         return fallback;
       }
       return null; // All remaining moves are suicidal or self-filling true eyes -> Pass!
@@ -1027,7 +1034,7 @@ export class GoAI {
       ? topTier[Math.floor(Math.random() * topTier.length)].move
       : root.children[0].move;
 
-    if (chosenMove && this.evaluateDragonPolicy(state, chosenMove, color, oppColor) <= -10000) {
+    if (chosenMove && this.evaluateDragonPolicy(state, chosenMove, color, oppColor, territoryEst) <= -10000) {
       return null; // Pass!
     }
 
@@ -1048,7 +1055,7 @@ export class GoAI {
     options: AIMoveOptions
   ): Point | null {
     const startTime = Date.now();
-    const maxTimeMs = 450; // Cap execution at 450ms for zero UI lag
+    const maxTimeMs = rootState.size === 19 ? 260 : rootState.size === 13 ? 320 : 380;
 
     // Prioritize high-value opening book if early in the game on standard board
     const moveNumber = rootState.moveHistory.length;
@@ -1058,13 +1065,16 @@ export class GoAI {
       if (opening) return opening;
     }
 
-    // Sort untried moves by quick heuristic so MCTS expands promising moves first
-    const sortedUntried = [...legalMoves].sort((a, b) => {
-      return (
-        this.quickEval(rootState, b, aiColor, oppColor) -
-        this.quickEval(rootState, a, aiColor, oppColor)
-      );
-    });
+    // Evaluate candidates once and prune root moves on large boards
+    const scoredMoves = legalMoves
+      .map((m) => ({
+        move: m,
+        score: this.quickEval(rootState, m, aiColor, oppColor),
+      }))
+      .sort((a, b) => b.score - a.score);
+
+    const maxRootCandidates = rootState.size === 19 ? 32 : rootState.size === 13 ? 24 : scoredMoves.length;
+    const sortedUntried = scoredMoves.slice(0, maxRootCandidates).map((item) => item.move);
 
     const root = new MCTSNode(null, oppColor, null, sortedUntried);
 
