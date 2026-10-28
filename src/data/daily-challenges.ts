@@ -382,6 +382,227 @@ export const SUPPLEMENTARY_DAILY_PUZZLES: PuzzleData[] = [
       comment: '有眼杀无眼！白棋气短无法入公气，黑棋大获全胜！',
     },
   },
+
+  // 13. 课上实战真题 1：角部分断吃
+  {
+    id: 'daily-cut-1',
+    title: '课上真题·角部分断吃',
+    category: 'tactics',
+    difficulty: 'easy',
+    boardSize: 9,
+    initialTurn: 'black',
+    description: '【昨日课后真题第1题】白棋大龙在角上露出致命断点！找准分断白棋的关键断点，一子落下直接提吃带△的三颗白棋！',
+    voicePrompt: '看准白棋连接的断裂口！下在二三断点，一口气提掉带三角的三颗白棋！',
+    hint: '找到断点 (2, 3)，分断白棋并完成叫吃提子！',
+    initialBoard: {
+      black: [
+        { x: 1, y: 4 },
+        { x: 1, y: 5 },
+        { x: 2, y: 5 },
+        { x: 2, y: 6 },
+        { x: 3, y: 6 },
+        { x: 4, y: 5 },
+        { x: 4, y: 4 },
+        { x: 4, y: 3 },
+        { x: 3, y: 3 },
+      ],
+      white: [
+        { x: 1, y: 2 },
+        { x: 1, y: 3 },
+        { x: 2, y: 4 },
+        { x: 3, y: 4 },
+        { x: 3, y: 5 },
+      ],
+    },
+    solutionTree: {
+      move: { x: 2, y: 3 },
+      isCorrect: true,
+      comment: '漂亮！精准切断白棋大龙，三颗白棋瞬间被黑棋全部提吃！',
+    },
+  },
+
+  // 14. 课上实战真题 2：边路横排冲断吃
+  {
+    id: 'daily-cut-2',
+    title: '课上真题·边路横排冲断吃',
+    category: 'tactics',
+    difficulty: 'easy',
+    boardSize: 9,
+    initialTurn: 'black',
+    description: '【昨日课后真题第2题】上方黑棋筑起高墙！中间白棋三子想往外连接，果断冲入断点，直接提吃整排白棋！',
+    voicePrompt: '白棋横排三子露出断点！果断冲下去分断，整排白棋全部吃掉！',
+    hint: '下在断点 (4, 3)，封锁白棋外逃通道！',
+    initialBoard: {
+      black: [
+        { x: 2, y: 1 },
+        { x: 3, y: 1 },
+        { x: 4, y: 1 },
+        { x: 5, y: 1 },
+        { x: 1, y: 2 },
+        { x: 1, y: 3 },
+        { x: 2, y: 3 },
+        { x: 3, y: 3 },
+        { x: 5, y: 2 },
+      ],
+      white: [
+        { x: 4, y: 4 },
+        { x: 5, y: 3 },
+        { x: 5, y: 4 },
+        { x: 2, y: 2 },
+        { x: 3, y: 2 },
+        { x: 4, y: 2 },
+      ],
+    },
+    solutionTree: {
+      move: { x: 4, y: 3 },
+      isCorrect: true,
+      comment: '神机妙算！下在断点切断白棋，横排三颗白子全部落入囊中！',
+    },
+  },
+
+  // 15. 课上实战真题 3：长龙关节分断吃
+  {
+    id: 'daily-cut-3',
+    title: '课上真题·长龙关节分断吃',
+    category: 'tactics',
+    difficulty: 'easy',
+    boardSize: 9,
+    initialTurn: 'black',
+    description: '【昨日课后真题第3题】黑棋像长城一样包围白棋大龙！白棋关节连接处出现致命破绽，一子断开，整条白龙瞬间被提吃！',
+    voicePrompt: '白棋大长龙关节裂开啦！一子直刺断点，四颗白棋大丰收！',
+    hint: '刺入断点 (4, 2)，斩断白棋大龙与救兵的连接！',
+    initialBoard: {
+      black: [
+        { x: 2, y: 1 },
+        { x: 3, y: 1 },
+        { x: 1, y: 2 },
+        { x: 1, y: 3 },
+        { x: 2, y: 3 },
+        { x: 2, y: 4 },
+        { x: 3, y: 4 },
+        { x: 4, y: 4 },
+        { x: 5, y: 3 },
+      ],
+      white: [
+        { x: 5, y: 2 },
+        { x: 6, y: 2 },
+        { x: 2, y: 2 },
+        { x: 3, y: 2 },
+        { x: 3, y: 3 },
+        { x: 4, y: 3 },
+      ],
+    },
+    solutionTree: {
+      move: { x: 4, y: 2 },
+      isCorrect: true,
+      comment: '太厉害了！长龙关节被黑棋精准切断，四颗白棋束手就擒！',
+    },
+  },
+
+  // 16. 课上实战真题 4：腹部扭断一步杀
+  {
+    id: 'daily-cut-4',
+    title: '课上真题·腹部扭断一步杀',
+    category: 'tactics',
+    difficulty: 'easy',
+    boardSize: 9,
+    initialTurn: 'black',
+    description: '【昨日课后真题第4题】腹部扭断大作战！识破白棋的假连接，下在最关键的断点，吃掉带△的白子！',
+    voicePrompt: '扭羊头不如先找断点！下在十字交叉口，直接提吃两颗白棋！',
+    hint: '下在十字断点 (3, 2)，直接提吃两颗白子！',
+    initialBoard: {
+      black: [
+        { x: 2, y: 2 },
+        { x: 1, y: 3 },
+        { x: 2, y: 4 },
+        { x: 3, y: 4 },
+        { x: 4, y: 3 },
+      ],
+      white: [
+        { x: 4, y: 2 },
+        { x: 4, y: 1 },
+        { x: 2, y: 3 },
+        { x: 3, y: 3 },
+      ],
+    },
+    solutionTree: {
+      move: { x: 3, y: 2 },
+      isCorrect: true,
+      comment: '一击必杀！下在十字断点，直接提吃两颗要子！',
+    },
+  },
+
+  // 17. 课上实战真题 5：双壁夹攻冲断吃
+  {
+    id: 'daily-cut-5',
+    title: '课上真题·双壁夹攻冲断吃',
+    category: 'tactics',
+    difficulty: 'easy',
+    boardSize: 9,
+    initialTurn: 'black',
+    description: '【昨日课后真题第5题】白棋三颗子冲进黑棋夹壁深处！下在头部门户断点，彻底关门封死，整排白棋束手就擒！',
+    voicePrompt: '关门大吉！在两堵黑墙正中间断下去，三颗白棋立刻全部提吃！',
+    hint: '在 (2, 2) 正面分断，切断白棋退路！',
+    initialBoard: {
+      black: [
+        { x: 1, y: 3 },
+        { x: 1, y: 4 },
+        { x: 1, y: 5 },
+        { x: 3, y: 3 },
+        { x: 3, y: 4 },
+        { x: 3, y: 5 },
+        { x: 2, y: 6 },
+      ],
+      white: [
+        { x: 2, y: 1 },
+        { x: 3, y: 1 },
+        { x: 2, y: 3 },
+        { x: 2, y: 4 },
+        { x: 2, y: 5 },
+      ],
+    },
+    solutionTree: {
+      move: { x: 2, y: 2 },
+      isCorrect: true,
+      comment: '关门捉贼！断点一封，中间三颗白棋插翅难逃！',
+    },
+  },
+
+  // 18. 课上实战真题 6：角部虎口致命分断
+  {
+    id: 'daily-cut-6',
+    title: '课上真题·角部虎口致命分断',
+    category: 'tactics',
+    difficulty: 'easy',
+    boardSize: 9,
+    initialTurn: 'black',
+    description: '【昨日课后真题第6题】角部星位经典常型！白棋连接薄弱，黑棋果断刺入断点，角上带△白子全部被吃！',
+    voicePrompt: '致命断点现身！刺入白棋虎口软肋，把包围圈里的两颗白棋提起来！',
+    hint: '点在 (2, 6) 致命断点上！',
+    initialBoard: {
+      black: [
+        { x: 2, y: 4 },
+        { x: 1, y: 5 },
+        { x: 0, y: 6 },
+        { x: 1, y: 7 },
+        { x: 3, y: 7 },
+        { x: 2, y: 8 },
+        { x: 3, y: 5 },
+      ],
+      white: [
+        { x: 3, y: 4 },
+        { x: 4, y: 4 },
+        { x: 4, y: 5 },
+        { x: 1, y: 6 },
+        { x: 2, y: 5 },
+      ],
+    },
+    solutionTree: {
+      move: { x: 2, y: 6 },
+      isCorrect: true,
+      comment: '太神勇了！刺破虎口软肋，包围圈内的白子全部被吃！',
+    },
+  },
 ];
 
 // Combine all puzzle sources
@@ -428,7 +649,9 @@ export function getDaily15Puzzles(dateStr?: string): { theme: DayThemeInfo; puzz
   const rotatedMatching = rotateArray(matching, dayOfYear % Math.max(1, matching.length));
   const rotatedOthers = rotateArray(others, (dayOfYear * 3) % Math.max(1, others.length));
 
-  const pool = [...rotatedMatching, ...rotatedOthers];
+  // Prioritize recently synchronized classroom test puzzles at the top
+  const cutPuzzles = SUPPLEMENTARY_DAILY_PUZZLES.filter((p) => p.id.startsWith('daily-cut-'));
+  const pool = [...cutPuzzles, ...rotatedMatching, ...rotatedOthers];
 
   // Return exactly 15 unique puzzles
   const selected: PuzzleData[] = [];

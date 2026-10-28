@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { GoCore } from './go-core';
-import { getDaily15Puzzles, WEEKLY_THEMES } from '../data/daily-challenges';
+import { getDaily15Puzzles, WEEKLY_THEMES, SUPPLEMENTARY_DAILY_PUZZLES } from '../data/daily-challenges';
 
 describe('Daily 15 Tsumego Challenge Tests', () => {
   it('should generate exactly 15 valid puzzles for any day of the week', () => {
@@ -65,5 +65,26 @@ describe('Daily 15 Tsumego Challenge Tests', () => {
 
     const map = GoCore.getTerritoryMap(board);
     expect(map.blackPoints.some((p) => p.x === 0 && p.y === 0)).toBe(true);
+  });
+
+  it('Verifies all 6 newly added class worksheet cut-and-capture puzzles', () => {
+    const cutPuzzles = SUPPLEMENTARY_DAILY_PUZZLES.filter((p: any) => p.id.startsWith('daily-cut-'));
+    expect(cutPuzzles.length).toBe(6);
+
+    for (const p of cutPuzzles) {
+      let board = GoCore.createEmptyBoard(p.boardSize);
+      for (const b of p.initialBoard.black) {
+        board.grid[b.y][b.x] = 'black';
+      }
+      for (const w of p.initialBoard.white) {
+        board.grid[w.y][w.x] = 'white';
+      }
+      board.turn = p.initialTurn;
+
+      const sol = p.solutionTree.move!;
+      const playRes = GoCore.playMove(board, sol, p.initialTurn);
+      expect(playRes.error, `Puzzle ${p.id} move at (${sol.x}, ${sol.y}) failed: ${playRes.error}`).toBeUndefined();
+      expect(playRes.captured.length, `Puzzle ${p.id} must capture target white stones on cut`).toBeGreaterThan(0);
+    }
   });
 });
