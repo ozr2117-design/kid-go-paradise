@@ -461,4 +461,41 @@ export class GoCore {
     state.turn = 'white';
     return state;
   }
+
+  /**
+   * Helper: Detects if a point is a true eye for friendly stones (自填真眼判定)
+   */
+  static isTrueEye(
+    grid: (Color | null)[][],
+    move: Point,
+    color: Color,
+    size: BoardSize = grid.length as BoardSize
+  ): boolean {
+    const neighbors = this.getNeighbors(move, size);
+
+    // All orthogonal neighbors must be friendly stones
+    for (const n of neighbors) {
+      if (grid[n.y][n.x] !== color) return false;
+    }
+
+    // Check diagonal intersections
+    const diagonals = [
+      { x: move.x - 1, y: move.y - 1 },
+      { x: move.x + 1, y: move.y - 1 },
+      { x: move.x - 1, y: move.y + 1 },
+      { x: move.x + 1, y: move.y + 1 },
+    ];
+
+    let controlledDiagonals = 0;
+    for (const d of diagonals) {
+      if (!this.isInside(d, size)) {
+        controlledDiagonals++;
+      } else if (grid[d.y][d.x] === color) {
+        controlledDiagonals++;
+      }
+    }
+
+    const isEdge = move.x === 0 || move.x === size - 1 || move.y === 0 || move.y === size - 1;
+    return isEdge ? controlledDiagonals >= 2 : controlledDiagonals >= 3;
+  }
 }

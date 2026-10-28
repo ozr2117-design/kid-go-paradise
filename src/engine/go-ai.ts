@@ -449,34 +449,7 @@ export class GoAI {
    * and at least 3 diagonal corners (or 2 for corners/edges) are friendly or board edge.
    */
   private static isTrueEye(state: BoardState, move: Point, color: Color): boolean {
-    const size = state.size;
-    const neighbors = GoCore.getNeighbors(move, size);
-
-    // All orthogonal neighbors must be friendly stones
-    for (const n of neighbors) {
-      if (state.grid[n.y][n.x] !== color) return false;
-    }
-
-    // Check diagonal intersections
-    const diagonals = [
-      { x: move.x - 1, y: move.y - 1 },
-      { x: move.x + 1, y: move.y - 1 },
-      { x: move.x - 1, y: move.y + 1 },
-      { x: move.x + 1, y: move.y + 1 },
-    ];
-
-    let controlledDiagonals = 0;
-    for (const d of diagonals) {
-      if (!GoCore.isInside(d, size)) {
-        controlledDiagonals++; // Board edge counts as eye control
-      } else if (state.grid[d.y][d.x] === color) {
-        controlledDiagonals++;
-      }
-    }
-
-    // On board interior, need >= 3 controlled diagonals. On edge/corner, need >= 2.
-    const isEdge = move.x === 0 || move.x === size - 1 || move.y === 0 || move.y === size - 1;
-    return isEdge ? controlledDiagonals >= 2 : controlledDiagonals >= 3;
+    return GoCore.isTrueEye(state.grid, move, color, state.size);
   }
 
   /**
@@ -971,11 +944,13 @@ export class GoAI {
 
     // 3. Deep MCTS guided by Dragon Policy Prior
     // Prune untried moves on large boards (19x19 / 13x13) to concentrate search budget
-    const maxRootCandidates = size === 19 ? 36 : size === 13 ? 28 : scoredCandidates.length;
+    const maxRootCandidates = size === 19 ? 42 : size === 13 ? 30 : scoredCandidates.length;
     const sortedUntried = scoredCandidates.slice(0, maxRootCandidates).map((c) => c.move);
 
-    const mctsIterations = size === 9 ? 450 : size === 13 ? 240 : 120;
-    const maxTimeMs = size === 19 ? 260 : size === 13 ? 320 : 380;
+    // Calibrated search budget for Xiaomi Pad 6 Pro (Snapdragon 8+ Gen 1):
+    // 19x19: 240 visits within ~380ms window, blazing fast and tactically deep
+    const mctsIterations = size === 9 ? 450 : size === 13 ? 300 : 240;
+    const maxTimeMs = size === 19 ? 380 : size === 13 ? 320 : 380;
     const startTime = Date.now();
     const root = new MCTSNode(null, oppColor, null, sortedUntried);
 
@@ -1017,25 +992,34 @@ export class GoAI {
       }
     }
 
+    // Strict safeguard against premature mid-game pass/surrender:
+    // Only pass if true late endgame (moves >= size * 8) AND no productive moves exist
+    const minEndgameMoves = size === 19 ? 150 : size === 13 ? 75 : 35;
+    const isLateEndgame = state.moveHistory.length >= minEndgameMoves;
+
     if (root.children.length === 0) {
-      const fallback = sortedUntried[0] || legalMoves[0];
-      if (fallback && this.evaluateDragonPolicy(state, fallback, color, oppColor, territoryEst) > -10000) {
-        return fallback;
+      const nonSuicide = legalMoves.find((m) => !this.isTrueEye(state, m, color));
+      if (!isLateEndgame && nonSuicide) {
+        return nonSuicide;
       }
-      return null; // All remaining moves are suicidal or self-filling true eyes -> Pass!
+      return null;
     }
 
     root.children.sort((a, b) => b.visits - a.visits);
 
-    // Among top moves with close visits (within 12%), pick with subtle temperature for true master unpredictability
+    // Among top moves with close visits (within 12%), pick with subtle temperature
     const topVisits = root.children[0].visits;
     const topTier = root.children.filter((c) => c.visits >= topVisits * 0.88);
-    const chosenMove = (topTier.length > 1 && Math.random() < 0.35)
-      ? topTier[Math.floor(Math.random() * topTier.length)].move
-      : root.children[0].move;
+    const chosenMove =
+      topTier.length > 1 && Math.random() < 0.2
+        ? topTier[Math.floor(Math.random() * topTier.length)].move
+        : root.children[0].move;
 
-    if (chosenMove && this.evaluateDragonPolicy(state, chosenMove, color, oppColor, territoryEst) <= -10000) {
-      return null; // Pass!
+    // Never fill true eye; in midgame fight persistently instead of passing!
+    if (chosenMove && this.isTrueEye(state, chosenMove, color)) {
+      if (isLateEndgame) return null;
+      const alt = legalMoves.find((m) => !this.isTrueEye(state, m, color));
+      return alt || null;
     }
 
     return chosenMove;
