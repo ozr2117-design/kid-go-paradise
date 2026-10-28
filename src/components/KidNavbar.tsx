@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { GameMode } from '../types/go';
-import { Volume2, VolumeX, Sparkles, Map, Swords, Grid, Bot, Maximize, Minimize } from 'lucide-react';
+import { Volume2, VolumeX, Sparkles, Map, Swords, Grid, Bot, Maximize, Minimize, RefreshCw } from 'lucide-react';
+import { APP_VERSION, APP_VERSION_TITLE } from '../version';
 
 interface KidNavbarProps {
   currentMode: GameMode;
@@ -38,13 +39,68 @@ export const KidNavbar: React.FC<KidNavbarProps> = ({
       document.exitFullscreen().catch(() => {});
     }
   };
+
+  const [versionToastVisible, setVersionToastVisible] = useState<boolean>(false);
+
+  const handleVersionClick = () => {
+    setVersionToastVisible(true);
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (const reg of registrations) {
+          reg.update().catch(() => {});
+        }
+      });
+    }
+    setTimeout(() => {
+      setVersionToastVisible(false);
+    }, 3000);
+  };
+
+  const handleForceRefresh = () => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (const reg of registrations) {
+          reg.unregister();
+        }
+        caches.keys().then((keys) => {
+          Promise.all(keys.map((k) => caches.delete(k))).then(() => {
+            window.location.reload();
+          });
+        });
+      });
+    } else {
+      window.location.reload();
+    }
+  };
+
   return (
-    <header className="w-full bg-amber-500 text-white shadow-sm border-b-2 sm:border-b-4 border-amber-600 px-2 sm:px-3 py-1 sm:py-1.5 flex items-center justify-between gap-1.5 select-none shrink-0 overflow-x-auto">
+    <header className="relative w-full bg-amber-500 text-white shadow-sm border-b-2 sm:border-b-4 border-amber-600 px-2 sm:px-3 py-1 sm:py-1.5 flex items-center justify-between gap-1.5 select-none shrink-0 overflow-x-auto">
       {/* Brand & Stars */}
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-1.5 bg-amber-600/60 px-3 py-1 rounded-2xl border border-amber-400">
-          <span className="text-lg sm:text-xl font-black tracking-wide font-cartoon">森森围棋基地</span>
+      <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-2 bg-amber-600/60 px-2.5 sm:px-3 py-1 rounded-2xl border border-amber-400 shadow-sm">
+          <span className="text-base sm:text-xl font-black tracking-wide font-cartoon">森森围棋基地</span>
+          <button
+            onClick={handleVersionClick}
+            title={`当前版本：${APP_VERSION} (${APP_VERSION_TITLE})\n点击可检查并更新最新离线缓存`}
+            className="flex items-center gap-0.5 text-[10px] sm:text-xs font-mono font-bold bg-amber-700/80 hover:bg-amber-800 text-amber-200 hover:text-white px-1.5 py-0.5 rounded-md border border-amber-400/40 transition-all shadow-inner active:scale-95"
+          >
+            <span>{APP_VERSION}</span>
+          </button>
         </div>
+
+        {/* Version Toast / Quick Refresh Popup */}
+        {versionToastVisible && (
+          <div className="absolute top-12 left-2 z-50 bg-amber-900/95 text-white text-xs px-3 py-2 rounded-xl shadow-xl border border-amber-400/60 backdrop-blur-sm flex items-center gap-2.5 animate-in fade-in slide-in-from-top-1">
+            <span className="font-bold">当前版本：{APP_VERSION} ({APP_VERSION_TITLE})</span>
+            <button
+              onClick={handleForceRefresh}
+              className="flex items-center gap-1 bg-yellow-400 hover:bg-yellow-300 text-amber-950 font-bold px-2 py-0.5 rounded-lg text-[11px] transition-colors"
+            >
+              <RefreshCw className="w-3 h-3" />
+              <span>强刷更新</span>
+            </button>
+          </div>
+        )}
 
         {/* Stars counter */}
         <div
