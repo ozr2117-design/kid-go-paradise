@@ -40,10 +40,10 @@ export const KidNavbar: React.FC<KidNavbarProps> = ({
     }
   };
 
-  const [versionToastVisible, setVersionToastVisible] = useState<boolean>(false);
+  const [versionModalOpen, setVersionModalOpen] = useState<boolean>(false);
 
   const handleVersionClick = () => {
-    setVersionToastVisible(true);
+    setVersionModalOpen(true);
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then((registrations) => {
         for (const reg of registrations) {
@@ -51,9 +51,6 @@ export const KidNavbar: React.FC<KidNavbarProps> = ({
         }
       });
     }
-    setTimeout(() => {
-      setVersionToastVisible(false);
-    }, 3000);
   };
 
   const handleForceRefresh = () => {
@@ -74,35 +71,23 @@ export const KidNavbar: React.FC<KidNavbarProps> = ({
   };
 
   return (
-    <header className="relative w-full bg-amber-500 text-white shadow-sm border-b-2 sm:border-b-4 border-amber-600 px-2 sm:px-3 py-1 sm:py-1.5 flex items-center justify-between gap-1.5 select-none shrink-0 overflow-x-auto">
-      {/* Brand & Stars */}
-      <div className="flex items-center gap-2 sm:gap-3">
-        <div className="flex items-center gap-1.5 sm:gap-2 bg-amber-600/60 px-2.5 sm:px-3 py-1 rounded-2xl border border-amber-400 shadow-sm">
-          <span className="text-base sm:text-xl font-black tracking-wide font-cartoon">森森围棋基地</span>
-          <button
-            onClick={handleVersionClick}
-            title={`当前版本：${APP_VERSION} (${APP_VERSION_TITLE})\n点击可检查并更新最新离线缓存`}
-            className="flex items-center gap-0.5 text-[10px] sm:text-xs font-mono font-bold bg-amber-700/80 hover:bg-amber-800 text-amber-200 hover:text-white px-1.5 py-0.5 rounded-md border border-amber-400/40 transition-all shadow-inner active:scale-95"
-          >
-            <span>{APP_VERSION}</span>
-          </button>
-        </div>
-
-        {/* Version Toast / Quick Refresh Popup */}
-        {versionToastVisible && (
-          <div className="absolute top-12 left-2 z-50 bg-amber-900/95 text-white text-xs px-3 py-2 rounded-xl shadow-xl border border-amber-400/60 backdrop-blur-sm flex items-center gap-2.5 animate-in fade-in slide-in-from-top-1">
-            <span className="font-bold">当前版本：{APP_VERSION} ({APP_VERSION_TITLE})</span>
+    <>
+      <header className="relative w-full bg-amber-500 text-white shadow-sm border-b-2 sm:border-b-4 border-amber-600 px-2 sm:px-3 py-1 sm:py-1.5 flex items-center justify-between gap-1.5 select-none shrink-0 overflow-x-auto">
+        {/* Brand & Stars */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-2 bg-amber-600/60 px-2.5 sm:px-3 py-1 rounded-2xl border border-amber-400 shadow-sm">
+            <span className="text-base sm:text-xl font-black tracking-wide font-cartoon">森森围棋基地</span>
             <button
-              onClick={handleForceRefresh}
-              className="flex items-center gap-1 bg-yellow-400 hover:bg-yellow-300 text-amber-950 font-bold px-2 py-0.5 rounded-lg text-[11px] transition-colors"
+              onClick={handleVersionClick}
+              title={`当前版本：${APP_VERSION} (${APP_VERSION_TITLE})\n点击可检查并更新最新离线缓存`}
+              className="flex items-center gap-1 text-[10px] sm:text-xs font-mono font-bold bg-amber-700/80 hover:bg-amber-800 text-amber-200 hover:text-white px-2 py-0.5 rounded-lg border border-amber-400/50 transition-all shadow-inner active:scale-95 cursor-pointer"
             >
-              <RefreshCw className="w-3 h-3" />
-              <span>强刷更新</span>
+              <RefreshCw className="w-3 h-3 text-amber-300" />
+              <span>{APP_VERSION}</span>
             </button>
           </div>
-        )}
 
-        {/* Stars counter */}
+          {/* Stars counter */}
         <div
           title="通关累计获得的星星总数（每过一关摘得2~3颗星）"
           className="flex items-center gap-1.5 bg-yellow-400 text-amber-900 font-black px-2.5 py-0.5 rounded-full shadow-inner border border-yellow-300"
@@ -209,5 +194,38 @@ export const KidNavbar: React.FC<KidNavbarProps> = ({
         </button>
       </div>
     </header>
+
+    {/* Version Update & Force Refresh Center Modal */}
+    {versionModalOpen && (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-pop-in">
+        <div className="bg-gradient-to-b from-amber-50 to-orange-100 rounded-3xl p-5 max-w-sm w-full text-center shadow-2xl border-4 border-yellow-400 relative">
+          <button
+            onClick={() => setVersionModalOpen(false)}
+            className="absolute top-3 right-3 w-8 h-8 rounded-full bg-amber-200/80 hover:bg-amber-300 text-amber-950 flex items-center justify-center font-bold text-base transition active:scale-95"
+            title="关闭"
+          >
+            ✕
+          </button>
+          <div className="text-3xl mb-1">🚀</div>
+          <h3 className="text-lg font-black text-amber-950 font-cartoon">
+            版本更新与离线缓存
+          </h3>
+          <p className="text-xs font-bold text-amber-800 mt-1 mb-2">
+            当前最新版本：<span className="font-mono bg-amber-200 px-1.5 py-0.5 rounded text-amber-950 font-black">{APP_VERSION}</span>
+          </p>
+          <p className="text-[11px] text-gray-600 mb-4 bg-white/80 p-2.5 rounded-xl border border-amber-200 text-left leading-relaxed">
+            💡 <strong>小提示</strong>：如果页面因离线缓存未显示最新界面（如对弈侧边栏已全面优化免滚动），点击下方按钮即可一键清除旧缓存并重新载入！
+          </p>
+          <button
+            onClick={handleForceRefresh}
+            className="w-full py-2.5 px-4 bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 text-amber-950 font-black rounded-2xl shadow-lg border-2 border-yellow-300 flex items-center justify-center gap-2 text-sm transition active:scale-95 cursor-pointer"
+          >
+            <RefreshCw className="w-4 h-4 animate-spin" />
+            <span>⚡ 立即清除缓存并载入最新版</span>
+          </button>
+        </div>
+      </div>
+    )}
+  </>
   );
 };
