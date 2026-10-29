@@ -1,3 +1,3 @@
-export const APP_VERSION = 'v9.0';
-export const APP_VERSION_DATE = '2026-10-28';
-export const APP_VERSION_TITLE = '真·神经网络龙尊升级版（国家二级水准）';
+export const APP_VERSION = 'v9.1';
+export const APP_VERSION_DATE = '2026-10-29';
+export const APP_VERSION_TITLE = '平板紧凑全屏适配优化版（免滚动）';
