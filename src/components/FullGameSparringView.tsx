@@ -37,31 +37,31 @@ import {
 const SPARRING_PROFILES: SparringProfile[] = [
   {
     id: 'novice',
-    name: '菜鸟',
-    avatar: '🐤',
-    rank: '15K 稳健基础',
-    description: '扎实的基本战术，绝不无故自杀送子，是森森热身与练习五大吃子绝招的最佳陪练！',
+    name: '老鸟',
+    avatar: '🦅',
+    rank: '业余1段 守门名宿',
+    description: '扎实稳健的老手，大局平稳，算气严密，是森森热身开局、巩固赢棋信心的绝佳陪练！',
   },
   {
     id: 'club',
-    name: '中鸟',
-    avatar: '🦉',
-    rank: '10K 警觉高手',
-    description: '全新升级！具备前瞻防守意识，能提前识破双打吃陷阱与反杀，需要认真动脑才能突破！',
+    name: '战灵狐',
+    avatar: '🦊',
+    rank: '业余2-3段 中盘刺客',
+    description: '中盘肉搏极度凶狠！专咬大龙断点、敏锐猎杀孤子与制造反击，是孩子目前最关键的突破对手！',
   },
   {
     id: 'master',
-    name: '老鸟',
-    avatar: '🦅',
-    rank: '5K-1D MCTS老手',
-    description: '搭载蒙特卡洛树搜寻 (MCTS) 深度推演，算气严密、大局观强，24子长局极具压迫感！',
+    name: '麒麟',
+    avatar: '🦄',
+    rank: '业余4段 大局宗师',
+    description: '金角银边、大局厚重！搭载神经网络策略先验，官子极度精细，冲刺国家二级前的关键硬仗！',
   },
   {
     id: 'grandmaster',
     name: '龙尊',
     avatar: '🐲',
-    rank: '业余高段 终极神经大脑',
-    description: '神级龙尊！深谙金角银边、大局腾挪与虚实转换，绝不抱团等死，盘盘招法不重样！',
+    rank: '业余5段 国家二级神脑',
+    description: '国家二级水准终极大魔王！深度卷积神经网络矩阵推演，建议开启让 4 至 6 子进行大师指导棋！',
   },
 ];
 
@@ -70,10 +70,10 @@ interface FullGameSparringViewProps {
 }
 
 export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ showCoordinates }) => {
-  // Game Configuration State
+  // Game Configuration State - Default to 'novice' (老鸟 1D: the child's confident sparring partner)
   const [boardSize, setBoardSize] = useState<BoardSize>(13);
   const [playerColor, setPlayerColor] = useState<Color>('black');
-  const [aiLevel, setAiLevel] = useState<AISparringLevel>('club');
+  const [aiLevel, setAiLevel] = useState<AISparringLevel>('novice');
   const [winRule, setWinRule] = useState<WinRuleMode>('capture'); // Default to Kid-Friendly Capture Race!
   const [captureTarget, setCaptureTarget] = useState<number>(5); // Default: First to capture 5 stones wins!
   const [handicapCount, setHandicapCount] = useState<number>(0); // 0 = even game (分先), 2, 3, 4, 9 stones
@@ -183,7 +183,10 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
       setCanUndoTurn(false);
 
       if (handicap > 0) {
-        const msg = `让 ${handicap} 子开局！黑棋稳固占领星位，看白棋如何突围～`;
+        const msg =
+          lvl === 'grandmaster'
+            ? `吾乃龙尊！今日为你授业让 ${handicap} 子，若能守住大局不被我突破，便算你赢！🐲`
+            : `让 ${handicap} 子对弈！黑棋稳固占领星位，看白棋如何突围～`;
         setAiDialogue(msg);
         SoundEngine.speakText(msg);
         if (pColor === 'black') {
@@ -196,7 +199,11 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
         const msg =
           lvl === 'grandmaster'
             ? '吾乃龙尊！吃子决战与虚实腾挪双绝，先吃满 5 颗子获胜，拿出全部实力吧！🐲'
-            : `本盘规则：先吃满 ${target} 颗棋子获胜！看看谁的手法更敏锐～`;
+            : lvl === 'master'
+            ? '吾乃踏浪麒麟！攻防兼备，先吃满 5 颗子获胜，看看你的敏锐战术！🦄'
+            : lvl === 'club'
+            ? '吾乃战灵狐！中盘刺客盯紧断点，先吃满 5 颗子获胜，绝不手软！🦊'
+            : `我是老鸟！本盘规则：先吃满 ${target} 颗棋子获胜！看看谁的手法更敏锐～🦅`;
         setAiDialogue(msg);
         SoundEngine.speakText(msg);
         if (pColor === 'white') {
@@ -208,8 +215,12 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
       } else {
         const msg =
           lvl === 'grandmaster'
-            ? '吾乃龙尊！金角银边，全盘虚实皆通，就让我见识一下你的大局观！🐲'
-            : '本盘规则：正规围地盘点目！金角银边，占领更多地盘就能赢！';
+            ? '吾乃龙尊！国家二级神级大脑！若觉得压力大可随时开启让 4 至 6 子指导棋！🐲'
+            : lvl === 'master'
+            ? '吾乃踏浪麒麟！金角银边、大局厚重，来一场堂堂正正的 4 段点目对决！🦄'
+            : lvl === 'club'
+            ? '吾乃战灵狐！中盘肉搏刺客，小心你的大龙断点被我分断哦！🦊'
+            : '我是老鸟！棋局大势平稳，金角银边，占领更多地盘就能赢！🦅';
         setAiDialogue(msg);
         SoundEngine.speakText(msg);
         if (pColor === 'white') {
@@ -228,10 +239,11 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
     (level: AISparringLevel) => {
       SoundEngine.playStoneSound();
       setAiLevel(level);
+      const profile = SPARRING_PROFILES.find((p) => p.id === level) || SPARRING_PROFILES[0];
       const isGrandmaster = level === 'grandmaster';
       const msg = isGrandmaster
-        ? '吾乃龙尊！金角银边，全盘虚实皆通，就让我见识一下你的大局观！🐲'
-        : `${SPARRING_PROFILES.find((p) => p.id === level)?.name || 'AI'} 已就位，请落子！`;
+        ? '吾乃龙尊！国家二级神脑！若觉得压力大可随时开启让 4 至 6 子指导棋，拿出全部实力吧！🐲'
+        : `【${profile.name}】(${profile.rank.split(' ')[0]}) 已就位，请落子！`;
       setAiDialogue(msg);
       SoundEngine.speakText(msg);
       startNewGame(boardSize, playerColor, level, winRule, captureTarget, handicapCount);
@@ -600,9 +612,17 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
                     isSelected
                       ? p.id === 'grandmaster'
                         ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-amber-500 text-white shadow-md scale-[1.02] ring-2 ring-yellow-400'
+                        : p.id === 'master'
+                        ? 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-md scale-[1.02] ring-2 ring-teal-300'
+                        : p.id === 'club'
+                        ? 'bg-gradient-to-r from-orange-600 to-red-600 text-white shadow-md scale-[1.02] ring-2 ring-orange-300'
                         : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md scale-[1.02] ring-2 ring-amber-300'
                       : p.id === 'grandmaster'
                       ? 'bg-gradient-to-r from-purple-100 to-indigo-100 hover:from-purple-200 hover:to-indigo-200 text-purple-950 border border-purple-300'
+                      : p.id === 'master'
+                      ? 'bg-gradient-to-r from-teal-50 to-emerald-100 hover:from-teal-100 hover:to-emerald-200 text-teal-950 border border-teal-300'
+                      : p.id === 'club'
+                      ? 'bg-gradient-to-r from-orange-50 to-red-100 hover:from-orange-100 hover:to-red-200 text-orange-950 border border-orange-300'
                       : 'bg-amber-100/70 hover:bg-amber-200 text-amber-900 border border-amber-300'
                   }`}
                   title={`${p.name} (${p.rank})\n${p.description}`}

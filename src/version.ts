@@ -1,3 +1,3 @@
-export const APP_VERSION = 'v9.1';
+export const APP_VERSION = 'v9.2';
 export const APP_VERSION_DATE = '2026-10-29';
-export const APP_VERSION_TITLE = '平板紧凑全屏适配优化版（免滚动）';
+export const APP_VERSION_TITLE = '冲段天梯实战升级版（业1段至业5段）';

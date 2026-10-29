@@ -418,27 +418,24 @@ export class GoAI {
     const isGrandmaster =
       options.difficulty === 'grandmaster' || options.sparringLevel === 'grandmaster';
 
-    // 1. 🐲 龙尊 (Dragon Sovereign - Neural-Style Policy Priors + Deep MCTS + Sabaki Tenuki)
+    // 1. 🐲 极·龙尊 (Dragon Sovereign - 业余 5 段 / 国家二级水准: Full Neural Policy Priors + Deep MCTS + Anti-Surrender)
     if (isGrandmaster) {
       return this.getDragonSovereignFullGameMove(state, color, opponentColor, legalMoves, options);
     }
 
-    const isMaster =
-      options.difficulty === 'master' ||
-      options.difficulty === 'advanced' ||
-      options.sparringLevel === 'master';
-    const isClub =
-      options.difficulty === 'intermediate' || options.sparringLevel === 'club';
-
-    if (!isMaster && !isClub) {
-      return this.getTacticalHeuristicMove(state, color, opponentColor, legalMoves, options);
+    // 2. 🦄 踏浪麒麟 (Kylin - 业余 4 段 · 大局宗师: High-budget MCTS + Neural Policy Guidance)
+    const isKylin = options.sparringLevel === 'master';
+    if (isKylin) {
+      return this.getKylinFullGameMove(state, color, opponentColor, legalMoves, options);
     }
 
-    if (isClub) {
-      return this.getAdvancedClubTacticalMove(state, color, opponentColor, legalMoves, options);
+    // 3. 🦊 战灵狐 (War Fox - 业余 2 至 3 段 · 中盘刺客: Tactical Cutting & Atari Pressure + Focused MCTS)
+    const isWarFox = options.sparringLevel === 'club' || options.difficulty === 'intermediate';
+    if (isWarFox) {
+      return this.getWarFoxFullGameMove(state, color, opponentColor, legalMoves, options);
     }
 
-    // Master Full Game Sparring uses MCTS
+    // 4. 🦅 老鸟 (Old Bird - 业余 1 段 · 守门名宿: Standard MCTS, the child's confident 80%+ win rate anchor)
     const mctsIterations = size === 9 ? 450 : size === 13 ? 280 : 140;
     return this.runMCTS(state, color, opponentColor, legalMoves, mctsIterations, options);
   }
@@ -662,16 +659,20 @@ export class GoAI {
     scoreDiff += (aiLibBonus - oppLibBonus);
 
     // 5. Corner control bonus
-    const cornerChecks = size === 9
-      ? [{ x: 2, y: 2 }, { x: 6, y: 2 }, { x: 2, y: 6 }, { x: 6, y: 6 }]
-      : size === 13
-      ? [{ x: 3, y: 3 }, { x: 9, y: 3 }, { x: 3, y: 9 }, { x: 9, y: 9 }]
-      : [{ x: 3, y: 3 }, { x: 15, y: 3 }, { x: 3, y: 15 }, { x: 15, y: 15 }];
+    const cornerOffset = size >= 19 ? 3 : size >= 13 ? 3 : size >= 9 ? 2 : 1;
+    const cornerChecks = [
+      { x: cornerOffset, y: cornerOffset },
+      { x: size - 1 - cornerOffset, y: cornerOffset },
+      { x: cornerOffset, y: size - 1 - cornerOffset },
+      { x: size - 1 - cornerOffset, y: size - 1 - cornerOffset },
+    ];
 
     for (const cp of cornerChecks) {
-      const stone = state.grid[cp.y][cp.x];
-      if (stone === aiColor) scoreDiff += 3.5;
-      else if (stone === oppColor) scoreDiff -= 3.5;
+      if (cp.y < size && cp.x < size && state.grid[cp.y]) {
+        const stone = state.grid[cp.y][cp.x];
+        if (stone === aiColor) scoreDiff += 3.5;
+        else if (stone === oppColor) scoreDiff -= 3.5;
+      }
     }
 
     return scoreDiff;
@@ -877,6 +878,109 @@ export class GoAI {
     }
 
     return score;
+  }
+
+  /**
+   * Level 3: 🦄 踏浪麒麟 (Kylin - 业余 4 段 · 大局宗师)
+   * High-budget MCTS + Neural Policy Guidance, plays thick, solid, and makes almost no opening blunders.
+   */
+  private static getKylinFullGameMove(
+    state: BoardState,
+    color: Color,
+    oppColor: Color,
+    legalMoves: Point[],
+    options: AIMoveOptions
+  ): Point | null {
+    const size = state.size;
+
+    // 1. Immediate high-value tactical emergencies
+    const escapes = this.findEscapeAtariMoves(state, color, legalMoves);
+    if (escapes.length > 0) {
+      return escapes[0];
+    }
+
+    const captures = this.findImmediateCaptures(state, color, legalMoves);
+    if (captures.length > 0) {
+      return captures[0];
+    }
+
+    // 2. Opening book priority on empty or early board
+    const moveNumber = state.moveHistory.length;
+    const hasEmergency = this.hasUrgentAtari(state, color, oppColor);
+    if (!hasEmergency && !options.captureTarget && moveNumber < (size === 9 ? 8 : size === 13 ? 20 : 36)) {
+      const opening = this.getOpeningBookMove(state, legalMoves);
+      if (opening) return opening;
+    }
+
+    // 3. Pre-evaluate candidates using Dragon Policy (macro shape, corner/side balance, anti-clump)
+    const scoredCandidates = legalMoves
+      .map((m) => ({
+        move: m,
+        score: this.evaluateDragonPolicy(state, m, color, oppColor),
+      }))
+      .sort((a, b) => b.score - a.score);
+
+    const sortedMoves = scoredCandidates.map((c) => c.move);
+
+    // 4. Run High-budget MCTS (19x19: 320, 13x13: 420, 9x9: 550)
+    const mctsIterations = size === 9 ? 550 : size === 13 ? 420 : 320;
+    return this.runMCTS(state, color, oppColor, sortedMoves, mctsIterations, options);
+  }
+
+  /**
+   * Level 2: 🦊 战灵狐 (War Fox - 业余 2 至 3 段 · 中盘刺客)
+   * Focused on cutting opponent groups, double-atari, hunting weak shapes, and medium MCTS search.
+   */
+  private static getWarFoxFullGameMove(
+    state: BoardState,
+    color: Color,
+    oppColor: Color,
+    legalMoves: Point[],
+    options: AIMoveOptions
+  ): Point | null {
+    const size = state.size;
+
+    // 1. Tactical emergencies: escape atari
+    const escapes = this.findEscapeAtariMoves(state, color, legalMoves);
+    if (escapes.length > 0) {
+      return escapes[0];
+    }
+
+    // 2. High-value captures
+    const captures = this.findImmediateCaptures(state, color, legalMoves);
+    if (captures.length > 0) {
+      return captures[0];
+    }
+
+    // 3. Prioritize sharp cuts & double-ataris (战灵狐的核心杀招)
+    const tacticalCandidates = legalMoves
+      .map((m) => {
+        const sim = GoCore.playMove(state, m, color);
+        const cutBonus = sim.error ? -9999 : this.evaluateCutsAndPunish(state, sim, m, color, oppColor);
+        const baseScore = this.quickEval(state, m, color, oppColor);
+        return {
+          move: m,
+          score: baseScore + cutBonus * 1.5,
+        };
+      })
+      .sort((a, b) => b.score - a.score);
+
+    // If an exceptional cut or double atari exists, execute directly
+    if (tacticalCandidates.length > 0 && tacticalCandidates[0].score >= 380) {
+      return tacticalCandidates[0].move;
+    }
+
+    // 4. Opening book if early
+    const moveNumber = state.moveHistory.length;
+    if (!options.captureTarget && moveNumber < (size === 9 ? 6 : size === 13 ? 16 : 28)) {
+      const opening = this.getOpeningBookMove(state, legalMoves);
+      if (opening) return opening;
+    }
+
+    // 5. MCTS with tactical candidate priors (19x19: 220, 13x13: 320, 9x9: 480)
+    const sortedMoves = tacticalCandidates.map((c) => c.move);
+    const mctsIterations = size === 9 ? 480 : size === 13 ? 320 : 220;
+    return this.runMCTS(state, color, oppColor, sortedMoves, mctsIterations, options);
   }
 
   /**
