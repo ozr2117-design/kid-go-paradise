@@ -21,3 +21,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# 本地运维/调试文件，不入公开仓库（含 Cloudflare 账号信息与私有应用地址）
+cloudflare-worker/
+CLOUDFLARE_KEEP_ALIVE.md
+scratch/
+.wrangler/
