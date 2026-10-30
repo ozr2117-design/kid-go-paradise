@@ -35,6 +35,15 @@ jobs:
       - name: Build project
         run: npm run build
 
+      # Cloudflare Pages 采用「直接上传」模式（非 Git 连接），
+      # 因此每次构建后由 CI 把 dist 推送到 weiqi-kids 项目。
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=weiqi-kids --branch=master
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
