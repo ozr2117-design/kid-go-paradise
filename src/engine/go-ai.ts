@@ -418,26 +418,140 @@ export class GoAI {
     const isGrandmaster =
       options.difficulty === 'grandmaster' || options.sparringLevel === 'grandmaster';
 
+    let chosen: Point | null = null;
+
     // 1. 🐲 极·龙尊 (Dragon Sovereign - 业余 5 段 / 国家二级水准: Full Neural Policy Priors + Deep MCTS + Anti-Surrender)
     if (isGrandmaster) {
-      return this.getDragonSovereignFullGameMove(state, color, opponentColor, legalMoves, options);
+      chosen = this.getDragonSovereignFullGameMove(state, color, opponentColor, legalMoves, options);
+    } else if (options.sparringLevel === 'master') {
+      // 2. 🦄 踏浪麒麟 (Kylin - 业余 4 段 · 大局宗师: High-budget MCTS + Neural Policy Guidance)
+      chosen = this.getKylinFullGameMove(state, color, opponentColor, legalMoves, options);
+    } else if (options.sparringLevel === 'club' || options.difficulty === 'intermediate') {
+      // 3. 🦊 战灵狐 (War Fox - 业余 2 至 3 段 · 中盘刺客: Tactical Cutting & Atari Pressure + Focused MCTS)
+      chosen = this.getWarFoxFullGameMove(state, color, opponentColor, legalMoves, options);
+    } else {
+      // 4. 🦅 老鸟 (Old Bird - 业余 1 段 · 守门名宿: Standard MCTS, the child's confident 80%+ win rate anchor)
+      const mctsIterations = size === 9 ? 450 : size === 13 ? 280 : 140;
+      chosen = this.runMCTS(state, color, opponentColor, legalMoves, mctsIterations, options);
     }
 
-    // 2. 🦄 踏浪麒麟 (Kylin - 业余 4 段 · 大局宗师: High-budget MCTS + Neural Policy Guidance)
-    const isKylin = options.sparringLevel === 'master';
-    if (isKylin) {
-      return this.getKylinFullGameMove(state, color, opponentColor, legalMoves, options);
+    // ========================================================
+    // 🛡️ 核心铁律：反摆烂与绝境胜负手安全拦截 (Anti-Pass & Swindle Safeguard)
+    // 无论是龙尊还是老鸟，只要落后或对手主动 Pass，绝不被动虚手！
+    // ========================================================
+    const est = GoCore.estimateTerritory(state);
+    const komi = size === 19 ? 7.5 : size === 13 ? 5.5 : 3.5;
+    const myScore = color === 'black' ? est.black : est.white + komi;
+    const oppScore = color === 'black' ? est.white + komi : est.black;
+    const isLosing = myScore < oppScore;
+    const isOpponentPass = state.consecutivePasses > 0;
+
+    if (isLosing || isOpponentPass) {
+      if (!chosen || this.isTrueEye(state, chosen, color)) {
+        const desperateMove = this.findDesperateInvasionMove(state, color, opponentColor, legalMoves);
+        if (desperateMove) {
+          return desperateMove;
+        }
+      }
     }
 
-    // 3. 🦊 战灵狐 (War Fox - 业余 2 至 3 段 · 中盘刺客: Tactical Cutting & Atari Pressure + Focused MCTS)
-    const isWarFox = options.sparringLevel === 'club' || options.difficulty === 'intermediate';
-    if (isWarFox) {
-      return this.getWarFoxFullGameMove(state, color, opponentColor, legalMoves, options);
+    return chosen;
+  }
+
+  /**
+   * 绝境胜负手与破空打入 (Anti-Pass Desperate Swindle & Deep Invasion)
+   * 当 AI 处于劣势或对手试图通过连续停一手锁定胜局时被触发
+   */
+  public static findDesperateInvasionMove(
+    state: BoardState,
+    color: Color,
+    oppColor: Color,
+    legalMoves: Point[]
+  ): Point | null {
+    const size = state.size;
+    if (legalMoves.length === 0) return null;
+
+    // 1. 过滤掉自填真眼
+    const validMoves = legalMoves.filter((m) => !this.isTrueEye(state, m, color));
+    if (validMoves.length === 0) return null;
+
+    // 2. 紧急打吃/解救优先
+    const escapes = this.findEscapeAtariMoves(state, color, validMoves);
+    if (escapes.length > 0) return escapes[0];
+
+    const captures = this.findImmediateCaptures(state, color, validMoves);
+    if (captures.length > 0) return captures[0];
+
+    // 3. 空角三三打入 (San-San Points)
+    const sanSanList: Point[] = [
+      { x: 2, y: 2 },
+      { x: size - 3, y: 2 },
+      { x: 2, y: size - 3 },
+      { x: size - 3, y: size - 3 },
+    ];
+    for (const ss of sanSanList) {
+      if (validMoves.some((m) => m.x === ss.x && m.y === ss.y)) {
+        const sim = GoCore.playMove(state, ss, color);
+        if (!sim.error) {
+          const grp = GoCore.findGroup(sim.nextState.grid, ss);
+          if (grp && grp.liberties.length >= 2) {
+            return ss;
+          }
+        }
+      }
     }
 
-    // 4. 🦅 老鸟 (Old Bird - 业余 1 段 · 守门名宿: Standard MCTS, the child's confident 80%+ win rate anchor)
-    const mctsIterations = size === 9 ? 450 : size === 13 ? 280 : 140;
-    return this.runMCTS(state, color, opponentColor, legalMoves, mctsIterations, options);
+    // 4. 打入对手空腹、断开对手连接、或者抢占未收净的官子
+    const scoredMoves = validMoves
+      .map((m) => {
+        let score = 0;
+        const sim = GoCore.playMove(state, m, color);
+        if (sim.error) return { move: m, score: -99999 };
+
+        const myGroup = GoCore.findGroup(sim.nextState.grid, m);
+        const myLibs = myGroup ? myGroup.liberties.length : 0;
+
+        // 绝不白送 1 气死肉
+        if (myLibs <= 1 && sim.captured.length === 0) {
+          score -= 2000;
+        } else {
+          score += myLibs * 60;
+        }
+
+        if (sim.captured.length > 0) {
+          score += sim.captured.length * 600;
+        }
+
+        // 贴靠对手棋子寻找破绽
+        const oppNeighbors = GoCore.getNeighbors(m, size).filter(
+          (n) => state.grid[n.y][n.x] === oppColor
+        );
+        score += oppNeighbors.length * 90;
+
+        // 冲断奖励
+        const cutBonus = this.evaluateCutsAndPunish(state, sim, m, color, oppColor);
+        score += cutBonus * 1.6;
+
+        return { move: m, score };
+      })
+      .sort((a, b) => b.score - a.score);
+
+    if (scoredMoves.length > 0 && scoredMoves[0].score > -1500) {
+      return scoredMoves[0].move;
+    }
+
+    // 5. 兜底挑选气数 >= 2 的合法步
+    for (const vm of validMoves) {
+      const sim = GoCore.playMove(state, vm, color);
+      if (!sim.error) {
+        const grp = GoCore.findGroup(sim.nextState.grid, vm);
+        if (grp && grp.liberties.length >= 2) {
+          return vm;
+        }
+      }
+    }
+
+    return validMoves[0] || null;
   }
 
   /**
@@ -1097,14 +1211,23 @@ export class GoAI {
     }
 
     // Strict safeguard against premature mid-game pass/surrender:
-    // Only pass if true late endgame (moves >= size * 8) AND no productive moves exist
+    // Only pass if true late endgame (moves >= size * 8) AND no productive moves exist AND not losing
     const minEndgameMoves = size === 19 ? 150 : size === 13 ? 75 : 35;
     const isLateEndgame = state.moveHistory.length >= minEndgameMoves;
+
+    const komi = size === 19 ? 7.5 : size === 13 ? 5.5 : 3.5;
+    const myScore = color === 'black' ? territoryEst.black : territoryEst.white + komi;
+    const oppScore = color === 'black' ? territoryEst.white + komi : territoryEst.black;
+    const isLosing = myScore < oppScore;
+    const isOpponentPass = state.consecutivePasses > 0;
 
     if (root.children.length === 0) {
       const nonSuicide = legalMoves.find((m) => !this.isTrueEye(state, m, color));
       if (!isLateEndgame && nonSuicide) {
         return nonSuicide;
+      }
+      if (isLosing || isOpponentPass) {
+        return this.findDesperateInvasionMove(state, color, oppColor, legalMoves);
       }
       return null;
     }
@@ -1119,11 +1242,18 @@ export class GoAI {
         ? topTier[Math.floor(Math.random() * topTier.length)].move
         : root.children[0].move;
 
-    // Never fill true eye; in midgame fight persistently instead of passing!
+    // Never fill true eye; in midgame or losing game, fight persistently instead of passing!
     if (chosenMove && this.isTrueEye(state, chosenMove, color)) {
-      if (isLateEndgame) return null;
       const alt = legalMoves.find((m) => !this.isTrueEye(state, m, color));
-      return alt || null;
+      if (alt) return alt;
+      if (isLosing || isOpponentPass) {
+        return this.findDesperateInvasionMove(state, color, oppColor, legalMoves);
+      }
+      return null;
+    }
+
+    if (!chosenMove && (isLosing || isOpponentPass)) {
+      return this.findDesperateInvasionMove(state, color, oppColor, legalMoves);
     }
 
     return chosenMove;

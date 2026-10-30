@@ -11,6 +11,7 @@ import {
 } from '../types/go';
 import { GoCore } from '../engine/go-core';
 import { GoAI } from '../engine/go-ai';
+import { AiSensei } from '../engine/ai-sensei';
 import { SoundEngine } from '../engine/sound-engine';
 import { GoBoard } from './GoBoard';
 import { SparringSettlementModal } from './SparringSettlementModal';
@@ -106,6 +107,9 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
   const [undosRemaining, setUndosRemaining] = useState<number>(MAX_UNDOS_PER_GAME);
   const [canUndoTurn, setCanUndoTurn] = useState<boolean>(false);
 
+  // 记录小选手是否在对局中使用了停一手（用于名师复盘与投机诊断）
+  const [playerAttemptedPass, setPlayerAttemptedPass] = useState<boolean>(false);
+
   const activeProfile = SPARRING_PROFILES.find((p) => p.id === aiLevel) || SPARRING_PROFILES[1];
   const aiColor: Color = playerColor === 'black' ? 'white' : 'black';
 
@@ -181,6 +185,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
       setTimeLeft(30);
       setUndosRemaining(MAX_UNDOS_PER_GAME);
       setCanUndoTurn(false);
+      setPlayerAttemptedPass(false);
 
       if (handicap > 0) {
         const msg =
@@ -312,7 +317,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
         }
       }
 
-      setSettlementData({
+      const baseSettlement: GameSettlementData = {
         winner,
         winReason: finalReason,
         winRule,
@@ -323,10 +328,24 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
         totalMoves: finalState.moveHistory.length,
         titleBadge,
         stars,
+      };
+
+      // 🧠 双脑协同：调用名师认知脑生成专业复盘评测
+      const senseiReview = AiSensei.generateSenseiReview(
+        baseSettlement,
+        finalState,
+        playerColor,
+        activeProfile.name,
+        playerAttemptedPass
+      );
+
+      setSettlementData({
+        ...baseSettlement,
+        senseiReview,
       });
       setIsSettlementOpen(true);
     },
-    [boardSize, playerColor, winRule, captureTarget, activeProfile.name]
+    [boardSize, playerColor, winRule, captureTarget, activeProfile.name, playerAttemptedPass]
   );
 
   // Player Move Handler
@@ -398,7 +417,13 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
           const res = GoCore.playMove(current, aiMove, aiColor, targetRule);
           setBoardState(res.nextState);
 
-          if (res.captured.length > 0) {
+          // 🛡️ 双脑协同：若小选手上一手试图停一手，AI 绝境打入并进行心理施压
+          if (current.consecutivePasses > 0) {
+            const isDragon = aiLevel === 'grandmaster';
+            const antiPassText = AiSensei.getAntiPassSpeech(activeProfile.name, isDragon);
+            updateAiDialogue(antiPassText);
+            setStatusMessage(`🔥 【胜负手打入】${activeProfile.name} 识破停一手，落子于 (${aiMove.x + 1}, ${aiMove.y + 1}) 强势反扑！`);
+          } else if (res.captured.length > 0) {
             SoundEngine.playCaptureSound();
             const aiCaps = aiColor === 'black' ? res.nextState.captures.black : res.nextState.captures.white;
             if (winRule === 'capture' && aiCaps >= captureTarget) {
@@ -419,13 +444,32 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
             triggerEndGame(res.nextState);
           }
         } else {
-          // AI passes
-          const passed = GoCore.pass(current);
-          setBoardState(passed);
-          updateAiDialogue('棋局大势已定，边界已经分清，我选择停一手！');
-          setStatusMessage(`${activeProfile.name} 停一手 (Pass)`);
-          if (passed.isGameOver) {
-            triggerEndGame(passed);
+          // AI 没有合法的非真眼可下之步（全盘单官已真正下满）
+          const est = GoCore.estimateTerritory(current);
+          const komi = current.size === 19 ? 7.5 : current.size === 13 ? 5.5 : 3.5;
+          const myScore = aiColor === 'black' ? est.black : est.white + komi;
+          const oppScore = aiColor === 'black' ? est.white + komi : est.black;
+
+          if (myScore < oppScore) {
+            // 劣势且全盘单官收尽：体面投子认负！
+            const resignMsg = `黑棋大阵坚不可摧，防守滴水不漏！${activeProfile.name} 甘拜下风，投子认负！`;
+            updateAiDialogue(resignMsg);
+            setStatusMessage(`${activeProfile.name} 投子认负（中盘认输）`);
+            const resignedState = GoCore.cloneState(current);
+            resignedState.isGameOver = true;
+            resignedState.winner = playerColor;
+            resignedState.winReason = `对手【${activeProfile.name}】投子认负，中盘胜！`;
+            setBoardState(resignedState);
+            triggerEndGame(resignedState, resignedState.winReason, 'player');
+          } else {
+            // 优势且确实已终局：才选择停一手
+            const passed = GoCore.pass(current);
+            setBoardState(passed);
+            updateAiDialogue('棋局大势已定，边界已经分清，我选择停一手！');
+            setStatusMessage(`${activeProfile.name} 停一手 (Pass)`);
+            if (passed.isGameOver) {
+              triggerEndGame(passed);
+            }
           }
         }
 
@@ -443,6 +487,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
     winRule,
     captureTarget,
     activeProfile.name,
+    playerColor,
     triggerEndGame,
     updateAiDialogue,
   ]);
@@ -450,10 +495,11 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
   // Player Pass
   const handlePass = () => {
     if (boardState.isGameOver || boardState.turn !== playerColor || isAiThinking) return;
+    setPlayerAttemptedPass(true);
     const next = GoCore.pass(boardState);
     setBoardState(next);
     setCanUndoTurn(true);
-    setStatusMessage('你选择停一手 (Pass)');
+    setStatusMessage('你选择停一手 (Pass)，已将宝贵先手让给对手！');
     if (next.isGameOver) {
       triggerEndGame(next);
     }

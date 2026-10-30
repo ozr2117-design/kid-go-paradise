@@ -197,4 +197,27 @@ describe('GoAI Kid-Friendly Sparring Engine', () => {
     // AI must gracefully pass (return null) instead of filling its own eye!
     expect(move).toBeNull();
   });
+
+  it('Dragon Sovereign (龙尊) NEVER passes when opponent passes and AI is behind', () => {
+    // Create a 19x19 board where Black (player) has built a massive territory on the left side
+    let board = GoCore.createEmptyBoard(19);
+    for (let y = 0; y < 19; y++) {
+      board.grid[y][5] = 'black'; // A strong vertical wall by black
+    }
+    // Simulate opponent (Black) passing: consecutivePasses = 1
+    board = GoCore.pass(board); // turn is now white, consecutivePasses = 1
+    board.moveHistory = new Array(160).fill({ x: 0, y: 0, color: 'black' }); // late endgame simulation
+
+    const move = GoAI.getBestMove(board, 'white', {
+      sparringLevel: 'grandmaster',
+      isFullGame: true,
+    });
+
+    // Dragon Sovereign must refuse to pass and find a fighting move!
+    expect(move).not.toBeNull();
+    if (move) {
+      expect(GoCore.isLegalMove(board, move, 'white').legal).toBe(true);
+      expect(GoCore.isTrueEye(board.grid, move, 'white', 19)).toBe(false);
+    }
+  });
 });

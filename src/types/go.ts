@@ -49,6 +49,13 @@ export interface SparringProfile {
   description: string;
 }
 
+export interface SenseiReviewData {
+  headline: string;
+  stageAnalysis: string[];
+  criticalAdvice: string;
+  tacticalScore: number;
+}
+
 export interface GameSettlementData {
   winner: 'player' | 'ai' | 'draw';
   winReason: string;
@@ -60,6 +67,7 @@ export interface GameSettlementData {
   totalMoves: number;
   titleBadge: string;
   stars: number;
+  senseiReview?: SenseiReviewData;
 }
 
 

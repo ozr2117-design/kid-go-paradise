@@ -1,8 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { GameSettlementData } from '../types/go';
 import { SoundEngine } from '../engine/sound-engine';
-import { Star, RotateCcw, Award, CheckCircle2, Swords, Home } from 'lucide-react';
+import { Star, RotateCcw, Award, CheckCircle2, Swords, Home, Bot, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface SparringSettlementModalProps {
   isOpen: boolean;
@@ -31,6 +31,8 @@ export const SparringSettlementModal: React.FC<SparringSettlementModalProps> = (
       }
     }
   }, [isOpen, data]);
+
+  const [showReviewDetail, setShowReviewDetail] = useState(false);
 
   if (!isOpen || !data) return null;
 
@@ -125,6 +127,44 @@ export const SparringSettlementModal: React.FC<SparringSettlementModalProps> = (
             <span className="text-[10px] text-gray-500">共激战 {data.totalMoves} 手棋</span>
           </div>
         </div>
+
+        {/* 🧠 双脑协同：名师深度复盘报告 */}
+        {data.senseiReview && (
+          <div className="bg-white/95 rounded-2xl p-3 border-2 border-amber-300 shadow-sm text-left mb-4">
+            <div
+              onClick={() => setShowReviewDetail(!showReviewDetail)}
+              className="flex items-center justify-between cursor-pointer select-none"
+            >
+              <div className="flex items-center gap-1.5 font-black text-xs text-amber-950 font-cartoon">
+                <Bot className="w-4 h-4 text-orange-500 animate-bounce" />
+                <span>【龙尊·名师终局复盘报告】</span>
+                <span className="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-bold">
+                  战术分 {data.senseiReview.tacticalScore}
+                </span>
+              </div>
+              <div className="text-gray-400 hover:text-gray-600">
+                {showReviewDetail ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </div>
+            </div>
+
+            {/* 核心建议（默认展示） */}
+            <div className="mt-2 text-xs font-bold text-amber-900 bg-amber-50/80 p-2 rounded-xl border border-amber-200/60 leading-relaxed">
+              {data.senseiReview.criticalAdvice}
+            </div>
+
+            {/* 展开的阶段复盘详情 */}
+            {showReviewDetail && (
+              <div className="mt-2.5 pt-2 border-t border-amber-100 flex flex-col gap-1.5 text-[11px] text-gray-700 font-medium">
+                {data.senseiReview.stageAnalysis.map((stg, i) => (
+                  <div key={i} className="flex items-start gap-1">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                    <span>{stg}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="flex flex-col gap-2">
