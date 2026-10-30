@@ -61,12 +61,13 @@ export const KidNavbar: React.FC<KidNavbarProps> = ({
         }
         caches.keys().then((keys) => {
           Promise.all(keys.map((k) => caches.delete(k))).then(() => {
-            window.location.reload();
+            // 使用时间戳参数破除浏览器和 CDN 边缘强缓存
+            window.location.href = window.location.origin + window.location.pathname + '?_t=' + Date.now();
           });
         });
       });
     } else {
-      window.location.reload();
+      window.location.href = window.location.origin + window.location.pathname + '?_t=' + Date.now();
     }
   };
 
