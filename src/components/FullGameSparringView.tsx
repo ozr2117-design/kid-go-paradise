@@ -498,7 +498,24 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
           }
         } else {
           // AI 没有合法的非真眼可下之步
-          if (winRule === 'capture' || winRule === 'timed-capture') {
+          if (winRule === 'timed-capture') {
+            // 限时吃子：比赛规则是「15 分钟到点比吃子数」，停一手绝不能提前终结棋局。
+            // 否则孩子只要吃子领先，停一手就能直接判赢——这正是他能靠停手打掉龙尊的原因。
+            // 这里让 AI 停手只把先手还给小选手，不累加 pass、不终局。
+            const passed = GoCore.pass(current);
+            passed.consecutivePasses = 0;
+            passed.isGameOver = false;
+            updateAiDialogue('我这里没有能下的有效棋了，先让给你！');
+            setStatusMessage(`${activeProfile.name} 停一手 (Pass)`);
+            if (GoAI.getFastLegalMoves(passed, playerColor).length === 0) {
+              // 全盘已无合法落点，确实没什么可争了：按吃子数结算
+              const finished = GoCore.cloneState(passed);
+              finished.isGameOver = true;
+              triggerEndGame(finished);
+            } else {
+              setBoardState(passed);
+            }
+          } else if (winRule === 'capture') {
             // 吃子/限时吃子模式：不按围空判负，AI 直接停一手（双 pass 由 triggerEndGame 按吃子规则判定）
             const passed = GoCore.pass(current);
             setBoardState(passed);
@@ -559,6 +576,8 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
   // Player Pass
   const handlePass = () => {
     if (boardState.isGameOver || boardState.turn !== playerColor || isAiThinking) return;
+    // 限时吃子对齐比赛规则：15 分钟到点才比吃子数，不允许靠停一手提前收官判胜
+    if (winRule === 'timed-capture') return;
     setPlayerAttemptedPass(true);
     const next = GoCore.pass(boardState);
     setBoardState(next);
@@ -1097,9 +1116,15 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
 
           <button
             onClick={handlePass}
-            disabled={boardState.turn !== playerColor || isAiThinking || isReviewMode}
+            disabled={
+              boardState.turn !== playerColor || isAiThinking || isReviewMode || winRule === 'timed-capture'
+            }
             className="flex items-center justify-center gap-0.5 py-1.5 px-0.5 bg-white hover:bg-amber-50 disabled:opacity-40 text-amber-900 font-bold rounded-xl border border-amber-300 text-[11px] shadow-xs transition active:scale-95 cursor-pointer"
-            title="放弃本手（停一手）"
+            title={
+              winRule === 'timed-capture'
+                ? '限时吃子模式不能停一手（比赛规则：15 分钟到点比吃子数，停手不能提前结束）'
+                : '放弃本手（停一手）'
+            }
           >
             <CheckCircle2 className="w-3.5 h-3.5 text-amber-700 shrink-0" />
             <span>停一手</span>

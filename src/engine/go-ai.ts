@@ -328,7 +328,11 @@ export class GoAI {
     let bestMove: Point | null = null;
     let maxScore = -Infinity;
 
-    for (const move of legalMoves) {
+    // 硬性过滤送子手：宁可停一手（返回 null），也不自叫吃白送对手
+    const validMoves = this.filterGiftMoves(state, color, legalMoves);
+    if (validMoves.length === 0) return null;
+
+    for (const move of validMoves) {
       let score = this.evaluateDeepTactics(state, move, color, oppColor, options);
 
       // 分断加分：如果这步棋切断了对方两块不同棋子
@@ -355,7 +359,7 @@ export class GoAI {
       }
     }
 
-    return bestMove ?? legalMoves[0];
+    return bestMove ?? validMoves[0];
   }
 
   /**
@@ -373,10 +377,10 @@ export class GoAI {
       return this.pickBestCapture(state, instantCaps, color);
     }
 
-    // 过滤自填真眼（合法但自杀的棋），避免无棋可下时硬塞烂棋
-    const validMoves = legalMoves.filter((m) => !this.isTrueEye(state, m, color));
+    // 硬性过滤：自填真眼 + 自叫吃（送子手）。全被过滤掉时宁可停一手，绝不送吃。
+    const validMoves = this.filterGiftMoves(state, color, legalMoves);
     if (validMoves.length === 0) {
-      return null; // 无有效棋可下 → 停一手，而非硬塞自填眼
+      return null; // 无棋可下或下什么都是送子 → 停一手
     }
 
     // 候选着法初筛打分
@@ -385,7 +389,7 @@ export class GoAI {
       score: this.evaluateDeepTactics(state, m, color, oppColor, options),
     }));
     scoredCandidates.sort((a, b) => b.score - a.score);
-    const topCandidates = scoredCandidates.slice(0, 10).map((c) => c.move);
+    const topCandidates = scoredCandidates.slice(0, 12).map((c) => c.move);
 
     let bestMove: Point | null = null;
     let bestValue = -Infinity;
@@ -408,10 +412,24 @@ export class GoAI {
         }
       }
 
-      const netValue = (sim1.captured.length * 1000) - (oppWorstDamage * 1200);
+      // 主动进攻：叫吃对方（尤其是大龙）比守着一块空地有价值得多。
+      // 旧版只算"提子/被提"，没有提子机会时所有候选同分，AI 于是变成被动挨打。
+      let threat = 0;
+      for (const n of GoCore.getNeighbors(move, state.size)) {
+        if (sim1.nextState.grid[n.y][n.x] !== oppColor) continue;
+        const oppGrp = GoCore.findGroup(sim1.nextState.grid, n);
+        if (!oppGrp) continue;
+        if (oppGrp.liberties.length === 1) {
+          threat += oppGrp.points.length * 900; // 叫吃！下一手就能提
+        } else if (oppGrp.liberties.length === 2) {
+          threat += 150; // 紧气，制造叫吃机会
+        }
+      }
+
+      const netValue = (sim1.captured.length * 1000) - (oppWorstDamage * 1400) + threat;
       const myGroup = GoCore.findGroup(sim1.nextState.grid, move);
       const myLibs = myGroup ? myGroup.liberties.length : 0;
-      const totalScore = netValue + (myLibs * 50);
+      const totalScore = netValue + (myLibs * 60);
 
       if (totalScore > bestValue) {
         bestValue = totalScore;
@@ -581,6 +599,32 @@ export class GoAI {
    */
   private static isTrueEye(state: BoardState, move: Point, color: Color): boolean {
     return GoCore.isTrueEye(state.grid, move, color, state.size);
+  }
+
+  /**
+   * 判定一手棋是不是「送吃手」：下完之后自己这块棋只剩 1 口气，且没有提到对方任何子。
+   * 这种棋对手下一手直接提掉，等于白送一颗（甚至一串）子。
+   * 这是吃子模式「AI 一颗一颗送子、孩子秒下连吃几十子」的根因——必须硬性禁止，
+   * 而不是只在打分里扣分（扣完分候选里全是送吃手时，AI 照样会挑一个最不烂的送出去）。
+   */
+  private static isSelfAtariGift(state: BoardState, move: Point, color: Color): boolean {
+    const sim = GoCore.playMove(state, move, color);
+    if (sim.error) return true;
+    if (sim.captured.length > 0) return false; // 能提子，不算送吃
+    const grp = GoCore.findGroup(sim.nextState.grid, move);
+    if (!grp) return true;
+    return grp.liberties.length <= 1;
+  }
+
+  /**
+   * 过滤掉「纯送子」的候选点：自填真眼 + 自叫吃。
+   * 返回空数组表示这一手没有不亏的下法，调用方应选择停一手。
+   */
+  private static filterGiftMoves(state: BoardState, color: Color, legalMoves: Point[]): Point[] {
+    return legalMoves.filter((m) => {
+      if (this.isTrueEye(state, m, color)) return false;
+      return !this.isSelfAtariGift(state, m, color);
+    });
   }
 
   /**
@@ -1538,10 +1582,17 @@ export class GoAI {
     }
 
     // 5. Score all legal moves with 2-ply counter-attack penalty
+    // 先剔除「纯送子」的候选点（自填真眼 + 自叫吃），避免无好点时一颗一颗喂给对手。
+    // 老鸟档只做「不送子」，不做主动叫吃加权 —— 保持它在战灵狐之下。
+    const validMoves = this.filterGiftMoves(state, color, legalMoves);
+    if (validMoves.length === 0) {
+      return null; // 无棋可下且下什么都是送子 → 停一手
+    }
+
     let bestMove: Point | null = null;
     let maxScore = -Infinity;
 
-    for (const move of legalMoves) {
+    for (const move of validMoves) {
       let score = this.evaluateDeepTactics(state, move, color, opponentColor, options);
 
       // 2-ply lookahead check: If I play this move, does opponent have an immediate capture against me?
@@ -1575,7 +1626,7 @@ export class GoAI {
       return null; // Pass
     }
 
-    return bestMove ?? legalMoves[0];
+    return bestMove ?? validMoves[0];
   }
 
   /**

@@ -27,33 +27,70 @@ describe('GoAI capture-mode regression (v9.4)', () => {
     }
   });
 
-  it('capture mode maps each sparringLevel to a DISTINCT tier (difficulty ladder restored)', () => {
-    // 用一个中盘局面：黑棋在 (5,4) 的子处于被打吃边缘，白棋有多个可选应手。
-    // 修复前 novice/club 全落到龙档，行为与 grandmaster 相同；修复后应各自走不同档位。
-    let board = GoCore.createEmptyBoard(13);
-    board = GoCore.playMove(board, { x: 5, y: 5 }, 'black').nextState;
-    board = GoCore.playMove(board, { x: 5, y: 4 }, 'white').nextState;
-    board = GoCore.playMove(board, { x: 6, y: 5 }, 'black').nextState;
-    board = GoCore.playMove(board, { x: 4, y: 4 }, 'white').nextState;
-    board = GoCore.playMove(board, { x: 4, y: 5 }, 'black').nextState;
-    board = GoCore.playMove(board, { x: 6, y: 6 }, 'white').nextState;
-
-    const byLevel = (lvl: string) => {
-      const m = GoAI.getBestMove(board, 'black', {
-        sparringLevel: lvl as 'novice' | 'club' | 'master' | 'grandmaster',
-        captureTarget: 5,
-      });
-      return m ? `${m.x},${m.y}` : null;
+  it('capture mode maps sparringLevel onto the same branch as an explicit difficulty', () => {
+    // 难度映射回归（v9.4 修复的 bug）：sparringLevel 必须被显式翻译成合法难度，
+    // 而不是 as AIDifficulty 硬转后落到 default（= 最强龙档）。
+    const mapping: Record<string, string> = {
+      novice: 'advanced',        // 老鸟 → 狐
+      club: 'master',            // 战灵狐 → 鹰
+      master: 'grandmaster',     // 麒麟 → 龙
+      grandmaster: 'grandmaster', // 龙尊 → 龙
     };
 
-    const novice = byLevel('novice');
-    const club = byLevel('club');
-    const master = byLevel('master');
-    const grandmaster = byLevel('grandmaster');
+    const buildBoard = (variant: number) => {
+      let board = GoCore.createEmptyBoard(13);
+      board = GoCore.playMove(board, { x: 5, y: 5 }, 'black').nextState;
+      board = GoCore.playMove(board, { x: 5, y: 4 }, 'white').nextState;
+      board = GoCore.playMove(board, { x: 6, y: 5 }, 'black').nextState;
+      board = GoCore.playMove(board, { x: 4, y: 4 }, 'white').nextState;
+      board = GoCore.playMove(board, { x: 4, y: 5 }, 'black').nextState;
+      board = GoCore.playMove(board, { x: 6, y: 6 }, 'white').nextState;
+      if (variant === 1) {
+        board = GoCore.playMove(board, { x: 3, y: 6 }, 'black').nextState;
+        board = GoCore.playMove(board, { x: 7, y: 4 }, 'white').nextState;
+        board = GoCore.playMove(board, { x: 2, y: 8 }, 'black').nextState;
+      }
+      return board;
+    };
 
-    // 至少要有两个档位落点不同，证明映射真的生效（不再是全员同点）。
-    const distinct = new Set([novice, club, master, grandmaster]).size;
-    expect(distinct, `各档位落点：novice=${novice} club=${club} master=${master} grandmaster=${grandmaster}`).toBeGreaterThan(1);
+    for (const variant of [0, 1]) {
+      const board = buildBoard(variant);
+      for (const [lvl, diff] of Object.entries(mapping)) {
+        const viaLevel = GoAI.getBestMove(board, 'black', {
+          sparringLevel: lvl as 'novice' | 'club' | 'master' | 'grandmaster',
+          captureTarget: 5,
+        });
+        const viaDiff = GoAI.getBestMove(board, 'black', {
+          difficulty: diff as 'advanced' | 'master' | 'grandmaster',
+          captureTarget: 5,
+        });
+        const fmt = (m: { x: number; y: number } | null) => (m ? `${m.x},${m.y}` : 'PASS');
+        expect(fmt(viaLevel), `board${variant} sparringLevel=${lvl} 应等价于 difficulty=${diff}`).toBe(
+          fmt(viaDiff)
+        );
+      }
+    }
+  });
+
+  it('never gifts a stone: passes when every legal move would be self-atari', () => {
+    // v9.5 修复：吃子模式下 AI 不能「一颗一颗送子」——所有候选都只剩 1 口气时，
+    // 必须停手，而不是硬下一手给对手白吃（这正是孩子能秒下连吃几十子的根因）。
+    let board = GoCore.createEmptyBoard(7);
+    for (let y = 0; y < 7; y++) {
+      for (let x = 0; x < 7; x++) {
+        board.grid[y][x] = 'white';
+      }
+    }
+    board.grid[3][3] = null;
+    board.grid[3][4] = null; // 白棋只剩两个互相成气的空点，填任何一个都是自叫吃
+    board.turn = 'white';
+
+    const move = GoAI.getBestMove(board, 'white', {
+      sparringLevel: 'grandmaster',
+      captureTarget: 5,
+    });
+
+    expect(move).toBeNull();
   });
 
   it('Dragon (grandmaster) in capture mode passes instead of self-filling a true eye (2b)', () => {
