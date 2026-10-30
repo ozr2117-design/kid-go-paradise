@@ -72,9 +72,10 @@ describe('GoAI capture-mode regression (v9.4)', () => {
     }
   });
 
-  it('never gifts a stone: passes when every legal move would be self-atari', () => {
-    // v9.5 修复：吃子模式下 AI 不能「一颗一颗送子」——所有候选都只剩 1 口气时，
-    // 必须停手，而不是硬下一手给对手白吃（这正是孩子能秒下连吃几十子的根因）。
+  it('never self-fills a true eye, even when every point is a self-atari', () => {
+    // v9.5 修复：吃子模式下 AI 不能「一颗一颗送子」。
+    // v9.6 细化：只要棋盘上还有非眼位空点就必须落子（无安全点时退而求其次），
+    // 否则 AI 会在残局反复停手；但「自填真眼」永远禁止，真终局才停手。
     let board = GoCore.createEmptyBoard(7);
     for (let y = 0; y < 7; y++) {
       for (let x = 0; x < 7; x++) {
@@ -90,7 +91,11 @@ describe('GoAI capture-mode regression (v9.4)', () => {
       captureTarget: 5,
     });
 
-    expect(move).toBeNull();
+    // 允许落子（避免残局反复停手），但绝不允许自填真眼
+    if (move) {
+      expect(GoCore.isTrueEye(board.grid, move, 'white', 7)).toBe(false);
+      expect(GoCore.isLegalMove(board, move, 'white').legal).toBe(true);
+    }
   });
 
   it('Dragon (grandmaster) in capture mode passes instead of self-filling a true eye (2b)', () => {
@@ -112,4 +117,37 @@ describe('GoAI capture-mode regression (v9.4)', () => {
     // 唯一合法落点 (3,3) 是自填真眼，AI 必须停手（返回 null），而不是硬塞烂棋
     expect(move).toBeNull();
   });
+
+  it('tier ladder is monotonic: 战灵狐(club) must out-capture 老鸟(novice)', () => {
+    // v9.6 回归：曾出现「战灵狐比老鸟还菜」——鹰档那套特化打分让它不敢进攻，
+    // 被老鸟 101:8 打穿。现在鹰档改用 2-ply 搜索（4 候选），必须强于老鸟。
+    const duel = (blackLvl: 'novice' | 'club', whiteLvl: 'novice' | 'club') => {
+      let board = GoCore.createEmptyBoard(13);
+      for (let i = 0; i < 200; i++) {
+        if (board.isGameOver) break;
+        if (board.captures.black >= 5 || board.captures.white >= 5) break;
+        const turn = board.turn;
+        const lvl = turn === 'black' ? blackLvl : whiteLvl;
+        const mv = GoAI.getBestMove(board, turn, { sparringLevel: lvl, captureTarget: 5 });
+        if (!mv) {
+          board = GoCore.pass(board);
+          continue;
+        }
+        const res = GoCore.playMove(board, mv, turn);
+        if (res.error) break;
+        board = res.nextState;
+      }
+      return [board.captures.black, board.captures.white] as const;
+    };
+
+    const [clubAsBlack, noviceAsWhite] = duel('club', 'novice');
+    const [noviceAsBlack, clubAsWhite] = duel('novice', 'club');
+    const clubTotal = clubAsBlack + clubAsWhite;
+    const noviceTotal = noviceAsBlack + noviceAsWhite;
+
+    expect(
+      clubTotal,
+      `战灵狐合计吃子 ${clubTotal}（黑${clubAsBlack}+白${clubAsWhite}）应多于老鸟 ${noviceTotal}（黑${noviceAsBlack}+白${noviceAsWhite}）`
+    ).toBeGreaterThan(noviceTotal);
+  }, 120000);
 });

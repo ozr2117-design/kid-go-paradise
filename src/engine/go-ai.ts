@@ -175,17 +175,19 @@ export class GoAI {
       return rescues[0];
     }
 
-    // 基础战术走子，不主动组织双打吃偷袭
+    // 基础战术走子，不主动组织双打吃偷袭（但不再白送子）
+    const safeMoves = this.selectCandidateMoves(state, color, legalMoves);
+    if (!safeMoves) return null;
     let bestMove: Point | null = null;
     let maxScore = -Infinity;
-    for (const move of legalMoves) {
+    for (const move of safeMoves) {
       const score = this.evaluateDeepTactics(state, move, color, oppColor, options);
       if (score > maxScore) {
         maxScore = score;
         bestMove = move;
       }
     }
-    return bestMove ?? legalMoves[0];
+    return bestMove ?? safeMoves[0];
   }
 
   /**
@@ -228,26 +230,29 @@ export class GoAI {
           return r;
         }
       }
-      return rescues[0];
+      // 所有逃跑点仍是自叫吃（死征子）→ 不逃，弃子转向他处，绝不一路送吃
     }
 
-    // 3. 积极发起双打吃
+    // 3. 积极发起双打吃（必须自身安全，否则双打吃会被对手直接提掉）
     const doubleAtaris = this.findDoubleAtariMoves(state, color, legalMoves);
-    if (doubleAtaris.length > 0) {
-      return doubleAtaris[0];
+    const safeDouble = this.pickSafePoint(state, color, doubleAtaris);
+    if (safeDouble) {
+      return safeDouble;
     }
 
-    // 4. 消除对手的双打吃威胁
+    // 4. 消除对手的双打吃威胁（同样不能自己去填一个只剩 1 气的点）
     const oppLegal = this.getFastLegalMoves(state, oppColor);
     const oppDoubleAtaris = this.findDoubleAtariMoves(state, oppColor, oppLegal);
     for (const threatPoint of oppDoubleAtaris) {
       if (legalMoves.some((m) => GoCore.pointsEqual(m, threatPoint))) {
+        if (!this.pickSafePoint(state, color, [threatPoint])) continue;
         return threatPoint;
       }
     }
 
-    // 5. 战术评估：优先分断对手大龙与做眼
-    return this.evaluateEagleTactics(state, color, oppColor, legalMoves, options);
+    // 5. 主力搜索：复用龙档那套已验证有效的 2-ply 对抗搜索，但只搜 4 个候选
+    //    （弱化版，落在老鸟与麒麟/龙尊之间）
+    return this.runMinimaxTacticalSearch(state, color, oppColor, legalMoves, options, 4);
   }
 
   /**
@@ -260,7 +265,10 @@ export class GoAI {
     legalMoves: Point[],
     options: AIMoveOptions
   ): Point | null {
-    return this.runMinimaxTacticalSearch(state, color, oppColor, legalMoves, options);
+    // 麒麟（master）与龙尊（grandmaster）共用龙档引擎，靠搜索宽度拉开差距：
+    // 麒麟 8 个候选（业4），龙尊 12 个（业5/终极 boss）。
+    const width = options.sparringLevel === 'master' ? 8 : 12;
+    return this.runMinimaxTacticalSearch(state, color, oppColor, legalMoves, options, width);
   }
 
   /**
@@ -328,9 +336,9 @@ export class GoAI {
     let bestMove: Point | null = null;
     let maxScore = -Infinity;
 
-    // 硬性过滤送子手：宁可停一手（返回 null），也不自叫吃白送对手
-    const validMoves = this.filterGiftMoves(state, color, legalMoves);
-    if (validMoves.length === 0) return null;
+    // 硬性过滤送子手：优先安全点，无安全点时退到非眼位（只有真终局才停手）
+    const validMoves = this.selectCandidateMoves(state, color, legalMoves);
+    if (!validMoves) return null;
 
     for (const move of validMoves) {
       let score = this.evaluateDeepTactics(state, move, color, oppColor, options);
@@ -343,13 +351,27 @@ export class GoAI {
         score += 350;
       }
 
-      // 2-ply 反击推演
+      // 2-ply 反击推演：对方下一手能立刻提我 → 这一步明显亏
+      // （自叫吃已经在 selectCandidateMoves 里硬过滤过，这里只做排序惩罚，
+      //  旧值 -4000 过重，导致它不敢主动进攻、只会一味回避而被慢慢围死）
       const sim = GoCore.playMove(state, move, color, options.captureTarget);
       if (!sim.error) {
         const nextOppLegal = this.getFastLegalMoves(sim.nextState, oppColor);
         const oppImmediateCaps = this.findImmediateCaptures(sim.nextState, oppColor, nextOppLegal);
         if (oppImmediateCaps.length > 0) {
-          score -= 4000; // 严禁送吃
+          score -= 1500;
+        }
+
+        // 主动叫吃：下一手就能提掉对方（尤其是大块），远比守空有价值
+        for (const n of GoCore.getNeighbors(move, state.size)) {
+          if (sim.nextState.grid[n.y][n.x] !== oppColor) continue;
+          const oppGrp = GoCore.findGroup(sim.nextState.grid, n);
+          if (!oppGrp) continue;
+          if (oppGrp.liberties.length === 1) {
+            score += oppGrp.points.length * 900;
+          } else if (oppGrp.liberties.length === 2) {
+            score += 150;
+          }
         }
       }
 
@@ -363,24 +385,26 @@ export class GoAI {
   }
 
   /**
-   * Helper: 棋道龙 2-ply 深度对抗搜索
+   * Helper: 2-ply 深度对抗搜索（龙档 / 鹰档共用）
+   * maxCandidates 控制搜索宽度：鹰档用 4（弱化版），龙档用 12（满血版）。
    */
   private static runMinimaxTacticalSearch(
     state: BoardState,
     color: Color,
     oppColor: Color,
     legalMoves: Point[],
-    options: AIMoveOptions
+    options: AIMoveOptions,
+    maxCandidates = 12
   ): Point | null {
     const instantCaps = this.findImmediateCaptures(state, color, legalMoves);
     if (instantCaps.length > 0) {
       return this.pickBestCapture(state, instantCaps, color);
     }
 
-    // 硬性过滤：自填真眼 + 自叫吃（送子手）。全被过滤掉时宁可停一手，绝不送吃。
-    const validMoves = this.filterGiftMoves(state, color, legalMoves);
-    if (validMoves.length === 0) {
-      return null; // 无棋可下或下什么都是送子 → 停一手
+    // 硬性过滤：自填真眼 + 自叫吃（送子手）。无安全点时退到非眼位，只有真终局才停手。
+    const validMoves = this.selectCandidateMoves(state, color, legalMoves);
+    if (!validMoves) {
+      return null; // 只剩自己的眼位 → 真正无棋可下，停一手
     }
 
     // 候选着法初筛打分
@@ -389,7 +413,7 @@ export class GoAI {
       score: this.evaluateDeepTactics(state, m, color, oppColor, options),
     }));
     scoredCandidates.sort((a, b) => b.score - a.score);
-    const topCandidates = scoredCandidates.slice(0, 12).map((c) => c.move);
+    const topCandidates = scoredCandidates.slice(0, maxCandidates).map((c) => c.move);
 
     let bestMove: Point | null = null;
     let bestValue = -Infinity;
@@ -625,6 +649,40 @@ export class GoAI {
       if (this.isTrueEye(state, m, color)) return false;
       return !this.isSelfAtariGift(state, m, color);
     });
+  }
+
+  /**
+   * 选出本轮候选落点。
+   * 1) 优先「安全点」：非自填真眼、非自叫吃；
+   * 2) 若一个安全点都没有（残局常见），只要还有非眼位空点就必须落子 ——
+   *    停手等于白送先手，比下一手 1 气的棋更亏；
+   * 3) 只剩自己的眼位（真终局）才返回 null，让调用方停一手。
+   */
+  private static selectCandidateMoves(
+    state: BoardState,
+    color: Color,
+    legalMoves: Point[]
+  ): Point[] | null {
+    const safe = this.filterGiftMoves(state, color, legalMoves);
+    if (safe.length > 0) return safe;
+
+    const nonEye = legalMoves.filter((m) => !this.isTrueEye(state, m, color));
+    if (nonEye.length === 0) return null; // 只剩自己的眼位 → 真正无棋可下
+    return nonEye;
+  }
+
+  /**
+   * 从一批战术候选里挑第一个「安全点」（非真眼、非自叫吃）。
+   * 用于自救 / 双打吃 / 破双打吃这些"提前返回"分支，
+   * 避免它们绕过送子过滤把棋子白送出去。全部不安全时返回 null。
+   */
+  private static pickSafePoint(state: BoardState, color: Color, candidates: Point[]): Point | null {
+    for (const m of candidates) {
+      if (this.isTrueEye(state, m, color)) continue;
+      if (this.isSelfAtariGift(state, m, color)) continue;
+      return m;
+    }
+    return null;
   }
 
   /**
@@ -1558,10 +1616,11 @@ export class GoAI {
       return rescues[0];
     }
 
-    // 3. Double Atari offense
+    // 3. Double Atari offense (must be self-safe, or the opponent just captures it)
     const doubleAtaris = this.findDoubleAtariMoves(state, color, legalMoves);
-    if (doubleAtaris.length > 0) {
-      return doubleAtaris[0];
+    const safeDouble = this.pickSafePoint(state, color, doubleAtaris);
+    if (safeDouble) {
+      return safeDouble;
     }
 
     // 4. Proactive Defense: Neutralize Opponent's Double-Atari threats!
@@ -1584,9 +1643,9 @@ export class GoAI {
     // 5. Score all legal moves with 2-ply counter-attack penalty
     // 先剔除「纯送子」的候选点（自填真眼 + 自叫吃），避免无好点时一颗一颗喂给对手。
     // 老鸟档只做「不送子」，不做主动叫吃加权 —— 保持它在战灵狐之下。
-    const validMoves = this.filterGiftMoves(state, color, legalMoves);
-    if (validMoves.length === 0) {
-      return null; // 无棋可下且下什么都是送子 → 停一手
+    const validMoves = this.selectCandidateMoves(state, color, legalMoves);
+    if (!validMoves) {
+      return null; // 只剩自己的眼位 → 真正无棋可下，停一手
     }
 
     let bestMove: Point | null = null;
