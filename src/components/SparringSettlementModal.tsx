@@ -101,6 +101,11 @@ export const SparringSettlementModal: React.FC<SparringSettlementModalProps> = (
                 吃子决胜模式
               </span>
             )}
+            {data.winRule === 'timed-capture' && (
+              <span className="text-[10px] text-amber-800 bg-amber-100 py-0.5 rounded-md">
+                限时吃子模式
+              </span>
+            )}
           </div>
 
           {/* Territory Card */}

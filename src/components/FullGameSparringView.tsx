@@ -77,6 +77,8 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
   const [aiLevel, setAiLevel] = useState<AISparringLevel>('novice');
   const [winRule, setWinRule] = useState<WinRuleMode>('capture'); // Default to Kid-Friendly Capture Race!
   const [captureTarget, setCaptureTarget] = useState<number>(5); // Default: First to capture 5 stones wins!
+  const [timedMinutes, setTimedMinutes] = useState<number>(15); // 限时吃子：整局包干时长（分钟）
+  const [timedSecondsLeft, setTimedSecondsLeft] = useState<number>(15 * 60); // 包干剩余秒数
   const [handicapCount, setHandicapCount] = useState<number>(0); // 0 = even game (分先), 2, 3, 4, 9 stones
   const [showTerritoryHeatmap, setShowTerritoryHeatmap] = useState<boolean>(false); // 势力地图 / 看地盘视界
 
@@ -183,6 +185,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
       setIsReviewMode(false);
       setReviewStep(0);
       setTimeLeft(30);
+      setTimedSecondsLeft(timedMinutes * 60);
       setUndosRemaining(MAX_UNDOS_PER_GAME);
       setCanUndoTurn(false);
       setPlayerAttemptedPass(false);
@@ -199,6 +202,16 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
           setIsAiThinking(true);
         } else {
           setStatusMessage('让子已就位，轮到白棋先行，请落子！');
+        }
+      } else if (rule === 'timed-capture') {
+        const msg = `限时吃子大作战！整局 ${timedMinutes} 分钟，时间到谁吃得多谁赢，抓紧提子吧！⏱️`;
+        setAiDialogue(msg);
+        SoundEngine.speakText(msg);
+        if (pColor === 'white') {
+          setStatusMessage('你执白后行，AI 正在思考第一手开局...');
+          setIsAiThinking(true);
+        } else {
+          setStatusMessage('你执黑先行，请占角开局！');
         }
       } else if (rule === 'capture') {
         const msg =
@@ -236,7 +249,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
         }
       }
     },
-    [boardSize, playerColor, aiLevel, winRule, captureTarget, handicapCount]
+    [boardSize, playerColor, aiLevel, winRule, captureTarget, handicapCount, timedMinutes]
   );
 
   // Directly switch AI Opponent level with immediate voice and audio feedback
@@ -297,6 +310,24 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
           titleBadge = '百折不挠小健将';
           stars = 1;
         }
+      } else if (winRule === 'timed-capture') {
+        // 限时吃子：时间到，比吃子数，多者胜；打平判和
+        if (playerCaptures > aiCaptures) {
+          winner = 'player';
+          finalReason = `⏱️ 时间到！你以 ${playerCaptures} : ${aiCaptures} 的吃子数获胜！`;
+          titleBadge = '限时吃子小冠军';
+          stars = 3;
+        } else if (aiCaptures > playerCaptures) {
+          winner = 'ai';
+          finalReason = `⏱️ 时间到！${activeProfile.name} 以 ${aiCaptures} : ${playerCaptures} 的吃子数获胜。`;
+          titleBadge = '分秒必争小健将';
+          stars = 1;
+        } else {
+          winner = 'draw';
+          finalReason = `⏱️ 时间到！双方吃子数 ${playerCaptures} : ${aiCaptures} 打平，握手言和！`;
+          titleBadge = '棋逢对手小君子';
+          stars = 2;
+        }
       } else {
         // Territory mode
         if (playerTerritory > aiTerritory) {
@@ -347,6 +378,25 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
     },
     [boardSize, playerColor, winRule, captureTarget, activeProfile.name, playerAttemptedPass]
   );
+
+  // 限时吃子：整局包干倒计时（时间到按吃子数判胜负）
+  useEffect(() => {
+    if (winRule !== 'timed-capture' || isReviewMode || boardState.isGameOver) return;
+    const interval = setInterval(() => {
+      setTimedSecondsLeft((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [winRule, isReviewMode, boardState.isGameOver]);
+
+  // 时间到 → 锁定棋局并按吃子数判定终局
+  useEffect(() => {
+    if (winRule === 'timed-capture' && timedSecondsLeft === 0 && !boardState.isGameOver && !isReviewMode) {
+      const finalState = GoCore.cloneState(boardState);
+      finalState.isGameOver = true;
+      setBoardState(finalState);
+      triggerEndGame(finalState);
+    }
+  }, [winRule, timedSecondsLeft, boardState, isReviewMode, triggerEndGame]);
 
   // Player Move Handler
   const handlePlayerMove = (point: Point) => {
@@ -406,15 +456,18 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
           return;
         }
 
-        const targetRule = winRule === 'capture' ? captureTarget : undefined;
+        // 限时吃子：AI 用吃子策略（传 captureTarget 走吃子体系），但 playMove 不传 captureTarget，
+        // 避免「吃满 N 子提前终局」——限时模式胜负只看时间到时的吃子数。
+        const playTarget = winRule === 'capture' ? captureTarget : undefined;
+        const aiTarget = winRule === 'capture' || winRule === 'timed-capture' ? captureTarget : undefined;
         const aiMove = GoAI.getBestMove(current, aiColor, {
           sparringLevel: aiLevel,
-          captureTarget: targetRule,
+          captureTarget: aiTarget,
           isFullGame: winRule === 'territory',
         });
 
         if (aiMove) {
-          const res = GoCore.playMove(current, aiMove, aiColor, targetRule);
+          const res = GoCore.playMove(current, aiMove, aiColor, playTarget);
           setBoardState(res.nextState);
 
           // 🛡️ 双脑协同：若小选手上一手试图停一手，AI 绝境打入并进行心理施压
@@ -444,31 +497,42 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
             triggerEndGame(res.nextState);
           }
         } else {
-          // AI 没有合法的非真眼可下之步（全盘单官已真正下满）
-          const est = GoCore.estimateTerritory(current);
-          const komi = current.size === 19 ? 7.5 : current.size === 13 ? 5.5 : 3.5;
-          const myScore = aiColor === 'black' ? est.black : est.white + komi;
-          const oppScore = aiColor === 'black' ? est.white + komi : est.black;
-
-          if (myScore < oppScore) {
-            // 劣势且全盘单官收尽：体面投子认负！
-            const resignMsg = `黑棋大阵坚不可摧，防守滴水不漏！${activeProfile.name} 甘拜下风，投子认负！`;
-            updateAiDialogue(resignMsg);
-            setStatusMessage(`${activeProfile.name} 投子认负（中盘认输）`);
-            const resignedState = GoCore.cloneState(current);
-            resignedState.isGameOver = true;
-            resignedState.winner = playerColor;
-            resignedState.winReason = `对手【${activeProfile.name}】投子认负，中盘胜！`;
-            setBoardState(resignedState);
-            triggerEndGame(resignedState, resignedState.winReason, 'player');
-          } else {
-            // 优势且确实已终局：才选择停一手
+          // AI 没有合法的非真眼可下之步
+          if (winRule === 'capture' || winRule === 'timed-capture') {
+            // 吃子/限时吃子模式：不按围空判负，AI 直接停一手（双 pass 由 triggerEndGame 按吃子规则判定）
             const passed = GoCore.pass(current);
             setBoardState(passed);
-            updateAiDialogue('棋局大势已定，边界已经分清，我选择停一手！');
+            updateAiDialogue('这里没有能下的有效棋了，我停一手！');
             setStatusMessage(`${activeProfile.name} 停一手 (Pass)`);
             if (passed.isGameOver) {
               triggerEndGame(passed);
+            }
+          } else {
+            const est = GoCore.estimateTerritory(current);
+            const komi = current.size === 19 ? 7.5 : current.size === 13 ? 5.5 : 3.5;
+            const myScore = aiColor === 'black' ? est.black : est.white + komi;
+            const oppScore = aiColor === 'black' ? est.white + komi : est.black;
+
+            if (myScore < oppScore) {
+              // 劣势且全盘单官收尽：体面投子认负！
+              const resignMsg = `黑棋大阵坚不可摧，防守滴水不漏！${activeProfile.name} 甘拜下风，投子认负！`;
+              updateAiDialogue(resignMsg);
+              setStatusMessage(`${activeProfile.name} 投子认负（中盘认输）`);
+              const resignedState = GoCore.cloneState(current);
+              resignedState.isGameOver = true;
+              resignedState.winner = playerColor;
+              resignedState.winReason = `对手【${activeProfile.name}】投子认负，中盘胜！`;
+              setBoardState(resignedState);
+              triggerEndGame(resignedState, resignedState.winReason, 'player');
+            } else {
+              // 优势且确实已终局：才选择停一手
+              const passed = GoCore.pass(current);
+              setBoardState(passed);
+              updateAiDialogue('棋局大势已定，边界已经分清，我选择停一手！');
+              setStatusMessage(`${activeProfile.name} 停一手 (Pass)`);
+              if (passed.isGameOver) {
+                triggerEndGame(passed);
+              }
             }
           }
         }
@@ -540,6 +604,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
   // Calculate live capture progress & energy bar
   const myCaptures = playerColor === 'black' ? boardState.captures.black : boardState.captures.white;
   const oppCaptures = playerColor === 'black' ? boardState.captures.white : boardState.captures.black;
+  const timedDisplay = `${Math.floor(timedSecondsLeft / 60)}:${String(timedSecondsLeft % 60).padStart(2, '0')}`;
 
   const territory = GoCore.estimateTerritory(boardState);
   const komi = boardSize === 19 ? 7.5 : boardSize === 13 ? 5.5 : 3.5;
@@ -752,28 +817,40 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
 
         {/* Middle Section 1: Capture Status / Live Progress (吃子情况) */}
         <div className="shrink-0">
-          {winRule === 'capture' ? (
-            /* Capture Race Badge Tracker */
+          {winRule === 'capture' || winRule === 'timed-capture' ? (
+            /* Capture Race Badge Tracker (含限时吃子) */
             <div className="bg-gradient-to-r from-yellow-100 via-amber-100 to-orange-100 p-2 rounded-2xl border-2 border-amber-400 shadow-xs flex flex-col gap-1">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black text-amber-950 font-cartoon flex items-center gap-1">
                   <Swords className="w-3.5 h-3.5 text-amber-700" />
-                  <span>吃子战况</span>
+                  <span>{winRule === 'timed-capture' ? '限时吃子战况' : '吃子战况'}</span>
                 </span>
 
-                {/* Target badge - opens custom input modal */}
-                <button
-                  onClick={() => {
-                    setCustomTargetInput(String(captureTarget));
-                    setIsTargetModalOpen(true);
-                  }}
-                  className="flex items-center gap-0.5 bg-white hover:bg-amber-50 text-amber-950 px-1.5 py-0.5 rounded-md border border-amber-400 text-[10px] font-bold shadow-xs transition"
-                  title="点击修改目标吃子数"
-                >
-                  <span>先吃满</span>
-                  <span className="font-black text-red-600 font-cartoon text-xs">{captureTarget}</span>
-                  <span>子胜 ✏️</span>
-                </button>
+                {winRule === 'timed-capture' ? (
+                  /* 限时吃子：显示包干倒计时 */
+                  <span
+                    className={`flex items-center gap-0.5 bg-white px-1.5 py-0.5 rounded-md border border-amber-400 text-[10px] font-bold shadow-xs ${
+                      timedSecondsLeft <= 30 ? 'text-red-600 border-red-400 animate-pulse' : 'text-amber-950'
+                    }`}
+                  >
+                    <Hourglass className="w-3 h-3" />
+                    <span className="font-black font-cartoon text-xs">{timedDisplay}</span>
+                  </span>
+                ) : (
+                  /* Target badge - opens custom input modal */
+                  <button
+                    onClick={() => {
+                      setCustomTargetInput(String(captureTarget));
+                      setIsTargetModalOpen(true);
+                    }}
+                    className="flex items-center gap-0.5 bg-white hover:bg-amber-50 text-amber-950 px-1.5 py-0.5 rounded-md border border-amber-400 text-[10px] font-bold shadow-xs transition"
+                    title="点击修改目标吃子数"
+                  >
+                    <span>先吃满</span>
+                    <span className="font-black text-red-600 font-cartoon text-xs">{captureTarget}</span>
+                    <span>子胜 ✏️</span>
+                  </button>
+                )}
               </div>
 
               {/* Progress Duel Cards */}
@@ -785,7 +862,8 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
                     <span className="text-[11px] font-bold text-amber-950">你已吃</span>
                   </div>
                   <div className="text-xs sm:text-sm font-black text-emerald-700 font-cartoon">
-                    {myCaptures} <span className="text-[9px] text-gray-500 font-normal">/ {captureTarget}</span>
+                    {myCaptures}
+                    {winRule !== 'timed-capture' && <span className="text-[9px] text-gray-500 font-normal">/ {captureTarget}</span>}
                   </div>
                 </div>
 
@@ -796,13 +874,14 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
                     <span className="text-[11px] font-bold text-amber-950">AI已吃</span>
                   </div>
                   <div className="text-xs sm:text-sm font-black text-orange-700 font-cartoon">
-                    {oppCaptures} <span className="text-[9px] text-gray-500 font-normal">/ {captureTarget}</span>
+                    {oppCaptures}
+                    {winRule !== 'timed-capture' && <span className="text-[9px] text-gray-500 font-normal">/ {captureTarget}</span>}
                   </div>
                 </div>
               </div>
 
               {/* Match point alert if close */}
-              {myCaptures >= captureTarget - 1 && myCaptures < captureTarget && (
+              {winRule === 'capture' && myCaptures >= captureTarget - 1 && myCaptures < captureTarget && (
                 <div className="text-[10px] font-black text-red-600 bg-red-100 py-0.5 px-1.5 rounded-md border border-red-300 animate-bounce flex items-center justify-center gap-1">
                   <Zap className="w-2.5 h-2.5 fill-current" />
                   <span>赛点！再吃 1 颗直接获胜！</span>
@@ -873,6 +952,17 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
             >
               <CheckCircle2 className="w-3 h-3" />
               <span>🏰 正规点目</span>
+            </button>
+            <button
+              onClick={() => startNewGame(boardSize, playerColor, aiLevel, 'timed-capture', captureTarget)}
+              className={`flex-1 py-1 px-1 rounded-xl font-bold text-[11px] transition flex items-center justify-center gap-1 ${
+                winRule === 'timed-capture'
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-amber-950 font-black shadow border border-amber-500'
+                  : 'bg-amber-100/70 hover:bg-amber-200 text-amber-900 border border-amber-300'
+              }`}
+            >
+              <Hourglass className="w-3 h-3" />
+              <span>⏱️ 限时吃子</span>
             </button>
           </div>
 
@@ -1171,7 +1261,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
               </h3>
               <p className="text-xs font-bold text-amber-900 mt-2 leading-relaxed bg-amber-100/80 p-3 rounded-2xl border border-amber-300">
                 当前对局已经下了 <span className="text-red-600 font-black">{boardState.moveHistory.length}</span> 手
-                {winRule === 'capture' && (
+                {(winRule === 'capture' || winRule === 'timed-capture') && (
                   <>，你已经吃了 <span className="text-emerald-700 font-black">{myCaptures}</span> 颗棋子</>
                 )}！<br />
                 重新开局将清空当前棋盘。

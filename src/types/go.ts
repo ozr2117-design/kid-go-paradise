@@ -37,7 +37,7 @@ export interface BoardState {
 
 export type GameMode = 'adventure' | 'battle' | 'sparring' | 'puzzle' | 'sandbox' | 'daily';
 
-export type WinRuleMode = 'capture' | 'territory';
+export type WinRuleMode = 'capture' | 'territory' | 'timed-capture';
 
 export type AISparringLevel = 'novice' | 'club' | 'master' | 'grandmaster';
 

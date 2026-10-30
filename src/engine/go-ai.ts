@@ -87,7 +87,21 @@ export class GoAI {
     legalMoves: Point[],
     options: AIMoveOptions
   ): Point | null {
-    const diff = options.difficulty || (options.sparringLevel as AIDifficulty) || 'beginner';
+    // Map full-game sparring levels onto the capture-engine difficulty ladder.
+    // sparringLevel uses novice/club/master/grandmaster, which are NOT valid
+    // AIDifficulty values — so previously novice (老鸟) and club (战灵狐) fell
+    // through to the default dragon tier (the strongest), making them as strong
+    // as 龙尊 and collapsing the whole difficulty ladder.
+    const sparringToDifficulty: Record<AISparringLevel, AIDifficulty> = {
+      novice: 'advanced',        // 老鸟 业1 → 狐 (5K~1D, "真正老鸟" per design)
+      club: 'master',            // 战灵狐 业2-3 → 鹰 (1D~2D)
+      master: 'grandmaster',     // 麒麟 业4 → 龙 (3D~5D)
+      grandmaster: 'grandmaster', // 龙尊 业5 → 龙 (3D~5D)
+    };
+    const diff =
+      options.difficulty ||
+      (options.sparringLevel ? sparringToDifficulty[options.sparringLevel] : undefined) ||
+      'beginner';
 
     // 1. 萌萌兔 (15K 练习练手 - 温和可爱，适度留破绽)
     if (diff === 'beginner') {
@@ -359,15 +373,21 @@ export class GoAI {
       return this.pickBestCapture(state, instantCaps, color);
     }
 
+    // 过滤自填真眼（合法但自杀的棋），避免无棋可下时硬塞烂棋
+    const validMoves = legalMoves.filter((m) => !this.isTrueEye(state, m, color));
+    if (validMoves.length === 0) {
+      return null; // 无有效棋可下 → 停一手，而非硬塞自填眼
+    }
+
     // 候选着法初筛打分
-    const scoredCandidates = legalMoves.map((m) => ({
+    const scoredCandidates = validMoves.map((m) => ({
       move: m,
       score: this.evaluateDeepTactics(state, m, color, oppColor, options),
     }));
     scoredCandidates.sort((a, b) => b.score - a.score);
     const topCandidates = scoredCandidates.slice(0, 10).map((c) => c.move);
 
-    let bestMove = topCandidates[0] || legalMoves[0];
+    let bestMove: Point | null = null;
     let bestValue = -Infinity;
 
     for (const move of topCandidates) {
@@ -399,7 +419,7 @@ export class GoAI {
       }
     }
 
-    return bestMove;
+    return bestMove ?? validMoves[0];
   }
 
   /**
@@ -721,15 +741,18 @@ export class GoAI {
     const size = state.size;
 
     // 1. Captures differential (weight 3.0 per stone)
-    let scoreDiff = (state.captures[aiColor] - state.captures[oppColor]) * 3.0;
+    const captureDiff = state.captures[aiColor] - state.captures[oppColor];
+    let scoreDiff = captureDiff * 3.0;
 
     // 2. Komi
     const komi = size === 19 ? 7.5 : size === 13 ? 5.5 : 3.5;
     scoreDiff += (aiColor === 'white' ? komi : -komi);
 
     // 3. Enclosed territory
+    //    estimateTerritory() 内部已按 1.0x 计入提子，故此处减去 captureDiff，
+    //    避免提子被重复计分（上面已按 3.0x 加权过一次）。
     const est = GoCore.estimateTerritory(state);
-    scoreDiff += (est[aiColor] - est[oppColor]);
+    scoreDiff += (est[aiColor] - est[oppColor]) - captureDiff;
 
     // 4. Group health & presence
     const visited = new Set<string>();
