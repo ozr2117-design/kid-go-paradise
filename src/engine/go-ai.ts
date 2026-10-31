@@ -453,7 +453,7 @@ export class GoAI {
       const netValue = (sim1.captured.length * 1000) - (oppWorstDamage * 1400) + threat;
       const myGroup = GoCore.findGroup(sim1.nextState.grid, move);
       const myLibs = myGroup ? myGroup.liberties.length : 0;
-      const totalScore = netValue + (myLibs * 60);
+      const totalScore = netValue + (myLibs * 60) + this.proximitySignal(state, move, color, oppColor);
 
       if (totalScore > bestValue) {
         bestValue = totalScore;
@@ -1768,6 +1768,50 @@ export class GoAI {
   }
 
   /**
+   * 距离感知信号：主动进攻 + 护子连接。
+   *
+   * 这是 19 路「AI 只会散着下、被小选手逐块围吃」的根因修复——
+   * 空盘上所有安全点的旧打分几乎相同（都只是「有几口气」），AI 只能随机散布，
+   * 结果自己的子落单被围吃，也永远不去贴对方造接触战。
+   * 加入这个信号后：
+   *   1) 靠近对方棋子加分（越近、对方气越少加越多）→ AI 主动贴上去进攻；
+   *   2) 靠近自己棋子加分（越近、自己气越少加越多）→ AI 连成一块，不落单被吃。
+   */
+  private static proximitySignal(
+    state: BoardState,
+    move: Point,
+    color: Color,
+    oppColor: Color
+  ): number {
+    const size = state.size;
+    const radius = size >= 19 ? 2 : 1; // 大盘允许隔一格接近，小盘只贴一格
+    let sig = 0;
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const d = Math.abs(dx) + Math.abs(dy);
+        if (d > radius) continue;
+        const nx = move.x + dx;
+        const ny = move.y + dy;
+        if (nx < 0 || ny < 0 || nx >= size || ny >= size) continue;
+        const cell = state.grid[ny][nx];
+        if (cell === oppColor) {
+          const g = GoCore.findGroup(state.grid, { x: nx, y: ny });
+          const libs = g ? g.liberties.length : 4;
+          // 贴身（距离 1）比隔一格（距离 2）更主动；对方气越少越值得进攻
+          sig += (d === 1 ? 150 : 60) + Math.max(0, 5 - libs) * 40;
+        } else if (cell === color) {
+          const g = GoCore.findGroup(state.grid, { x: nx, y: ny });
+          const libs = g ? g.liberties.length : 4;
+          // 靠近自己的子 = 连接/护子；自己的子气越少越需要连
+          sig += (d === 1 ? 90 : 30) + Math.max(0, 5 - libs) * 30;
+        }
+      }
+    }
+    return sig;
+  }
+
+  /**
    * Deep Tactical Evaluation
    */
   private static evaluateDeepTactics(
@@ -1866,6 +1910,9 @@ export class GoAI {
       if (sim.nextState.grid[d.y][d.x] === color) diagFriendly++;
     }
     if (diagFriendly >= 2) score += 80;
+
+    // 主动进攻 + 护子连接（19 路不主动缠斗的根因修复）
+    score += this.proximitySignal(state, move, color, oppColor);
 
     return score;
   }

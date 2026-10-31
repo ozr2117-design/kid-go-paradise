@@ -214,4 +214,23 @@ describe('GoAI capture-mode regression (v9.4)', () => {
     b.turn = 'white';
     expect(GoAI.hasMeaningfulMove(b, 'white')).toBe(true);
   }, 30000);
+
+  /**
+   * v9.10 回归：19 路 AI 必须「主动贴近」而不是「远离散着下」。
+   * 曾经的根因：空盘上所有安全点打分几乎相同（都只是「有几口气」），
+   * AI 只能随机散布，结果自己的子落单被小选手逐块围吃（实测 56:11）。
+   * 正确行为：对方有孤子时，AI 应下在离它很近的地方（距离≤2），主动制造接触。
+   */
+  it('19 路空盘 + 单颗白子，AI 会主动贴近（曼哈顿距离≤2）', () => {
+    const b = GoCore.createEmptyBoard(19);
+    b.grid[9][9] = 'white';
+    b.turn = 'black';
+    b.moveHistory = [];
+    for (const level of ['novice', 'club', 'master', 'grandmaster'] as const) {
+      const mv = GoAI.getBestMove(b, 'black', { sparringLevel: level, captureTarget: 20 });
+      expect(mv, `${level} 应主动贴近对方孤子`).not.toBeNull();
+      const dist = Math.abs(mv!.x - 9) + Math.abs(mv!.y - 9);
+      expect(dist, `${level} 落点应离白子≤2，实际距离=${dist}`).toBeLessThanOrEqual(2);
+    }
+  }, 60000);
 });
