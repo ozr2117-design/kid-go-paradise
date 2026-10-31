@@ -179,4 +179,39 @@ describe('GoAI capture-mode regression (v9.4)', () => {
       expect(mv, `${level} 不应往死空腔里填子`).toBeNull();
     }
   }, 60000);
+
+  /**
+   * v9.9 回归：限时吃子「双方都无棋可下」必须能结算。
+   * 曾经的行为：判断「无棋可下」时，AI 用「无安全点」（排除死洞），
+   * 小选手却用「无合法点」（死洞仍算合法）——两把尺子不一样，
+   * 导致双方在死洞残局里互相停手、却永远不触发结算，只能干等 15 分钟计时结束。
+   * 正确行为：hasMeaningfulMove 用和 AI 同一把尺子，死洞不算「有意义落点」。
+   */
+  it('全盘只剩死洞时，hasMeaningfulMove 应判 false（死洞不是有意义落点）', () => {
+    const b = GoCore.createEmptyBoard(9);
+    for (let y = 0; y < 9; y++) for (let x = 0; x < 9; x++) b.grid[y][x] = 'black';
+    // 四处 2 格死洞：白棋下进去只剩 1 气，规则上合法但属于送子
+    for (const h of [
+      { x: 2, y: 2 },
+      { x: 3, y: 2 },
+      { x: 5, y: 5 },
+      { x: 6, y: 5 },
+    ]) {
+      b.grid[h.y][h.x] = null;
+    }
+    b.turn = 'white';
+    b.moveHistory = [];
+
+    // 规则上仍「能下」（死洞是合法落点）——这正是旧代码误判「还有棋可下」的地方
+    expect(GoAI.getFastLegalMoves(b, 'white').length).toBeGreaterThan(0);
+    // 但没有任何「有意义」落点（全是送子/眼位）→ 双方都该停手结算
+    expect(GoAI.hasMeaningfulMove(b, 'white')).toBe(false);
+  }, 60000);
+
+  it('盘面还有普通空点时，hasMeaningfulMove 应判 true', () => {
+    const b = GoCore.createEmptyBoard(9);
+    // 中间留一片空旷区域：白棋随便下都有气，属于有意义落点
+    b.turn = 'white';
+    expect(GoAI.hasMeaningfulMove(b, 'white')).toBe(true);
+  }, 30000);
 });

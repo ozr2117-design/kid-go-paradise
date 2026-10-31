@@ -1,4 +1,4 @@
-const CACHE_NAME = 'weiqi-kids-offline-v9.8';
+const CACHE_NAME = 'weiqi-kids-offline-v9.9';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

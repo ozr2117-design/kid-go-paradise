@@ -398,13 +398,18 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
     }
   }, [winRule, timedSecondsLeft, boardState, isReviewMode, triggerEndGame]);
 
-  // 限时吃子：轮到小选手却全盘无合法落点（双方把棋盘填满的僵局）时给出明确提示，
-  // 否则孩子会以为是程序卡住了。此时「停一手」是可用的。
+  // 限时吃子：轮到小选手却「无棋可下」（全盘已满，或只剩会被马上吃掉的死洞）时给出明确提示，
+  // 否则孩子会以为是程序卡住了。此时「停一手」是可用的；AI 也会对称地停手并结算。
   useEffect(() => {
     if (winRule !== 'timed-capture' || isReviewMode || boardState.isGameOver) return;
     if (boardState.turn !== playerColor) return;
-    if (GoAI.getFastLegalMoves(boardState, playerColor).length > 0) return;
-    setStatusMessage('棋盘已经填满了，没有能落子的点了 —— 点【停一手】把先手让给对手');
+    if (GoAI.hasMeaningfulMove(boardState, playerColor)) return;
+    const noLegal = GoAI.getFastLegalMoves(boardState, playerColor).length === 0;
+    setStatusMessage(
+      noLegal
+        ? '棋盘已经填满了，没有能落子的点了 —— 点【停一手】把先手让给对手'
+        : '剩下的都是会被马上吃掉的死洞，别填了 —— 点【停一手】把先手让给对手'
+    );
   }, [winRule, isReviewMode, boardState, playerColor]);
 
   // Player Move Handler
@@ -516,8 +521,9 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
             passed.isGameOver = false;
             updateAiDialogue('我这里没有能下的有效棋了，先让给你！');
             setStatusMessage(`${activeProfile.name} 停一手 (Pass)`);
-            if (GoAI.getFastLegalMoves(passed, playerColor).length === 0) {
-              // 全盘已无合法落点，确实没什么可争了：按吃子数结算
+            // 双方都无棋可下才结算：AI 无棋可下（getBestMove 返回 null 才走到这），
+            // 小选手这边若也只是「送子手/眼位」而无有意义落点，棋局就到此为止，按吃子数结算。
+            if (!GoAI.hasMeaningfulMove(passed, playerColor)) {
               const finished = GoCore.cloneState(passed);
               finished.isGameOver = true;
               triggerEndGame(finished);

@@ -2064,6 +2064,21 @@ export class GoAI {
   }
 
   /**
+   * 是否存在「有意义」的落点：既不是自填真眼，也不是下进去只剩 1 气、马上被提的送子手。
+   *
+   * 用于限时吃子判断「双方都无棋可下」：只要任何一方还有能赢棋的点（哪怕很弱），棋局就该继续；
+   * 反之，若全盘可下点只剩「送子手 / 眼位」，双方都该停手，此时按吃子数结算。
+   *
+   * 注意：这里必须和 AI 自己判断「无棋可下」用的同一把尺子（selectCandidateMoves 的送子过滤），
+   * 否则会出现「AI 认为无棋可下停手，但小选手这边因为还有『死洞』被判成能下」的不对称，
+   * 导致双方互相停手却永远不结算的死锁。
+   */
+  static hasMeaningfulMove(state: BoardState, color: Color): boolean {
+    const legal = this.getFastLegalMoves(state, color);
+    return this.filterGiftMoves(state, color, legal).length > 0;
+  }
+
+  /**
    * Opening Book: Corner stars and center points
    */
   private static getOpeningBookMove(state: BoardState, legalMoves: Point[]): Point | null {
