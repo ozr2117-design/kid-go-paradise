@@ -2133,7 +2133,9 @@ export class GoAI {
    */
   static hasMeaningfulMove(state: BoardState, color: Color): boolean {
     const legal = this.getFastLegalMoves(state, color);
-    return this.filterGiftMoves(state, color, legal).length > 0;
+    // 与 AI 自己「无棋可下」的判断（selectCandidateMoves）保持同一把尺子：
+    // 安全点 → 远处脱先点 → 都没有才算无棋可下。
+    return this.selectCandidateMoves(state, color, legal) !== null;
   }
 
   /**

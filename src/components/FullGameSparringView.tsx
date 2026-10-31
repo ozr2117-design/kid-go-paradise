@@ -309,6 +309,22 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
           finalReason = `${activeProfile.name} 率先吃满了 ${captureTarget} 颗棋子。`;
           titleBadge = '百折不挠小健将';
           stars = 1;
+        } else if (playerCaptures > aiCaptures) {
+          // 双方都无棋可下（棋盘下满）而没吃满目标时，按吃子数判——吃子赛吃多者胜
+          winner = 'player';
+          finalReason = `棋盘下满啦！你以 ${playerCaptures} : ${aiCaptures} 的吃子数获胜！`;
+          titleBadge = '吃子小神童';
+          stars = 3;
+        } else if (aiCaptures > playerCaptures) {
+          winner = 'ai';
+          finalReason = `棋盘下满啦！${activeProfile.name} 以 ${aiCaptures} : ${playerCaptures} 的吃子数获胜。`;
+          titleBadge = '百折不挠小健将';
+          stars = 1;
+        } else {
+          winner = 'draw';
+          finalReason = `棋盘下满啦！双方吃子数 ${playerCaptures} : ${aiCaptures} 打平，握手言和！`;
+          titleBadge = '棋逢对手小君子';
+          stars = 2;
         }
       } else if (winRule === 'timed-capture') {
         // 限时吃子：时间到，比吃子数，多者胜；打平判和
@@ -531,13 +547,19 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
               setBoardState(passed);
             }
           } else if (winRule === 'capture') {
-            // 吃子/限时吃子模式：不按围空判负，AI 直接停一手（双 pass 由 triggerEndGame 按吃子规则判定）
+            // 吃子战：AI 无棋可下也停手只交换先手，不累加 pass、不终局。
+            // 双方都无有意义落点（棋盘真正下满/只剩死洞）时，才按吃子数结算。
             const passed = GoCore.pass(current);
-            setBoardState(passed);
+            passed.consecutivePasses = 0;
+            passed.isGameOver = false;
             updateAiDialogue('这里没有能下的有效棋了，我停一手！');
             setStatusMessage(`${activeProfile.name} 停一手 (Pass)`);
-            if (passed.isGameOver) {
-              triggerEndGame(passed);
+            if (!GoAI.hasMeaningfulMove(passed, playerColor)) {
+              const finished = GoCore.cloneState(passed);
+              finished.isGameOver = true;
+              triggerEndGame(finished);
+            } else {
+              setBoardState(passed);
             }
           } else {
             const est = GoCore.estimateTerritory(current);
@@ -592,19 +614,25 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
   const handlePass = () => {
     if (boardState.isGameOver || boardState.turn !== playerColor || isAiThinking || isReviewMode) return;
 
-    // 限时吃子：允许停一手（真实比赛也允许 pass），但停手绝不终局、不冻结计时、不改吃子数，
-    // 只把先手交给对手。这样既不会「棋盘填满后无处落子」卡死，也仍然堵死「靠停手提前判胜」的漏洞。
-    if (winRule === 'timed-capture') {
+    // 吃子战 / 限时吃子：停一手只把先手交给对手，绝不终局、不改吃子数。
+    // 吃子赛的胜负只看「吃子数」（限时=到点比吃子，普通=先吃满目标），停手不能提前判胜，
+    // 否则孩子吃子领先时连点停手就能「逼 AI 认输」——这正是他曾经 3 手干掉龙尊的漏洞。
+    if (winRule === 'capture' || winRule === 'timed-capture') {
       const passed = GoCore.pass(boardState);
       passed.consecutivePasses = 0;
       passed.isGameOver = false;
       setPlayerAttemptedPass(true);
       setCanUndoTurn(true);
       setBoardState(passed);
-      setStatusMessage('你停一手 (Pass)，把先手让给对手（比赛规则：15 分钟到点才比吃子数）');
+      setStatusMessage(
+        winRule === 'timed-capture'
+          ? '你停一手 (Pass)，把先手让给对手（比赛规则：15 分钟到点才比吃子数）'
+          : '你停一手 (Pass)，把先手让给对手（吃子赛：先吃满目标子数才分胜负）'
+      );
       return;
     }
 
+    // 全盘围空对弈：保留标准「双 pass 点目」终局规则
     setPlayerAttemptedPass(true);
     const next = GoCore.pass(boardState);
     setBoardState(next);
