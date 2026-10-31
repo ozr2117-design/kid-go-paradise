@@ -1785,6 +1785,15 @@ export class GoAI {
   ): number {
     const size = state.size;
     const radius = size >= 19 ? 2 : 1; // 大盘允许隔一格接近，小盘只贴一格
+    // 19 路盘大，贴上去形成孤立 2 气块会被小选手隔空连紧气吃光（193:11），
+    // 要求自己 >=3 气才进攻；小盘（9/13）贴身战斗是常态，2 气块能连上/逃，>=2 即可。
+    const minLibs = size >= 19 ? 3 : 2;
+
+    // 落点后自己的块气：气不足就不进攻，否则贴上去被连紧气吃光（193:11 的根因）
+    const sim = GoCore.playMove(state, move, color);
+    const myGroup = sim.error ? null : GoCore.findGroup(sim.nextState.grid, move);
+    const myLibs = myGroup ? myGroup.liberties.length : 0;
+
     let sig = 0;
     for (let dy = -radius; dy <= radius; dy++) {
       for (let dx = -radius; dx <= radius; dx++) {
@@ -1798,12 +1807,14 @@ export class GoAI {
         if (cell === oppColor) {
           const g = GoCore.findGroup(state.grid, { x: nx, y: ny });
           const libs = g ? g.liberties.length : 4;
-          // 贴身（距离 1）比隔一格（距离 2）更主动；对方气越少越值得进攻
-          sig += (d === 1 ? 150 : 60) + Math.max(0, 5 - libs) * 40;
+          // 进攻：自己气够（>=minLibs）才贴上去，气不足收手防送死
+          if (myLibs >= minLibs) {
+            sig += (d === 1 ? 150 : 60) + Math.max(0, 5 - libs) * 40;
+          }
         } else if (cell === color) {
           const g = GoCore.findGroup(state.grid, { x: nx, y: ny });
           const libs = g ? g.liberties.length : 4;
-          // 靠近自己的子 = 连接/护子；自己的子气越少越需要连
+          // 连接护子：自己的气越少越需要连
           sig += (d === 1 ? 90 : 30) + Math.max(0, 5 - libs) * 30;
         }
       }

@@ -233,4 +233,27 @@ describe('GoAI capture-mode regression (v9.4)', () => {
       expect(dist, `${level} 落点应离白子≤2，实际距离=${dist}`).toBeLessThanOrEqual(2);
     }
   }, 60000);
+
+  /**
+   * v9.11 回归：19 路 AI 主动进攻时，绝不把子贴到「落点后自己只剩 2 气」的送死点上。
+   * 曾经的根因：v9.10 的 proximitySignal 无条件给「靠近对方」加分，
+   * AI 贴到孩子厚势旁形成孤立 2 气块，被孩子隔空连紧气收割（实测 193:11）。
+   * 正确行为：19 路要求自己 >=3 气才进攻（小盘 9/13 贴身 2 气正常，不在此限）。
+   */
+  it('19 路对角黑厚势旁，AI 落点后自己块气必须 >=3', () => {
+    const b = GoCore.createEmptyBoard(19);
+    b.grid[9][9] = 'black';
+    b.grid[8][10] = 'black';
+    b.turn = 'white';
+    b.moveHistory = [];
+
+    for (const level of ['club', 'master', 'grandmaster'] as const) {
+      const mv = GoAI.getBestMove(b, 'white', { sparringLevel: level, captureTarget: 20 });
+      expect(mv, `${level} 落点`).not.toBeNull();
+      const res = GoCore.playMove(b, mv!, 'white');
+      const g = GoCore.findGroup(res.nextState.grid, mv!);
+      expect(g!.liberties.length, `${level} 落点后自己块气应 >=3，实际 ${mv!.x},${mv!.y} 气=${g!.liberties.length}`)
+        .toBeGreaterThanOrEqual(3);
+    }
+  }, 30000);
 });
