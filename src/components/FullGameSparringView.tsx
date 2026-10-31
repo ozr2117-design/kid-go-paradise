@@ -398,6 +398,15 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
     }
   }, [winRule, timedSecondsLeft, boardState, isReviewMode, triggerEndGame]);
 
+  // 限时吃子：轮到小选手却全盘无合法落点（双方把棋盘填满的僵局）时给出明确提示，
+  // 否则孩子会以为是程序卡住了。此时「停一手」是可用的。
+  useEffect(() => {
+    if (winRule !== 'timed-capture' || isReviewMode || boardState.isGameOver) return;
+    if (boardState.turn !== playerColor) return;
+    if (GoAI.getFastLegalMoves(boardState, playerColor).length > 0) return;
+    setStatusMessage('棋盘已经填满了，没有能落子的点了 —— 点【停一手】把先手让给对手');
+  }, [winRule, isReviewMode, boardState, playerColor]);
+
   // Player Move Handler
   const handlePlayerMove = (point: Point) => {
     if (boardState.isGameOver || boardState.turn !== playerColor || isAiThinking || isReviewMode) return;
@@ -575,9 +584,21 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
 
   // Player Pass
   const handlePass = () => {
-    if (boardState.isGameOver || boardState.turn !== playerColor || isAiThinking) return;
-    // 限时吃子对齐比赛规则：15 分钟到点才比吃子数，不允许靠停一手提前收官判胜
-    if (winRule === 'timed-capture') return;
+    if (boardState.isGameOver || boardState.turn !== playerColor || isAiThinking || isReviewMode) return;
+
+    // 限时吃子：允许停一手（真实比赛也允许 pass），但停手绝不终局、不冻结计时、不改吃子数，
+    // 只把先手交给对手。这样既不会「棋盘填满后无处落子」卡死，也仍然堵死「靠停手提前判胜」的漏洞。
+    if (winRule === 'timed-capture') {
+      const passed = GoCore.pass(boardState);
+      passed.consecutivePasses = 0;
+      passed.isGameOver = false;
+      setPlayerAttemptedPass(true);
+      setCanUndoTurn(true);
+      setBoardState(passed);
+      setStatusMessage('你停一手 (Pass)，把先手让给对手（比赛规则：15 分钟到点才比吃子数）');
+      return;
+    }
+
     setPlayerAttemptedPass(true);
     const next = GoCore.pass(boardState);
     setBoardState(next);
@@ -1116,13 +1137,11 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
 
           <button
             onClick={handlePass}
-            disabled={
-              boardState.turn !== playerColor || isAiThinking || isReviewMode || winRule === 'timed-capture'
-            }
+            disabled={boardState.turn !== playerColor || isAiThinking || isReviewMode}
             className="flex items-center justify-center gap-0.5 py-1.5 px-0.5 bg-white hover:bg-amber-50 disabled:opacity-40 text-amber-900 font-bold rounded-xl border border-amber-300 text-[11px] shadow-xs transition active:scale-95 cursor-pointer"
             title={
               winRule === 'timed-capture'
-                ? '限时吃子模式不能停一手（比赛规则：15 分钟到点比吃子数，停手不能提前结束）'
+                ? '停一手：把先手让给对手。限时吃子到点才比吃子数，停手不会提前结束，也不会改变比分'
                 : '放弃本手（停一手）'
             }
           >
