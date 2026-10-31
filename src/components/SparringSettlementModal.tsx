@@ -38,9 +38,19 @@ export const SparringSettlementModal: React.FC<SparringSettlementModalProps> = (
 
   const isPlayerWin = data.winner === 'player';
 
+  // 👨‍👩‍👦 家长提问卡：给「不懂围棋」的家长照着念的两句话。
+  // 第一句按战果/模式动态生成（吃得多少，问法不同），第二句固定——
+  // 第二句是判断「这局孩子有没有在看自己的棋」的关键题，答不出来说明在乱下。
+  const parentQ1 =
+    data.winRule === 'territory'
+      ? '这局你围到的那一块地盘，是怎么围起来的？讲给我听。'
+      : data.playerCaptures >= 3
+        ? '这局你吃到的最大的那一块，是怎么吃到的？讲给我听。'
+        : '这局你有没有吃到子？讲一讲是怎么吃到的。';
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-pop-in">
-      <div className="bg-gradient-to-b from-amber-50 via-orange-50 to-amber-100 rounded-3xl p-6 max-w-md w-full text-center shadow-2xl border-4 border-yellow-400 relative overflow-hidden">
+      <div className="bg-gradient-to-b from-amber-50 via-orange-50 to-amber-100 rounded-3xl p-6 max-w-md w-full text-center shadow-2xl border-4 border-yellow-400 relative overflow-y-auto overflow-x-hidden max-h-[92vh]">
         {/* Top Badges */}
         <div className="flex justify-center items-center gap-1.5 mb-2">
           {[1, 2, 3].map((starIdx) => (
@@ -170,6 +180,31 @@ export const SparringSettlementModal: React.FC<SparringSettlementModalProps> = (
             )}
           </div>
         )}
+
+        {/* 👨‍👩‍👦 家长提问卡：不用懂围棋，照着念两句话 */}
+        <div className="bg-gradient-to-r from-sky-50 to-emerald-50 rounded-2xl p-3 border-2 border-sky-300 shadow-sm text-left mb-4">
+          <div className="flex items-center gap-1.5 font-black text-xs text-sky-900 mb-2 font-cartoon">
+            <span className="text-base">👨‍👩‍👦</span>
+            <span>给家长：照着念这两句（不用懂围棋）</span>
+          </div>
+          <ol className="text-[11px] text-sky-950 font-bold space-y-2 leading-relaxed list-none m-0 p-0">
+            <li className="flex items-start gap-1.5">
+              <span className="shrink-0 w-4 h-4 rounded-full bg-sky-500 text-white text-[9px] flex items-center justify-center font-black mt-0.5">
+                1
+              </span>
+              <span>{parentQ1}</span>
+            </li>
+            <li className="flex items-start gap-1.5">
+              <span className="shrink-0 w-4 h-4 rounded-full bg-emerald-500 text-white text-[9px] flex items-center justify-center font-black mt-0.5">
+                2
+              </span>
+              <span>有没有哪块棋，你差点被吃掉？</span>
+            </li>
+          </ol>
+          <p className="text-[10px] text-sky-700/80 mt-2 leading-snug">
+            孩子讲的过程就是复盘。你只要认真听、追问一句「然后呢」，不用判断对错。
+          </p>
+        </div>
 
         {/* Action Buttons */}
         <div className="flex flex-col gap-2">
