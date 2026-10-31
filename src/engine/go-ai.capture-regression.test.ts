@@ -150,4 +150,33 @@ describe('GoAI capture-mode regression (v9.4)', () => {
       `战灵狐合计吃子 ${clubTotal}（黑${clubAsBlack}+白${clubAsWhite}）应多于老鸟 ${noviceTotal}（黑${noviceAsBlack}+白${noviceAsWhite}）`
     ).toBeGreaterThan(noviceTotal);
   }, 120000);
+
+  /**
+   * v9.8 回归：满盘僵持时 AI 绝不一颗一颗送子。
+   * 曾经的行为：所有可下点都是「下进去只剩 1 气」时，代码会硬挑一个下，
+   * 结果在 19 路残局被小选手连续收割（实测 48:5、71:17）。
+   * 正确行为：宁可停手（吃子赛里停手只丢先手，送子却直接丢分）。
+   */
+  it('满盘只剩「下了就被提」的空腔时，AI 应当停手而不是喂子', () => {
+    const b = GoCore.createEmptyBoard(9);
+    for (let y = 0; y < 9; y++) for (let x = 0; x < 9; x++) b.grid[y][x] = 'black';
+    // 两处 2 格空腔：白棋下进去只剩 1 气，下一手必被提
+    for (const h of [
+      { x: 2, y: 2 },
+      { x: 3, y: 2 },
+      { x: 5, y: 5 },
+      { x: 6, y: 5 },
+    ]) {
+      b.grid[h.y][h.x] = null;
+    }
+    b.turn = 'white';
+    b.moveHistory = [];
+
+    const legal = GoAI.getFastLegalMoves(b, 'white');
+    expect(legal.length).toBeGreaterThan(0); // 规则上"能下"
+    for (const level of ['club', 'master', 'grandmaster'] as const) {
+      const mv = GoAI.getBestMove(b, 'white', { sparringLevel: level, captureTarget: 20 });
+      expect(mv, `${level} 不应往死空腔里填子`).toBeNull();
+    }
+  }, 60000);
 });

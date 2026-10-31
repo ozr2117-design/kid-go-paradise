@@ -654,9 +654,10 @@ export class GoAI {
   /**
    * 选出本轮候选落点。
    * 1) 优先「安全点」：非自填真眼、非自叫吃；
-   * 2) 若一个安全点都没有（残局常见），只要还有非眼位空点就必须落子 ——
-   *    停手等于白送先手，比下一手 1 气的棋更亏；
-   * 3) 只剩自己的眼位（真终局）才返回 null，让调用方停一手。
+   * 2) 没有安全点时，先找「远离一切棋子」的空点脱先；
+   * 3) 连脱先都没有（全盘可下点都是自叫吃）→ 返回 null 让调用方停一手。
+   *    注意：这里**不能**退化成「随便找个非眼位点硬下」——那会让 AI 在残局一颗一颗送子，
+   *    实测被小选手在 19 路打出 48:5、13 路 71:17。
    */
   private static selectCandidateMoves(
     state: BoardState,
@@ -666,9 +667,35 @@ export class GoAI {
     const safe = this.filterGiftMoves(state, color, legalMoves);
     if (safe.length > 0) return safe;
 
-    const nonEye = legalMoves.filter((m) => !this.isTrueEye(state, m, color));
-    if (nonEye.length === 0) return null; // 只剩自己的眼位 → 真正无棋可下
-    return nonEye;
+    // ① 没有安全点，但盘上还有「远离一切棋子」的空点：脱先，别往对方厚势里填子。
+    //    这一档专门解决 19 路中后盘「在对方大块里反复填 1 气的子」的送子循环。
+    const distant = legalMoves.filter(
+      (m) => !this.isTrueEye(state, m, color) && this.isDistantPoint(state, m)
+    );
+    if (distant.length > 0) return distant;
+
+    // ② 连脱先的空点都没有：说明全盘可下点都是「下了就被提」——
+    //    宁可停手，也绝不一颗一颗喂子。
+    //    吃子赛里送一颗 = 对方直接 +1 分；停手只丢先手，不丢分。
+    return null;
+  }
+
+  /**
+   * 判断一个空点是否「远离所有棋子」（曼哈顿距离 ≥ 2），用于无安全点时的脱先。
+   */
+  private static isDistantPoint(state: BoardState, move: Point): boolean {
+    const size = state.size;
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        if (Math.abs(dx) + Math.abs(dy) > 2) continue;
+        const nx = move.x + dx;
+        const ny = move.y + dy;
+        if (nx < 0 || ny < 0 || nx >= size || ny >= size) continue;
+        if (state.grid[ny][nx] !== null) return false;
+      }
+    }
+    return true;
   }
 
   /**
