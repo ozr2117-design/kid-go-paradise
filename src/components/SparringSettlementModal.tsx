@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { GameSettlementData } from '../types/go';
 import { SoundEngine } from '../engine/sound-engine';
-import { Star, RotateCcw, Award, CheckCircle2, Swords, Home, Bot, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { loadLatestRecord, exportGameRecord } from '../engine/game-recorder';
+import { Star, RotateCcw, Award, CheckCircle2, Swords, Home, Bot, Sparkles, ChevronDown, ChevronUp, ClipboardCopy, ClipboardCheck } from 'lucide-react';
 
 interface SparringSettlementModalProps {
   isOpen: boolean;
@@ -33,6 +34,21 @@ export const SparringSettlementModal: React.FC<SparringSettlementModalProps> = (
   }, [isOpen, data]);
 
   const [showReviewDetail, setShowReviewDetail] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyRecord = async () => {
+    const record = loadLatestRecord();
+    if (!record) return;
+    const text = exportGameRecord(record);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      // 剪贴板不可用时降级：弹一个提示框让家长手动复制
+      window.prompt('复制下面的棋谱发给 AI 分析：', text);
+    }
+  };
 
   if (!isOpen || !data) return null;
 
@@ -204,6 +220,22 @@ export const SparringSettlementModal: React.FC<SparringSettlementModalProps> = (
           <p className="text-[10px] text-sky-700/80 mt-2 leading-snug">
             孩子讲的过程就是复盘。你只要认真听、追问一句「然后呢」，不用判断对错。
           </p>
+          <button
+            onClick={handleCopyRecord}
+            className="mt-2 w-full py-1.5 px-2 flex items-center justify-center gap-1.5 rounded-xl border border-sky-300 bg-white/80 hover:bg-white text-sky-800 font-bold text-[11px] transition active:scale-[0.98]"
+          >
+            {copied ? (
+              <>
+                <ClipboardCheck className="w-3.5 h-3.5 text-emerald-600" />
+                <span>已复制，去微信发给 AI 分析</span>
+              </>
+            ) : (
+              <>
+                <ClipboardCopy className="w-3.5 h-3.5" />
+                <span>复制本局棋谱，发给 AI 分析孩子棋路</span>
+              </>
+            )}
+          </button>
         </div>
 
         {/* Action Buttons */}

@@ -1768,14 +1768,15 @@ export class GoAI {
   }
 
   /**
-   * 距离感知信号：主动进攻 + 护子连接。
+   * 距离感知信号：主动进攻 + 护子连接（v9.14 重写，修 v9.10 送子、v9.11 太保守两个极端）。
    *
-   * 这是 19 路「AI 只会散着下、被小选手逐块围吃」的根因修复——
-   * 空盘上所有安全点的旧打分几乎相同（都只是「有几口气」），AI 只能随机散布，
-   * 结果自己的子落单被围吃，也永远不去贴对方造接触战。
-   * 加入这个信号后：
-   *   1) 靠近对方棋子加分（越近、对方气越少加越多）→ AI 主动贴上去进攻；
-   *   2) 靠近自己棋子加分（越近、自己气越少加越多）→ AI 连成一块，不落单被吃。
+   * 目标：AI 既会「贴对方弱块进攻」（练小选手防守）、又会「连自己弱块护子」（练小选手进攻要动脑），
+   * 同时绝不贴对方厚势送死（v9.10 的 193:11 根因）。
+   *
+   * 三条铁律：
+   *   1) 进攻只挑「对方气少的弱块」：叫吃(1气)>紧气(2气)>轻攻(3气)，对方 4 气以上是厚势，不贴；
+   *   2) 护子无条件优先：自己的块气越少，越要连上去（1气救命 > 2气加固）；
+   *   3) 贴上去必须给自己留气：紧气要自己>=2气、轻攻要自己>=3气，否则收手防反吃。
    */
   private static proximitySignal(
     state: BoardState,
@@ -1785,16 +1786,14 @@ export class GoAI {
   ): number {
     const size = state.size;
     const radius = size >= 19 ? 2 : 1; // 大盘允许隔一格接近，小盘只贴一格
-    // 19 路盘大，贴上去形成孤立 2 气块会被小选手隔空连紧气吃光（193:11），
-    // 要求自己 >=3 气才进攻；小盘（9/13）贴身战斗是常态，2 气块能连上/逃，>=2 即可。
-    const minLibs = size >= 19 ? 3 : 2;
 
-    // 落点后自己的块气：气不足就不进攻，否则贴上去被连紧气吃光（193:11 的根因）
+    // 落点后自己的块气：气不足就不贴厚势，否则贴上去被连紧气吃光（193:11 的根因）
     const sim = GoCore.playMove(state, move, color);
     const myGroup = sim.error ? null : GoCore.findGroup(sim.nextState.grid, move);
     const myLibs = myGroup ? myGroup.liberties.length : 0;
 
     let sig = 0;
+    let connectsOwn = 0;
     for (let dy = -radius; dy <= radius; dy++) {
       for (let dx = -radius; dx <= radius; dx++) {
         if (dx === 0 && dy === 0) continue;
@@ -1807,18 +1806,33 @@ export class GoAI {
         if (cell === oppColor) {
           const g = GoCore.findGroup(state.grid, { x: nx, y: ny });
           const libs = g ? g.liberties.length : 4;
-          // 进攻：自己气够（>=minLibs）才贴上去，气不足收手防送死
-          if (myLibs >= minLibs) {
-            sig += (d === 1 ? 150 : 60) + Math.max(0, 5 - libs) * 40;
+          const stones = g ? g.points.length : 0;
+          // 进攻：贴「孤子/气少的弱块」才值得；贴大块厚势（4+气）等于送死，不给分。
+          if (stones <= 2) {
+            // 孤子 / 小弱块（1~2 颗）：贴上去围它，气越少越值得（孤军无援，安全）
+            sig += 120 + Math.max(0, 5 - libs) * 45;
+          } else if (libs === 1) {
+            sig += 400;                   // 叫吃大块 / 提子前一步
+          } else if (libs === 2) {
+            if (myLibs >= 2) sig += 170;  // 紧气：把对方压到 1 气，自己留 2 气防反吃
+          } else if (libs === 3) {
+            if (myLibs >= 3) sig += 60;   // 轻攻：对方 3 气，自己留足 3 气才贴
           }
+          // 大块且 libs >= 4：厚势，不贴（防送死）
         } else if (cell === color) {
           const g = GoCore.findGroup(state.grid, { x: nx, y: ny });
           const libs = g ? g.liberties.length : 4;
-          // 连接护子：自己的气越少越需要连
-          sig += (d === 1 ? 90 : 30) + Math.max(0, 5 - libs) * 30;
+          connectsOwn++;
+          // 护子：自己的弱块（1~2气）优先连接，避免落单被围吃
+          if (libs === 1) sig += 430;     // 救命连接
+          else if (libs === 2) sig += 200; // 弱块加固
+          else if (libs === 3) sig += 80;
+          else sig += 25;
         }
       }
     }
+    // 落点既贴着对方弱块、又连着自己的子 → 「有支撑的进攻」，额外鼓励
+    if (connectsOwn > 0 && sig > 0) sig += 40;
     return sig;
   }
 

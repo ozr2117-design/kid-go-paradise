@@ -13,6 +13,7 @@ import { GoCore } from '../engine/go-core';
 import { GoAI } from '../engine/go-ai';
 import { AiSensei } from '../engine/ai-sensei';
 import { SoundEngine } from '../engine/sound-engine';
+import { saveGameRecord, GameRecord } from '../engine/game-recorder';
 import { GoBoard } from './GoBoard';
 import { SparringSettlementModal } from './SparringSettlementModal';
 import {
@@ -391,6 +392,23 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
         senseiReview,
       });
       setIsSettlementOpen(true);
+
+      // 📝 保存棋谱（供家长导出、AI 分析孩子棋路）
+      const record: GameRecord = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        timestamp: Date.now(),
+        boardSize,
+        winRule,
+        opponent: activeProfile.name,
+        aiLevel,
+        playerColor,
+        winner,
+        playerCaptures,
+        aiCaptures,
+        totalMoves: finalState.moveHistory.length,
+        moves: finalState.moveHistory.map((m) => ({ ...m })),
+      };
+      saveGameRecord(record);
     },
     [boardSize, playerColor, winRule, captureTarget, activeProfile.name, playerAttemptedPass]
   );
