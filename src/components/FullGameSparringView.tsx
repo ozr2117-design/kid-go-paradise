@@ -654,6 +654,15 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
     updateAiDialogue,
   ]);
 
+  // 家长手动结束本局：孩子下到「无棋可下/胜负已分」但没触发自动结算（限时没到点）时，
+  // 家长点一下主动按当前比分结算 + 上传棋谱 + 弹结算页。
+  const handleManualEnd = () => {
+    if (boardState.isGameOver || isReviewMode || boardState.moveHistory.length < 3) return;
+    const finalState = GoCore.cloneState(boardState);
+    finalState.isGameOver = true;
+    triggerEndGame(finalState);
+  };
+
   // Player Pass
   const handlePass = () => {
     if (boardState.isGameOver || boardState.turn !== playerColor || isAiThinking || isReviewMode) return;
@@ -1262,6 +1271,17 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
             <span>看地盘</span>
           </button>
         </div>
+
+        {/* 家长手动结束本局：下到无棋可下/胜负已分但没弹结算时，点一下主动结算+上传 */}
+        <button
+          onClick={handleManualEnd}
+          disabled={boardState.isGameOver || isReviewMode || boardState.moveHistory.length < 3}
+          className="w-full py-2 px-3 flex items-center justify-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:opacity-40 text-white font-black rounded-xl shadow-xs transition active:scale-95 text-[12px]"
+          title="孩子下到无棋可下或胜负已分时，点这里主动结束并记录棋谱"
+        >
+          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+          <span>结束本局 · 记录棋谱</span>
+        </button>
       </div>
 
       {/* 4. VISUAL SETTLEMENT MODAL */}
