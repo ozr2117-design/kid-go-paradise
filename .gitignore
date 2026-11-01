@@ -27,3 +27,4 @@ cloudflare-worker/
 CLOUDFLARE_KEEP_ALIVE.md
 scratch/
 .wrangler/
+.workbuddy/
