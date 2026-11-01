@@ -14,6 +14,7 @@ import { GoAI } from '../engine/go-ai';
 import { AiSensei } from '../engine/ai-sensei';
 import { SoundEngine } from '../engine/sound-engine';
 import { saveGameRecord, GameRecord } from '../engine/game-recorder';
+import { uploadGameRecord } from '../engine/cloud-recorder';
 import { GoBoard } from './GoBoard';
 import { SparringSettlementModal } from './SparringSettlementModal';
 import {
@@ -409,6 +410,8 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
         moves: finalState.moveHistory.map((m) => ({ ...m })),
       };
       saveGameRecord(record);
+      // ☁️ 同步上传云端，AI 直接读表分析棋路（失败静默降级到本地，不影响对局）
+      uploadGameRecord(record);
     },
     [boardSize, playerColor, winRule, captureTarget, activeProfile.name, playerAttemptedPass]
   );
