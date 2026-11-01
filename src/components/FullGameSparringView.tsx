@@ -172,6 +172,29 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
       target: number = captureTarget,
       handicap: number = handicapCount
     ) => {
+      // 📝 中途退出也上传棋谱：孩子没下完就重开/换对手，棋谱同样要记录，方便 AI 分析棋路。
+      // 已结算（isGameOver）的不重复上传；刚开局（<3 手）无分析价值，跳过。
+      if (boardState.moveHistory.length >= 3 && !boardState.isGameOver) {
+        const myCaps = playerColor === 'black' ? boardState.captures.black : boardState.captures.white;
+        const aiCaps = playerColor === 'black' ? boardState.captures.white : boardState.captures.black;
+        const rec: GameRecord = {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          timestamp: Date.now(),
+          boardSize,
+          winRule,
+          opponent: activeProfile.name,
+          aiLevel,
+          playerColor,
+          winner: myCaps > aiCaps ? 'player' : aiCaps > myCaps ? 'ai' : 'draw',
+          playerCaptures: myCaps,
+          aiCaptures: aiCaps,
+          totalMoves: boardState.moveHistory.length,
+          moves: boardState.moveHistory.map((m) => ({ ...m })),
+        };
+        saveGameRecord(rec);
+        uploadGameRecord(rec);
+      }
+
       setBoardSize(sz);
       setPlayerColor(pColor);
       setAiLevel(lvl);
@@ -251,7 +274,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
         }
       }
     },
-    [boardSize, playerColor, aiLevel, winRule, captureTarget, handicapCount, timedMinutes]
+    [boardSize, playerColor, aiLevel, winRule, captureTarget, handicapCount, timedMinutes, boardState, activeProfile.name]
   );
 
   // Directly switch AI Opponent level with immediate voice and audio feedback
