@@ -3,6 +3,7 @@ import { GameMode, PuzzleData, StageInfo } from './types/go';
 import { ADVENTURE_STAGES } from './data/stages';
 import { ProgressStore, UserProgress } from './store/storage';
 import { SoundEngine } from './engine/sound-engine';
+import { syncPendingLocalRecords } from './engine/cloud-recorder';
 import { KidNavbar } from './components/KidNavbar';
 import { AdventureMap } from './components/AdventureMap';
 import { CaptureBattleView } from './components/CaptureBattleView';
@@ -21,6 +22,11 @@ export const App: React.FC = () => {
   useEffect(() => {
     SoundEngine.setMuted(progress.soundMuted);
   }, [progress.soundMuted]);
+
+  // 启动时自动同步并挽救本地未上传的历史棋谱
+  useEffect(() => {
+    syncPendingLocalRecords().catch(() => {});
+  }, []);
 
   // Compute total stars
   const totalStars = useMemo(() => {

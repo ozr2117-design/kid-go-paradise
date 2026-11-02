@@ -20,6 +20,7 @@ export interface GameRecord {
   aiCaptures: number;
   totalMoves: number;
   moves: Move[];
+  synced?: boolean;
 }
 
 const STORAGE_KEY = 'weiqi-kids-game-records';
@@ -44,6 +45,33 @@ export function loadGameRecords(): GameRecord[] {
     return raw ? (JSON.parse(raw) as GameRecord[]) : [];
   } catch {
     return [];
+  }
+}
+
+/** 获取所有尚未同步至云端的历史棋谱（例如由于此前 workers.dev 域名受阻未上传成功） */
+export function getUnsyncedRecords(): GameRecord[] {
+  const list = loadGameRecords();
+  return list.filter((r) => !r.synced);
+}
+
+/** 标记指定棋谱为已同步至云端 */
+export function markRecordsSynced(ids: string[]): void {
+  if (!ids || ids.length === 0) return;
+  try {
+    const set = new Set(ids);
+    const list = loadGameRecords();
+    let updated = false;
+    for (const r of list) {
+      if (set.has(r.id) && !r.synced) {
+        r.synced = true;
+        updated = true;
+      }
+    }
+    if (updated) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    }
+  } catch {
+    // 忽略异常
   }
 }
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'weiqi-kids-offline-v9.18';
+const CACHE_NAME = 'weiqi-kids-offline-v9.19';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -26,6 +26,10 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   // Only handle GET requests
   if (event.request.method !== 'GET') return;
+
+  // Never intercept or cache API endpoints
+  const url = new URL(event.request.url);
+  if (url.pathname.startsWith('/api/')) return;
 
   // Network-first with immediate offline cache fallback
   event.respondWith(

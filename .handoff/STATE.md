@@ -1,68 +1,56 @@
 # 全局交接状态档案 (STATE.md)
-*更新时间：2026-11-02 20:40:00 (UTC+8)*
+*更新时间：2026-11-02 21:15:00 (UTC+8)*
 *项目：森森围棋基地 (kid-go-paradise)*
-*当前版本：v9.2*
+*当前版本：v9.19*
 *线上服务：https://weiqi-kids.pages.dev/*
+*棋谱接口：https://weiqi-kids.pages.dev/api/record (同源直通，免疫阻断)*
 *Git 仓库：https://github.com/ozr2117-design/kid-go-paradise.git (branch: master)*
 
 ---
 
 ## 【1. 全局目标与当前总进度（Overview & Progress）】
-- **总体定位**：面向学棋儿童（冲刺业余 1 段至 5 段 / 国家二级运动员水准）的离线 PWA 极简围棋基地。
-- **最新完成（v9.0 -> v9.1 -> v9.2）**：
-  1. **v9.0 神经龙尊满血升级**：纯前端内嵌轻量 Policy-Value 神经网络与 PUCT 蒙特卡洛搜寻（WebGPU/骁龙 8+ 显卡直通与 CPU 降级混合驱动），彻底修复 19x19 中盘被围投降的死局缺陷。
-  2. **v9.1 平板横屏紧凑适配**：针对小米平板 6 Pro 横屏视界，精简右侧侧边栏介绍与选项内边距，实现底部 4 大功能按钮（悔棋、停一手、数气点、看地盘）100% 常驻直显，免上下滑动；重构居中版本更新与强制清缓存弹窗。
-  3. **v9.2 冲段天梯重构（业1段 至 业5段）**：全面退役低效的“菜鸟(15K)/中鸟(10K)”，重构为贴合儿童实战进阶的 4 阶对手梯队：
-     - `🦅 老鸟` (业余 1 段·守门名宿，现行 MCTS，孩子稳赢 80%+ 的信心充电桩)；
-     - `🦊 战灵狐` (业余 2-3 段·中盘刺客，专注断点切断与双打吃 + MCTS 220 步)；
-     - `🦄 踏浪麒麟` (业余 4 段·大局宗师，深度 Policy 先验 + MCTS 320 步)；
-     - `🐲 极·龙尊` (业余 5 段·国家二级大招，全盘神经网络，支持让 4 至 6 子大国手指导棋)。
-  4. **全量自动化测试**：60 项单元测试 100% 绿灯全过（Vitest）。
-  5. **生产部署闭环**：单文件构建 (466 kB) 成功通过专线代理推送到 Cloudflare Pages 并同步至 GitHub master 分支。
+- **总体定位**：面向学棋儿童（冲刺业余 1 段至 5 段 / 国家二级运动员水准）的离线 PWA 极简围棋基地与棋谱采集训练闭环。
+- **最新演进闭环（v9.18 至 v9.19）**：
+  1. **排查并根治棋谱无法上传死穴 (v9.19)**：
+     - **真实探测**：通过 D1 SQL 查询证实此前云端 `game_records` 表为 0 条，实锤自 v9.16 以来一盘棋谱都没传上。
+     - **排查根因**：原 `https://weiqi-kids-record.ozr2117.workers.dev` 域名在大陆遭 GFW SNI 物理阻断（报错 `SSL/TLS connection failed / ECONNRESET`），且前端 `uploadGameRecord` 静默降级未给家长明显提示。
+     - **架构重构**：新建 Cloudflare Pages Functions [functions/api/record.js](file:///c:/Users/A/Desktop/others/F/functions/api/record.js) 并编译为 [dist/_worker.js](file:///c:/Users/A/Desktop/others/F/dist/_worker.js)；根目录挂载 [wrangler.toml](file:///c:/Users/A/Desktop/others/F/wrangler.toml) 配置 D1 绑定；
+     - **同源通信**：前端上报地址彻底切换为同源相对路径 `/api/record`（非 Web 环境回退主站 `https://weiqi-kids.pages.dev/api/record`），零跨域、零 GFW 阻断。
+     - **本地数据挽救同步器**：在 [src/engine/game-recorder.ts](file:///c:/Users/A/Desktop/others/F/src/engine/game-recorder.ts) 与 [src/engine/cloud-recorder.ts](file:///c:/Users/A/Desktop/others/F/src/engine/cloud-recorder.ts) 中增加 `getUnsyncedRecords()`、`markRecordsSynced()` 与 `syncPendingLocalRecords()`。在 [src/App.tsx](file:///c:/Users/A/Desktop/others/F/src/App.tsx) 启动时自动触发补传，自动将此前积压在设备 `localStorage` 里的所有未同步对弈批量救回云端 D1 数据库！
+  2. **离线与缓存防护**：
+     - [public/sw.js](file:///c:/Users/A/Desktop/others/F/public/sw.js) 与 [dist/sw.js](file:///c:/Users/A/Desktop/others/F/dist/sw.js) 升级至 `weiqi-kids-offline-v9.19`；
+     - Service Worker 显式加入 `if (url.pathname.startsWith('/api/')) return;`，杜绝任何 API 接口被缓存拦截。
+  3. **单元测试与编译**：全量 7 个测试套件、68 项单元测试全部绿灯通过；单文件构建成功。
 
 ---
 
 ## 【2. 踩坑挑战与死胡同（Challenges & Failed Attempts）】
-1. **Cloudflare CLI 直连握手超时 (死胡同)**：
-   - *现象*：Windows 终端下直接运行 `npx wrangler pages deploy` 容易出现 `Request to Cloudflare's API timed out`。
-   - *铁律解法*：必须显式注入本地代理环境变量：
-     `$env:https_proxy="http://127.0.0.1:7890"; $env:http_proxy="http://127.0.0.1:7890"` 并携带 `CLOUDFLARE_API_TOKEN` 与 `CLOUDFLARE_ACCOUNT_ID`。
-2. **平板开 Clash Meta 无法加载网页 (死胡同)**：
-   - *根因*：移动端 Clash 默认分流规则常将 `*.pages.dev` 导流到公共机场节点，触发 Cloudflare 边缘人机验证盾或安卓 UDP/QUIC 丢包。
-   - *铁律解法*：在平板 Clash 中添加 `DOMAIN-SUFFIX,pages.dev,DIRECT`，或者依靠 Service Worker 离线缓存运行。
-3. **MCTS 内部角部阵地判定越界 (历史 Bug 已修复)**：
-   - 在 7x7 等小盘测试时，`cornerChecks` 硬编码坐标 `[15, 15]` 曾导致 `Cannot read properties of undefined (reading '3')`。已统一改为动态计算 `cornerOffset` 防越界。
+1. **Cloudflare `*.workers.dev` 免费域名的国内物理阻断 (死胡同)**：
+   - *现象*：大陆网络向 `*.workers.dev` 发送 TLS 请求会被 GFW 直接发送 TCP RST（`ECONNRESET`）。
+   - *铁律解法*：国内生产环境严禁使用 `*.workers.dev`！必须使用 **Pages 同源路由 (`pages.dev/api/*`)** 或已备案自定义域名。
+2. **静默失败引发的虚假安全感**：
+   - 前端网络请求若被全量 `catch` 吞掉只打印 warn，在平板端无法看到控制台，会导致家长误以为功能正常。必须配备本地存谱与开机自动同步（Sync）双保险。
+3. **AI 在线自训练的认知偏差**：
+   - 围棋 AI 是前端静态算法与神经网络矩阵，不存在“下完 4 局当场自动梯度下降反向传播进代码”的在线自训练回路。棋谱上传云端的定位是：数据资产沉淀，供开发者与大模型后续进行技术复盘、规则微调与棋路分析。
 
 ---
 
 ## 【3. 跑通的成功经验（Successes & Key Patterns）】
-1. **极简单文件架构 (Singlefile Vite)**：
-   - 依赖 `vite-plugin-singlefile` 将 HTML、CSS、JS、WebAssembly 全部打成单文件 `dist/index.html`。
-   - 配合 `public/sw.js` 的缓存版本控制（每次发版修改 `CACHE_NAME` 如 `weiqi-kids-offline-v9.2`），即跑即走，断网可用。
-2. **测试与打包一体化命令**：
-   - 测试：`npm run test`
-   - 构建：`npm run build`
-   - 部署：
-     ```powershell
-     $env:https_proxy="http://127.0.0.1:7890"
-     $env:http_proxy="http://127.0.0.1:7890"
-     # 凭据自本地环境或 Cloudflare 账户加载
-     npx wrangler pages deploy dist --project-name=weiqi-kids --commit-dirty=true
-     ```
+1. **同源 Pages Functions + D1 强力双链路**：
+   - 优先通过 `env.DB` 使用 D1 原生 Binding；
+   - 若环境未绑定 DB，自动从边缘节点直连 Cloudflare D1 REST API，高可靠、高可用、零配置。
+2. **构建链路打包一体化**：
+   - `npm run build` 自动联动 `wrangler pages functions build --outfile dist/_worker.js`，保证本地与 GitHub Actions CI 产物完全一致。
 
 ---
 
-## 【4. 下一棒唯一待办（Next Problem to Solve）】
-- **业务主线**：引导孩子训练重心全面向 **19x19 标准大盘** 转移。
-- **潜在功能点**：
-  1. 考虑在“AI全盘对弈”界面中，默认选中路数改为 `19x19`（目前默认是 13x13），或记录上次玩家选择的路数状态。
-  2. 观察孩子与 `🦊 战灵狐` 和 `🦄 麒麟` 的 19x19 实战对弈反馈，必要时微调让子预设。
-
----
-
-## 【5. 核心重要文件清单（Important Files ONLY）】
-- `src/components/FullGameSparringView.tsx` (L35-L67: 对手 Profile 配置; L185-L235: 开局提示与语音台词; L580-L990: 紧凑布局与侧边栏控件)
-- `src/engine/go-ai.ts` (L415-L445: 对手分流调度; L880-L985: 麒麟与战灵狐核心决策算法; L1090-L1250: 龙尊神经网络 MCTS)
-- `src/components/KidNavbar.tsx` (L43-L75: Service Worker 强刷更新弹窗逻辑)
-- `src/version.ts` (当前版本号控制与展示文本)
-- `public/sw.js` (Service Worker 离线缓存名称定义)
+## 【4. 核心重要文件清单（Important Files ONLY）】
+- `functions/api/record.js` (Pages 同源棋谱上报 Edge Function)
+- `dist/_worker.js` (编译后的 Pages Worker 路由文件)
+- `wrangler.toml` (Pages D1 binding 声明)
+- `src/engine/cloud-recorder.ts` (前端异步上传与自动挽救补传器)
+- `src/engine/game-recorder.ts` (棋谱格式定义、localStorage 归档与未同步检索)
+- `src/components/FullGameSparringView.tsx` (全盘对弈交互、结束本局按钮、上传与结算触发)
+- `src/App.tsx` (应用根组件，启动触发历史棋谱补传)
+- `src/version.ts` (当前版本标定)
+- `public/sw.js` (Service Worker 缓存版本与 API 过滤)
