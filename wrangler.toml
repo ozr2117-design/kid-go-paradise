@@ -1,8 +1,0 @@
-name = "weiqi-kids"
-pages_build_output_dir = "dist"
-compatibility_date = "2024-01-01"
-
-[[d1_databases]]
-binding = "DB"
-database_name = "weiqi-kids-db"
-database_id = "87149d92-522c-4fe4-a4ed-6a6b9d4fef29"
