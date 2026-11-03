@@ -35,7 +35,9 @@
 - **v9.17**：防中途退出丢谱：在 `startNewGame` 退出局面前，若步数 ≥ 3 且未终局，自动补传云端。
 - **v9.18**：界面新增「结束本局 · 记录棋谱」绿色常驻按钮。
 
-## 2026-11-03 21:00:00 (v9.20 修复服务端 D1 鉴权缺失 + 三通道闭环)
-- **诊断**：测试线上 `/api/record`，实测返回 HTTP 500 (`D1 binding not configured and no API token provided`)，证实边缘函数因缺少绑定和后备鉴权导致入库失败。
-- **重构**：`functions/api/record.js` 升级为三通道策略（Pages Binding -> Worker 骨干网内转 -> REST API 备用直连），彻底杜绝服务端 500。
-- **版本**：版本标定递增至 **v9.20**，缓存升级至 `weiqi-kids-offline-v9.20`。
+## 2026-11-02 至 2026-11-03 21:02:00 (v9.19 至 v9.20 根除阻断 + 三通道入库 + 本地挽救)
+- **诊断**：查验 D1 表为 0 条，确诊原 `workers.dev` 遭 GFW 阻断；线上 `/api/record` 缺少 D1 绑定鉴权报 500。
+- **重构**：重构 `functions/api/record.js` Pages Edge Function，确立“Pages Binding -> Worker 骨干网内转 -> REST API 备用直连”三通道策略，实现同源秒级入库。
+- **挽救**：实现 `syncPendingLocalRecords()`，前端启动时自动扫描 `localStorage` 并批量补传。
+- **实测**：孩子平板刷新后，**15 条记录（9 局实战棋谱）全部成功推入 D1 数据库**，包含完整每手坐标！
+- **诊断**：深入分析 19 路吃子 AI 代码，指出当前吃子模式跳过神经网络、仅为 2-ply 浅层搜索的“严重近视”本质，为 11 月 28 日备战指明了手筋强化与反击升级的真正技术路径。
