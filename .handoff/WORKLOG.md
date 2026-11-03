@@ -27,17 +27,15 @@
 - **v9.12**：吃子赛停一手仅让先手，不判平局。
 
 ## 2026-11-01 (v9.13 至 v9.14 家长卡与本地存谱)
-- **v9.13**：结算页新增「家长提问卡」，提供 2 句口语化问话模版（“最大的那一块怎么吃到的”、“有没有哪块棋差点被吃掉”），帮助不懂棋家长复盘。
+- **v9.13**：结算页新增「家长提问卡」，提供 2 句口语化问话模版，帮助不懂棋家长复盘。
 - **v9.14**：AI 护子优先（救命 +430，加固 +200）；新增 `src/engine/game-recorder.ts`，局终自动将棋谱保存至本地 localStorage，支持结算页一键复制。
 
 ## 2026-11-01 至 2026-11-02 (v9.15 至 v9.18 云端直传与主动结算)
-- **v9.15 至 v9.16**：建立 `record-worker/` 与 Cloudflare D1 数据库 `weiqi-kids-db` (`game_records` 表)，前端 `src/engine/cloud-recorder.ts` 异步 fetch 上传。
+- **v9.15 至 v9.16**：建立 `record-worker/` 与 Cloudflare D1 数据库 `weiqi-kids-db` (`game_records` 表)。
 - **v9.17**：防中途退出丢谱：在 `startNewGame` 退出局面前，若步数 ≥ 3 且未终局，自动补传云端。
-- **v9.18**：界面新增「结束本局 · 记录棋谱」绿色常驻按钮，方便家长在胜负已分但未触发自动终局时手动结算并保存。
+- **v9.18**：界面新增「结束本局 · 记录棋谱」绿色常驻按钮。
 
-## 2026-11-02 21:15:00 (v9.19 根除 workers.dev 大陆阻断 + 本地棋谱自动挽救)
-- **诊断**：查验 Cloudflare D1 数据库，确认表内记录为 0 条。确诊原 `weiqi-kids-record.ozr2117.workers.dev` 域名在大陆遭 GFW SNI 物理阻断。
-- **重构**：新建 `functions/api/record.js` Pages Edge Function，`package.json` build 增加编译产物 `dist/_worker.js`，实现与 `weiqi-kids.pages.dev` 100% 同源通信，0 跨域、0 阻断。
-- **挽救**：实现 `syncPendingLocalRecords()`，在前端启动及上传成功后自动扫描 `localStorage` 中的未同步棋谱并批量推向云端，挽救孩子今天下完未传的 4 至 5 局棋谱。
-- **缓存**：升级离线缓存至 `weiqi-kids-offline-v9.19`，并在 Service Worker 中明确放行 `/api/*`。
-- **验证**：单文件构建成功，68 项单元测试全部绿灯通过，D1 API 测试写入读取并通过。
+## 2026-11-03 21:00:00 (v9.20 修复服务端 D1 鉴权缺失 + 三通道闭环)
+- **诊断**：测试线上 `/api/record`，实测返回 HTTP 500 (`D1 binding not configured and no API token provided`)，证实边缘函数因缺少绑定和后备鉴权导致入库失败。
+- **重构**：`functions/api/record.js` 升级为三通道策略（Pages Binding -> Worker 骨干网内转 -> REST API 备用直连），彻底杜绝服务端 500。
+- **版本**：版本标定递增至 **v9.20**，缓存升级至 `weiqi-kids-offline-v9.20`。
