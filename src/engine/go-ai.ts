@@ -191,7 +191,7 @@ export class GoAI {
   }
 
   /**
-   * Level 3: 聪聪狐 🦊 (5K~1D 老鸟水平 - 真正的高手战术)
+   * Level 3: 聪聪狐 🦊 / 老鸟 🦅 (5K~1D 老鸟业1 守门名宿 - 稳健防守，不白送子，见单打即吃，死逃剪枝)
    */
   private static getFoxCaptureMove(
     state: BoardState,
@@ -200,14 +200,70 @@ export class GoAI {
     legalMoves: Point[],
     options: AIMoveOptions
   ): Point | null {
-    // 100% 紧抓吃子，100% 积极自救，主动发起双打吃并具备 2-ply 反杀防御
     return this.getAdvancedClubTacticalMove(state, color, oppColor, legalMoves, options);
   }
 
   /**
-   * Level 4: 傲天鹰 🦅 (1D~2D 强力鹰王 - 征子、分断与大龙做活)
+   * Level 4: 傲天鹰 🦅 / 战灵狐 🦊 (1D~2D 业2-3 赛场恶狼 - 绝杀提吃、反叫吃以攻代守、死逃剪枝开阔突围、主动双叫吃)
    */
   private static getEagleCaptureMove(
+    state: BoardState,
+    color: Color,
+    oppColor: Color,
+    legalMoves: Point[],
+    options: AIMoveOptions
+  ): Point | null {
+    // 1. 100% 优先提吃，提子数最多者优先
+    const instantCaptures = this.findImmediateCaptures(state, color, legalMoves);
+    if (instantCaptures.length > 0) {
+      return this.pickBestCapture(state, instantCaptures, color);
+    }
+
+    // 2. 核心恶狼手筋：被打吃时优先反叫吃/反提（以攻代守，破坏对手节奏）
+    const counterAtaris = this.findCounterAtariMoves(state, color, legalMoves);
+    if (counterAtaris.length > 0) {
+      const safeCounter = this.pickSafePoint(state, color, counterAtaris);
+      if (safeCounter) {
+        return safeCounter;
+      }
+    }
+
+    // 3. 自救时识别死征子与死逃：预判逃跑后必死走法，果断弃子转向他处
+    const rescues = this.findEscapeAtariMoves(state, color, legalMoves);
+    const viableRescues = rescues.filter((r) => !this.isDeadEscapeMove(state, r, color));
+    if (viableRescues.length > 0) {
+      viableRescues.sort(
+        (a, b) => this.getEscapeDirectionScore(state, b, color) - this.getEscapeDirectionScore(state, a, color)
+      );
+      return viableRescues[0];
+    }
+    // 若全是死征子/死逃，恶狼果断弃子换先手，绝不在边线连送糖葫芦！
+
+    // 4. 积极发起双打吃（撕裂对方棋形，专咬双弱棋断点）
+    const doubleAtaris = this.findDoubleAtariMoves(state, color, legalMoves);
+    const safeDouble = this.pickSafePoint(state, color, doubleAtaris);
+    if (safeDouble) {
+      return safeDouble;
+    }
+
+    // 5. 消除对手的双打吃威胁
+    const oppLegal = this.getFastLegalMoves(state, oppColor);
+    const oppDoubleAtaris = this.findDoubleAtariMoves(state, oppColor, oppLegal);
+    for (const threatPoint of oppDoubleAtaris) {
+      if (legalMoves.some((m) => GoCore.pointsEqual(m, threatPoint))) {
+        if (!this.pickSafePoint(state, color, [threatPoint])) continue;
+        return threatPoint;
+      }
+    }
+
+    // 6. 主力搜索：局部 2-ply 杀气与紧气前瞻（宽度 6）
+    return this.runMinimaxTacticalSearch(state, color, oppColor, legalMoves, options, 6);
+  }
+
+  /**
+   * Level 5: 棋道龙 🐉 / 踏浪麒麟 🦄 & 极·龙尊 🐲 (3D~5D 业4-5 终极统帅 - 恶狼手筋 + 局部 4 至 6 步杀气深搜)
+   */
+  private static getDragonCaptureMove(
     state: BoardState,
     color: Color,
     oppColor: Color,
@@ -220,27 +276,33 @@ export class GoAI {
       return this.pickBestCapture(state, instantCaptures, color);
     }
 
-    // 2. 自救时识别死征子：如果逃跑后依然只有 1 气且周围全是敌人，果断弃子转向他处
-    const rescues = this.findEscapeAtariMoves(state, color, legalMoves);
-    if (rescues.length > 0) {
-      for (const r of rescues) {
-        const sim = GoCore.playMove(state, r, color);
-        const grp = GoCore.findGroup(sim.nextState.grid, r);
-        if (grp && grp.liberties.length >= 2) {
-          return r;
-        }
+    // 2. 核心恶狼手筋：被打吃时优先反叫吃/反提（以攻代守）
+    const counterAtaris = this.findCounterAtariMoves(state, color, legalMoves);
+    if (counterAtaris.length > 0) {
+      const safeCounter = this.pickSafePoint(state, color, counterAtaris);
+      if (safeCounter) {
+        return safeCounter;
       }
-      // 所有逃跑点仍是自叫吃（死征子）→ 不逃，弃子转向他处，绝不一路送吃
     }
 
-    // 3. 积极发起双打吃（必须自身安全，否则双打吃会被对手直接提掉）
+    // 3. 自救与死逃剪枝 + 开阔突围
+    const rescues = this.findEscapeAtariMoves(state, color, legalMoves);
+    const viableRescues = rescues.filter((r) => !this.isDeadEscapeMove(state, r, color));
+    if (viableRescues.length > 0) {
+      viableRescues.sort(
+        (a, b) => this.getEscapeDirectionScore(state, b, color) - this.getEscapeDirectionScore(state, a, color)
+      );
+      return viableRescues[0];
+    }
+
+    // 4. 积极发起双打吃
     const doubleAtaris = this.findDoubleAtariMoves(state, color, legalMoves);
     const safeDouble = this.pickSafePoint(state, color, doubleAtaris);
     if (safeDouble) {
       return safeDouble;
     }
 
-    // 4. 消除对手的双打吃威胁（同样不能自己去填一个只剩 1 气的点）
+    // 5. 消除对手的双打吃威胁
     const oppLegal = this.getFastLegalMoves(state, oppColor);
     const oppDoubleAtaris = this.findDoubleAtariMoves(state, oppColor, oppLegal);
     for (const threatPoint of oppDoubleAtaris) {
@@ -250,24 +312,15 @@ export class GoAI {
       }
     }
 
-    // 5. 主力搜索：复用龙档那套已验证有效的 2-ply 对抗搜索，但只搜 4 个候选
-    //    （弱化版，落在老鸟与麒麟/龙尊之间）
-    return this.runMinimaxTacticalSearch(state, color, oppColor, legalMoves, options, 4);
-  }
+    // 6. 局部 4 至 6 步杀气深搜 (Deep Tactical Combat Search)
+    // 麒麟（master 业4）：深度 4 步，候选 8 个；龙尊（grandmaster 业5）：深度 6 步，候选 12 个
+    const isKylin = options.sparringLevel === 'master';
+    const depth = isKylin ? 4 : 6;
+    const width = isKylin ? 8 : 12;
 
-  /**
-   * Level 5: 棋道龙 🐉 (3D~5D 终极龙神 - 深度战术搜索，算无遗策)
-   */
-  private static getDragonCaptureMove(
-    state: BoardState,
-    color: Color,
-    oppColor: Color,
-    legalMoves: Point[],
-    options: AIMoveOptions
-  ): Point | null {
-    // 麒麟（master）与龙尊（grandmaster）共用龙档引擎，靠搜索宽度拉开差距：
-    // 麒麟 8 个候选（业4），龙尊 12 个（业5/终极 boss）。
-    const width = options.sparringLevel === 'master' ? 8 : 12;
+    const deepMove = this.runDeepTacticalCombatSearch(state, color, oppColor, legalMoves, options, depth, width);
+    if (deepMove) return deepMove;
+
     return this.runMinimaxTacticalSearch(state, color, oppColor, legalMoves, options, width);
   }
 
@@ -1637,10 +1690,14 @@ export class GoAI {
       return bestCap;
     }
 
-    // 2. Urgent rescue: Save friendly groups in Atari (1 liberty)
+    // 2. Urgent rescue: Save friendly groups in Atari (1 liberty) with dead escape pruning
     const rescues = this.findEscapeAtariMoves(state, color, legalMoves);
-    if (rescues.length > 0) {
-      return rescues[0];
+    const viableRescues = rescues.filter((r) => !this.isDeadEscapeMove(state, r, color));
+    if (viableRescues.length > 0) {
+      viableRescues.sort(
+        (a, b) => this.getEscapeDirectionScore(state, b, color) - this.getEscapeDirectionScore(state, a, color)
+      );
+      return viableRescues[0];
     }
 
     // 3. Double Atari offense (must be self-safe, or the opponent just captures it)
@@ -1878,30 +1935,49 @@ export class GoAI {
       score += Math.min(myLibs, 5) * 60;
     }
 
-    // Rescuing stones in Atari
+    // Rescuing stones in Atari (死逃剪枝与开阔出头)
     const neighborsFriendly = GoCore.getNeighbors(move, size).filter(
       (n) => state.grid[n.y][n.x] === color
     );
+    let myAtariBefore = false;
     for (const fn of neighborsFriendly) {
       const orig = GoCore.findGroup(state.grid, fn);
       if (orig && orig.liberties.length === 1) {
-        score += orig.points.length * 1000;
+        myAtariBefore = true;
+        if (this.isDeadEscapeMove(state, move, color)) {
+          // 死逃 / 死征子：绝不奖励，扣大分引导弃子换先手！
+          score -= 5000;
+        } else {
+          score += orig.points.length * 1000 + this.getEscapeDirectionScore(state, move, color);
+        }
       }
     }
 
-    // Threatening opponent stones (Atari & Semiai tightening)
+    // Threatening opponent stones (Atari & Semiai tightening + 双叫吃嗅探 + 反叫吃奖励)
     const neighborsOpp = GoCore.getNeighbors(move, size).filter(
       (n) => sim.nextState.grid[n.y][n.x] === oppColor
     );
+    let atariGroupsCount = 0;
     for (const on of neighborsOpp) {
       const oppGrp = GoCore.findGroup(sim.nextState.grid, on);
       if (oppGrp) {
         if (oppGrp.liberties.length === 1) {
           score += oppGrp.points.length * 600;
+          atariGroupsCount++;
         } else if (oppGrp.liberties.length === 2) {
           score += 180;
         }
       }
+    }
+
+    // 双叫吃加分：一子撕裂对方两块弱棋
+    if (atariGroupsCount >= 2 && myLibs >= 2) {
+      score += 2500;
+    }
+
+    // 反叫吃加分：己方被打吃时，以攻代守反咬对方进攻棋子
+    if (myAtariBefore && atariGroupsCount >= 1 && myLibs >= 2) {
+      score += 2800;
     }
 
     // Cutting and connecting
@@ -2004,7 +2080,7 @@ export class GoAI {
   /**
    * Helper: Find immediate captures of 1-liberty groups
    */
-  private static findImmediateCaptures(
+  public static findImmediateCaptures(
     state: BoardState,
     color: Color,
     legalMoves: Point[]
@@ -2027,22 +2103,33 @@ export class GoAI {
   }
 
   /**
-   * Helper: Find double atari moves (simultaneously putting 2 opponent groups into Atari)
+   * 1. 双叫吃嗅探 (findDoubleAtariMoves)
+   * 识别断点与两块同时叫吃手筋，赋予最高战术权重。
+   * 铁律：自身落子后气数必须 >= 2（或落子直接提子），严禁「自叫吃式的假双打」。
    */
-  private static findDoubleAtariMoves(
+  public static findDoubleAtariMoves(
     state: BoardState,
     color: Color,
     legalMoves: Point[]
   ): Point[] {
     const oppColor: Color = color === 'black' ? 'white' : 'black';
-    const list: Point[] = [];
+    const list: { move: Point; score: number }[] = [];
 
     for (const move of legalMoves) {
+      if (this.isTrueEye(state, move, color)) continue;
       const sim = GoCore.playMove(state, move, color);
       if (sim.error) continue;
 
+      const myGrp = GoCore.findGroup(sim.nextState.grid, move);
+      if (!myGrp || myGrp.liberties.length < 2) {
+        // 自叫吃假双打：落子自己只有 1 气，对手下一手先提掉你，双打吃失败！
+        continue;
+      }
+
       let atariCount = 0;
+      let totalThreatStones = 0;
       const checked = new Set<string>();
+
       for (const n of GoCore.getNeighbors(move, state.size)) {
         if (sim.nextState.grid[n.y][n.x] === oppColor) {
           const grp = GoCore.findGroup(sim.nextState.grid, n);
@@ -2051,22 +2138,277 @@ export class GoAI {
             if (!checked.has(key)) {
               checked.add(key);
               atariCount++;
+              totalThreatStones += grp.points.length;
             }
           }
         }
       }
 
       if (atariCount >= 2) {
-        list.push(move);
+        list.push({
+          move,
+          score: atariCount * 500 + totalThreatStones * 200 + myGrp.liberties.length * 20,
+        });
       }
     }
-    return list;
+
+    list.sort((a, b) => b.score - a.score);
+    return list.map((item) => item.move);
+  }
+
+  /**
+   * 2. 反叫吃机制 (findCounterAtariMoves)
+   * 当己方棋子被打吃（1气）时，优先反击对方气紧的进攻子，以攻代守。
+   */
+  public static findCounterAtariMoves(
+    state: BoardState,
+    color: Color,
+    legalMoves: Point[]
+  ): Point[] {
+    const oppColor: Color = color === 'black' ? 'white' : 'black';
+    const size = state.size;
+
+    // 1. 找出所有正处于 1 气（被打吃）的己方棋块
+    const myAtariGroups: { points: Point[]; liberties: Point[] }[] = [];
+    const visited = new Set<string>();
+
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        if (state.grid[y][x] === color) {
+          const key = `${x},${y}`;
+          if (!visited.has(key)) {
+            const grp = GoCore.findGroup(state.grid, { x, y });
+            if (grp) {
+              for (const p of grp.points) visited.add(`${p.x},${p.y}`);
+              if (grp.liberties.length === 1) {
+                myAtariGroups.push(grp);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (myAtariGroups.length === 0) return [];
+
+    // 2. 收集与这些被打吃己方棋块相邻的敌方棋子/棋块
+    const oppAdjacentGroups = new Map<string, { points: Point[]; liberties: Point[] }>();
+    for (const myGrp of myAtariGroups) {
+      for (const p of myGrp.points) {
+        for (const n of GoCore.getNeighbors(p, size)) {
+          if (state.grid[n.y][n.x] === oppColor) {
+            const oppGrp = GoCore.findGroup(state.grid, n);
+            if (oppGrp) {
+              const rootKey = `${oppGrp.points[0].x},${oppGrp.points[0].y}`;
+              if (!oppAdjacentGroups.has(rootKey)) {
+                oppAdjacentGroups.set(rootKey, oppGrp);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    const counterMoves: { move: Point; score: number }[] = [];
+
+    for (const move of legalMoves) {
+      if (this.isTrueEye(state, move, color)) continue;
+      const sim = GoCore.playMove(state, move, color);
+      if (sim.error) continue;
+
+      // a) 贴身反提：如果这一步直接提吃了相邻的进攻敌群
+      if (sim.captured.length > 0) {
+        let isCounterCapture = false;
+        for (const cap of sim.captured) {
+          for (const oppGrp of oppAdjacentGroups.values()) {
+            if (oppGrp.points.some((p) => GoCore.pointsEqual(p, cap))) {
+              isCounterCapture = true;
+              break;
+            }
+          }
+        }
+        if (isCounterCapture) {
+          counterMoves.push({
+            move,
+            score: 5000 + sim.captured.length * 300,
+          });
+          continue;
+        }
+      }
+
+      // b) 贴身反打吃：让相邻的敌方进攻块从 2 气变成 1 气（叫吃）
+      // 必须保证自身落子后安全（liberties >= 2）
+      const mySimGrp = GoCore.findGroup(sim.nextState.grid, move);
+      if (!mySimGrp || mySimGrp.liberties.length < 2) continue;
+
+      let counterAtariStones = 0;
+      for (const oppGrp of oppAdjacentGroups.values()) {
+        const root = oppGrp.points[0];
+        const nextOppGrp = GoCore.findGroup(sim.nextState.grid, root);
+        if (nextOppGrp && nextOppGrp.liberties.length === 1) {
+          counterAtariStones += nextOppGrp.points.length;
+        }
+      }
+
+      if (counterAtariStones > 0) {
+        counterMoves.push({
+          move,
+          score: 3000 + counterAtariStones * 200 + mySimGrp.liberties.length * 20,
+        });
+      }
+    }
+
+    counterMoves.sort((a, b) => b.score - a.score);
+    return counterMoves.map((item) => item.move);
+  }
+
+  /**
+   * 3. 征子与死逃剪枝 (isDeadEscapeMove)
+   * 预判逃跑后气数不增且陷入敌阵的必死走法。
+   * 返回 true 表示这是无脑送成糖葫芦的必死逃跑，必须果断弃子！
+   */
+  public static isDeadEscapeMove(
+    state: BoardState,
+    escapeMove: Point,
+    color: Color
+  ): boolean {
+    const oppColor: Color = color === 'black' ? 'white' : 'black';
+    const size = state.size;
+
+    // 模拟己方走 escapeMove
+    const sim1 = GoCore.playMove(state, escapeMove, color);
+    if (sim1.error) return true;
+    if (sim1.captured.length > 0) return false; // 提子解围，绝对不是死逃！
+
+    const grp1 = GoCore.findGroup(sim1.nextState.grid, escapeMove);
+    if (!grp1) return true;
+
+    // 准则 1：逃完后依然 <= 1 气（自杀性逃跑）
+    if (grp1.liberties.length <= 1) {
+      return true;
+    }
+
+    // 若气数 >= 3，说明逃出重围或者接上了己方大部队，安全！
+    if (grp1.liberties.length >= 3) {
+      return false;
+    }
+
+    // 准则 2：气数恰好为 2。检测是否落入典型边线征子/门吃陷阱：
+    const distEdgeX = Math.min(escapeMove.x, size - 1 - escapeMove.x);
+    const distEdgeY = Math.min(escapeMove.y, size - 1 - escapeMove.y);
+    const line = Math.min(distEdgeX, distEdgeY) + 1;
+
+    if (line <= 2) {
+      for (const lib of grp1.liberties) {
+        const sim2 = GoCore.playMove(sim1.nextState, lib, oppColor);
+        if (!sim2.error) {
+          const nextGrp = GoCore.findGroup(sim2.nextState.grid, escapeMove);
+          if (nextGrp && nextGrp.liberties.length <= 1) {
+            const lastLib = nextGrp.liberties[0];
+            if (lastLib) {
+              const sim3 = GoCore.playMove(sim2.nextState, lastLib, color);
+              if (!sim3.error) {
+                const grp3 = GoCore.findGroup(sim3.nextState.grid, lastLib);
+                if (!grp3 || grp3.liberties.length <= 1) {
+                  return true; // 边线死征子/糖葫芦！
+                }
+              } else {
+                return true;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 准则 3：检查局部敌强我弱比例（3x3 邻域）
+    let oppStonesCount = 0;
+    let myStonesCount = 0;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const nx = escapeMove.x + dx;
+        const ny = escapeMove.y + dy;
+        if (nx >= 0 && nx < size && ny >= 0 && ny < size) {
+          if (state.grid[ny][nx] === oppColor) oppStonesCount++;
+          else if (state.grid[ny][nx] === color) myStonesCount++;
+        }
+      }
+    }
+
+    if (oppStonesCount >= 5 && myStonesCount <= 1 && grp1.liberties.length <= 2) {
+      const oppLegal = this.getFastLegalMoves(sim1.nextState, oppColor);
+      const oppAtaris = grp1.liberties.filter((lib) =>
+        oppLegal.some((m) => GoCore.pointsEqual(m, lib))
+      );
+      if (oppAtaris.length > 0) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * 4. 开阔突围寻路 (getEscapeDirectionScore)
+   * 逃跑与出头优先大跳至中央开阔空旷区域，逃离边线与敌方厚势。
+   */
+  public static getEscapeDirectionScore(
+    state: BoardState,
+    move: Point,
+    color: Color
+  ): number {
+    const oppColor: Color = color === 'black' ? 'white' : 'black';
+    const size = state.size;
+    let score = 0;
+
+    const distEdgeX = Math.min(move.x, size - 1 - move.x);
+    const distEdgeY = Math.min(move.y, size - 1 - move.y);
+    const line = Math.min(distEdgeX, distEdgeY) + 1;
+
+    if (line === 1) {
+      score -= 800;
+    } else if (line === 2) {
+      score -= 300;
+    } else if (line >= 3 && line <= 6) {
+      score += 350;
+    } else {
+      score += 450;
+    }
+
+    let emptyCount = 0;
+    let enemyCount = 0;
+    let friendCount = 0;
+
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const nx = move.x + dx;
+        const ny = move.y + dy;
+        if (nx >= 0 && nx < size && ny >= 0 && ny < size) {
+          const stone = state.grid[ny][nx];
+          if (stone === null) {
+            emptyCount++;
+          } else if (stone === oppColor) {
+            enemyCount++;
+          } else if (stone === color) {
+            friendCount++;
+          }
+        }
+      }
+    }
+
+    score += emptyCount * 30;
+    score -= enemyCount * 60;
+    score += friendCount * 40;
+
+    return score;
   }
 
   /**
    * Helper: Find moves that rescue friendly groups in Atari
    */
-  private static findEscapeAtariMoves(
+  public static findEscapeAtariMoves(
     state: BoardState,
     color: Color,
     legalMoves: Point[]
@@ -2095,6 +2437,212 @@ export class GoAI {
       }
     }
     return list;
+  }
+
+  /**
+   * 局部 4 至 6 步杀气深搜 (Deep Tactical Combat Search)
+   * 聚焦弱棋接触区（气数 <= 3 的所有邻域与切断点），运行微观 Alpha-Beta 对抗搜索。
+   */
+  private static runDeepTacticalCombatSearch(
+    state: BoardState,
+    color: Color,
+    oppColor: Color,
+    legalMoves: Point[],
+    options: AIMoveOptions,
+    maxDepth: number,
+    maxCandidates: number
+  ): Point | null {
+    const validMoves = this.selectCandidateMoves(state, color, legalMoves);
+    if (!validMoves || validMoves.length === 0) return null;
+
+    // 收集战术焦点（气数 <= 3 的所有弱棋周边）
+    const tacticalPoints = new Set<string>();
+    const size = state.size;
+
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const c = state.grid[y][x];
+        if (c !== null) {
+          const grp = GoCore.findGroup(state.grid, { x, y });
+          if (grp && grp.liberties.length <= 3) {
+            for (const lib of grp.liberties) {
+              tacticalPoints.add(`${lib.x},${lib.y}`);
+              for (const n of GoCore.getNeighbors(lib, size)) {
+                tacticalPoints.add(`${n.x},${n.y}`);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 候选着法初筛打分
+    const scoredCandidates = validMoves.map((m) => {
+      let score = this.evaluateDeepTactics(state, m, color, oppColor, options);
+      if (tacticalPoints.has(`${m.x},${m.y}`)) {
+        score += 350;
+      }
+      return { move: m, score };
+    });
+
+    scoredCandidates.sort((a, b) => b.score - a.score);
+    const topCandidates = scoredCandidates.slice(0, maxCandidates).map((c) => c.move);
+
+    let bestMove: Point | null = null;
+    let bestValue = -Infinity;
+    let alpha = -Infinity;
+    const beta = Infinity;
+
+    for (const move of topCandidates) {
+      const sim = GoCore.playMove(state, move, color, options.captureTarget);
+      if (sim.error) continue;
+
+      if (sim.captured.length > 0 && options.captureTarget && sim.nextState.captures[color] >= options.captureTarget) {
+        return move; // 绝杀胜！
+      }
+
+      const val = this.searchTacticsAlphaBeta(
+        sim.nextState,
+        oppColor,
+        color,
+        1,
+        maxDepth,
+        alpha,
+        beta,
+        options
+      );
+
+      if (val > bestValue) {
+        bestValue = val;
+        bestMove = move;
+      }
+      alpha = Math.max(alpha, val);
+    }
+
+    return bestMove;
+  }
+
+  /**
+   * 微观 Alpha-Beta 递归推演
+   */
+  private static searchTacticsAlphaBeta(
+    state: BoardState,
+    turn: Color,
+    aiColor: Color,
+    depth: number,
+    maxDepth: number,
+    alpha: number,
+    beta: number,
+    options: AIMoveOptions
+  ): number {
+    const oppColor: Color = aiColor === 'black' ? 'white' : 'black';
+
+    // 胜负终局检测
+    if (options.captureTarget) {
+      if (state.captures[aiColor] >= options.captureTarget) {
+        return 100000 - depth * 100;
+      }
+      if (state.captures[oppColor] >= options.captureTarget) {
+        return -100000 + depth * 100;
+      }
+    }
+
+    if (depth >= maxDepth) {
+      return this.evaluateTacticalLeaf(state, aiColor, oppColor);
+    }
+
+    const legal = this.getFastLegalMoves(state, turn);
+    const validMoves = this.selectCandidateMoves(state, turn, legal);
+    if (!validMoves || validMoves.length === 0) {
+      return this.evaluateTacticalLeaf(state, aiColor, oppColor);
+    }
+
+    // 剪枝：每层只探索最具战术威胁的 top 3 步（提子、叫吃、反叫吃、逃跑）
+    const caps = this.findImmediateCaptures(state, turn, validMoves);
+    let branchMoves: Point[] = [];
+    if (caps.length > 0) {
+      branchMoves = [this.pickBestCapture(state, caps, turn)];
+    } else {
+      branchMoves = validMoves.slice(0, 3);
+    }
+
+    const nextTurn = turn === 'black' ? 'white' : 'black';
+
+    if (turn === aiColor) {
+      let maxVal = -Infinity;
+      for (const m of branchMoves) {
+        const sim = GoCore.playMove(state, m, turn, options.captureTarget);
+        if (sim.error) continue;
+        const val = this.searchTacticsAlphaBeta(
+          sim.nextState,
+          nextTurn,
+          aiColor,
+          depth + 1,
+          maxDepth,
+          alpha,
+          beta,
+          options
+        );
+        maxVal = Math.max(maxVal, val);
+        alpha = Math.max(alpha, val);
+        if (beta <= alpha) break; // Beta 剪枝
+      }
+      return maxVal === -Infinity ? this.evaluateTacticalLeaf(state, aiColor, oppColor) : maxVal;
+    } else {
+      let minVal = Infinity;
+      for (const m of branchMoves) {
+        const sim = GoCore.playMove(state, m, turn, options.captureTarget);
+        if (sim.error) continue;
+        const val = this.searchTacticsAlphaBeta(
+          sim.nextState,
+          nextTurn,
+          aiColor,
+          depth + 1,
+          maxDepth,
+          alpha,
+          beta,
+          options
+        );
+        minVal = Math.min(minVal, val);
+        beta = Math.min(beta, val);
+        if (beta <= alpha) break; // Alpha 剪枝
+      }
+      return minVal === Infinity ? this.evaluateTacticalLeaf(state, aiColor, oppColor) : minVal;
+    }
+  }
+
+  /**
+   * 静态叶子节点战术评价
+   */
+  private static evaluateTacticalLeaf(state: BoardState, aiColor: Color, oppColor: Color): number {
+    const capDiff = (state.captures[aiColor] - state.captures[oppColor]) * 1000;
+    let libScore = 0;
+    const size = state.size;
+    const visited = new Set<string>();
+
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const c = state.grid[y][x];
+        if (c !== null && !visited.has(`${x},${y}`)) {
+          const grp = GoCore.findGroup(state.grid, { x, y });
+          if (grp) {
+            for (const p of grp.points) visited.add(`${p.x},${p.y}`);
+            const libs = grp.liberties.length;
+            if (c === aiColor) {
+              if (libs === 1) libScore -= grp.points.length * 900;
+              else if (libs === 2) libScore -= 120;
+              else libScore += libs * 30;
+            } else {
+              if (libs === 1) libScore += grp.points.length * 900;
+              else if (libs === 2) libScore += 150;
+              else libScore -= libs * 30;
+            }
+          }
+        }
+      }
+    }
+
+    return capDiff + libScore;
   }
 
   /**
