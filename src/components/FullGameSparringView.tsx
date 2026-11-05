@@ -40,31 +40,31 @@ import {
 const SPARRING_PROFILES: SparringProfile[] = [
   {
     id: 'novice',
-    name: '老鸟',
-    avatar: '🦅',
-    rank: '业余1段 守门名宿',
-    description: '扎实稳健的老手，大局平稳，算气严密，是森森热身开局、巩固赢棋信心的绝佳陪练！',
+    name: '18K 呆萌机',
+    avatar: '🤖',
+    rank: '18K 启蒙小助手',
+    description: '101 围棋经典呆萌机！棋风温和呆萌，专注基础落子与基本死活，冲刺吃子战信心的第一站！',
   },
   {
     id: 'club',
-    name: '战灵狐',
-    avatar: '🦊',
-    rank: '业余2-3段 中盘刺客',
-    description: '中盘肉搏极度凶狠！专咬大龙断点、敏锐猎杀孤子与制造反击，是孩子目前最关键的突破对手！',
+    name: '17K 巡逻机',
+    avatar: '🚁',
+    rank: '17K 巡逻侦察兵',
+    description: '101 围棋天梯巡逻兵！对局注重地盘边界与近身缠斗，会主动发起叫吃，考验你的防守专注度！',
   },
   {
     id: 'master',
-    name: '麒麟',
-    avatar: '🦄',
-    rank: '业余4段 大局宗师',
-    description: '金角银边、大局厚重！搭载神经网络策略先验，官子极度精细，冲刺国家二级前的关键硬仗！',
+    name: '16K 哨兵机',
+    avatar: '🛡️',
+    rank: '16K 防线铁哨兵',
+    description: '101 围棋硬核铁哨兵！棋形扎实、算气严密，绝不轻易弃守大龙，是突破级位硬战的实战试金石！',
   },
   {
     id: 'grandmaster',
-    name: '龙尊',
-    avatar: '🐲',
-    rank: '业余5段 国家二级神脑',
-    description: '国家二级水准终极大魔王！深度卷积神经网络矩阵推演，建议开启让 4 至 6 子进行大师指导棋！',
+    name: '15K 冲锋机',
+    avatar: '⚔️',
+    rank: '15K 锐利冲锋官',
+    description: '101 围棋冲段先锋！KataGo Human-SL 神经网络直觉，短兵相接杀气凶悍，大龙绝境死守！',
   },
 ];
 
@@ -218,7 +218,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
       if (handicap > 0) {
         const msg =
           lvl === 'grandmaster'
-            ? `吾乃龙尊！今日为你授业让 ${handicap} 子，若能守住大局不被我突破，便算你赢！🐲`
+            ? `我是 15K 冲锋机！今日为你开启让 ${handicap} 子冲段挑战，看你如何守住优势～⚔️`
             : `让 ${handicap} 子对弈！黑棋稳固占领星位，看白棋如何突围～`;
         setAiDialogue(msg);
         SoundEngine.speakText(msg);
@@ -241,12 +241,12 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
       } else if (rule === 'capture') {
         const msg =
           lvl === 'grandmaster'
-            ? '吾乃龙尊！吃子决战与虚实腾挪双绝，先吃满 5 颗子获胜，拿出全部实力吧！🐲'
+            ? '我是 15K 冲锋机！短兵相接吃子决战，先吃满 5 颗子获胜，拿出全部实力吧！⚔️'
             : lvl === 'master'
-            ? '吾乃踏浪麒麟！攻防兼备，先吃满 5 颗子获胜，看看你的敏锐战术！🦄'
+            ? '我是 16K 哨兵机！防线坚固算气严密，先吃满 5 颗子获胜，看看你的敏锐战术！🛡️'
             : lvl === 'club'
-            ? '吾乃战灵狐！中盘刺客盯紧断点，先吃满 5 颗子获胜，绝不手软！🦊'
-            : `我是老鸟！本盘规则：先吃满 ${target} 颗棋子获胜！看看谁的手法更敏锐～🦅`;
+            ? '我是 17K 巡逻机！巡逻侦察盯紧断点，先吃满 5 颗子获胜，绝不手软！🚁'
+            : `我是 18K 呆萌机！本盘规则：先吃满 ${target} 颗棋子获胜！看看谁的手法更敏锐～🤖`;
         setAiDialogue(msg);
         SoundEngine.speakText(msg);
         if (pColor === 'white') {
@@ -258,12 +258,12 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
       } else {
         const msg =
           lvl === 'grandmaster'
-            ? '吾乃龙尊！国家二级神级大脑！若觉得压力大可随时开启让 4 至 6 子指导棋！🐲'
+            ? '我是 15K 冲锋机！搭载 KataGo 直觉网络，来一场全盘高水准对弈！⚔️'
             : lvl === 'master'
-            ? '吾乃踏浪麒麟！金角银边、大局厚重，来一场堂堂正正的 4 段点目对决！🦄'
+            ? '我是 16K 哨兵机！金角银边、大局扎实，来一场堂堂正正的对决！🛡️'
             : lvl === 'club'
-            ? '吾乃战灵狐！中盘肉搏刺客，小心你的大龙断点被我分断哦！🦊'
-            : '我是老鸟！棋局大势平稳，金角银边，占领更多地盘就能赢！🦅';
+            ? '我是 17K 巡逻机！巡逻侦察，小心你的棋子断点被我分断哦！🚁'
+            : '我是 18K 呆萌机！棋局大势平稳，金角银边，占领更多地盘就能赢！🤖';
         setAiDialogue(msg);
         SoundEngine.speakText(msg);
         if (pColor === 'white') {
@@ -283,10 +283,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
       SoundEngine.playStoneSound();
       setAiLevel(level);
       const profile = SPARRING_PROFILES.find((p) => p.id === level) || SPARRING_PROFILES[0];
-      const isGrandmaster = level === 'grandmaster';
-      const msg = isGrandmaster
-        ? '吾乃龙尊！国家二级神脑！若觉得压力大可随时开启让 4 至 6 子指导棋，拿出全部实力吧！🐲'
-        : `【${profile.name}】(${profile.rank.split(' ')[0]}) 已就位，请落子！`;
+      const msg = `【${profile.name}】(${profile.rank.split(' ')[0]}) 已就位，请落子！`;
       setAiDialogue(msg);
       SoundEngine.speakText(msg);
       startNewGame(boardSize, playerColor, level, winRule, captureTarget, handicapCount);

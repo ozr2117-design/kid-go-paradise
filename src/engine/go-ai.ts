@@ -1,8 +1,9 @@
 import { BoardSize, BoardState, Color, Point } from '../types/go';
 import { GoCore } from './go-core';
+import { KataGoONNXEngine, RobotTier } from './neural/katago-onnx-engine';
 
 export type AIDifficulty = 'beginner' | 'intermediate' | 'advanced' | 'master' | 'grandmaster';
-export type AISparringLevel = 'novice' | 'club' | 'master' | 'grandmaster';
+export type AISparringLevel = '18k' | '17k' | '16k' | '15k' | 'novice' | 'club' | 'master' | 'grandmaster';
 
 export interface AIMoveOptions {
   difficulty?: AIDifficulty;
@@ -48,6 +49,9 @@ export class GoAI {
   /**
    * Main Entry: Choose best move based on mode (Capture Battle vs Full Game Sparring)
    */
+  /**
+   * Main Entry: Choose best move based on mode (Capture Battle vs Full Game Sparring)
+   */
   static getBestMove(
     state: BoardState,
     color: Color = state.turn,
@@ -76,6 +80,40 @@ export class GoAI {
   }
 
   /**
+   * Asynchronous Entry: Runs 1-Pass KataGo Human-SL ONNX inference directly,
+   * with seamless fallback to synchronous tactical routing if model is loading.
+   */
+  static async getBestMoveAsync(
+    state: BoardState,
+    color: Color = state.turn,
+    options: AIMoveOptions = { difficulty: 'beginner' }
+  ): Promise<Point | null> {
+    if (state.isGameOver) return null;
+
+    try {
+      const tier: RobotTier =
+        options.sparringLevel === '15k' || options.sparringLevel === 'grandmaster'
+          ? '15k'
+          : options.sparringLevel === '16k' || options.sparringLevel === 'master'
+          ? '16k'
+          : options.sparringLevel === '17k' || options.sparringLevel === 'club'
+          ? '17k'
+          : '18k';
+
+      const engine = KataGoONNXEngine.getInstance();
+      const res = await engine.predict(state, color, tier);
+      if (res.bestMove) {
+        return res.bestMove;
+      }
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('[GoAI.getBestMoveAsync] ONNX inference fallback:', e);
+    }
+
+    return this.getBestMove(state, color, options);
+  }
+
+  /**
    * ==========================================
    * CAPTURE BATTLE TACTICAL ENGINE
    * ==========================================
@@ -93,10 +131,14 @@ export class GoAI {
     // through to the default dragon tier (the strongest), making them as strong
     // as 龙尊 and collapsing the whole difficulty ladder.
     const sparringToDifficulty: Record<AISparringLevel, AIDifficulty> = {
-      novice: 'advanced',        // 老鸟 业1 → 狐 (5K~1D, "真正老鸟" per design)
-      club: 'master',            // 战灵狐 业2-3 → 鹰 (1D~2D)
-      master: 'grandmaster',     // 麒麟 业4 → 龙 (3D~5D)
-      grandmaster: 'grandmaster', // 龙尊 业5 → 龙 (3D~5D)
+      '18k': 'beginner',          // 18K 呆萌机
+      '17k': 'intermediate',      // 17K 巡逻机
+      '16k': 'advanced',          // 16K 哨兵机
+      '15k': 'master',            // 15K 冲锋机
+      novice: 'beginner',         // 兼容旧 ID 18K 呆萌机
+      club: 'intermediate',       // 兼容旧 ID 17K 巡逻机
+      master: 'advanced',         // 兼容旧 ID 16K 哨兵机
+      grandmaster: 'master',      // 兼容旧 ID 15K 冲锋机
     };
     const diff =
       options.difficulty ||
@@ -559,22 +601,28 @@ export class GoAI {
   ): Point | null {
     const size = state.size;
     const isGrandmaster =
-      options.difficulty === 'grandmaster' || options.sparringLevel === 'grandmaster';
+      options.difficulty === 'grandmaster' ||
+      options.sparringLevel === 'grandmaster' ||
+      options.sparringLevel === '15k';
 
     let chosen: Point | null = null;
 
-    // 1. 🐲 极·龙尊 (Dragon Sovereign - 业余 5 段 / 国家二级水准: Full Neural Policy Priors + Deep MCTS + Anti-Surrender)
+    // 1. ⚔️ 15K 冲锋机 (15K 冲段先锋 / Grandmaster: KataGo Human-SL 策略先验 + 战术直觉)
     if (isGrandmaster) {
       chosen = this.getDragonSovereignFullGameMove(state, color, opponentColor, legalMoves, options);
-    } else if (options.sparringLevel === 'master') {
-      // 2. 🦄 踏浪麒麟 (Kylin - 业余 4 段 · 大局宗师: High-budget MCTS + Neural Policy Guidance)
+    } else if (options.sparringLevel === 'master' || options.sparringLevel === '16k') {
+      // 2. 🛡️ 16K 哨兵机 (16K 防线铁哨兵 / Master: 神经网络策略引导 + 扎实防守)
       chosen = this.getKylinFullGameMove(state, color, opponentColor, legalMoves, options);
-    } else if (options.sparringLevel === 'club' || options.difficulty === 'intermediate') {
-      // 3. 🦊 战灵狐 (War Fox - 业余 2 至 3 段 · 中盘刺客: Tactical Cutting & Atari Pressure + Focused MCTS)
+    } else if (
+      options.sparringLevel === 'club' ||
+      options.sparringLevel === '17k' ||
+      options.difficulty === 'intermediate'
+    ) {
+      // 3. 🚁 17K 巡逻机 (17K 巡逻侦察兵 / Club: 敏锐盯紧断点 + 贴身缠斗)
       chosen = this.getWarFoxFullGameMove(state, color, opponentColor, legalMoves, options);
     } else {
-      // 4. 🦅 老鸟 (Old Bird - 业余 1 段 · 守门名宿: Standard MCTS, the child's confident 80%+ win rate anchor)
-      const mctsIterations = size === 9 ? 450 : size === 13 ? 280 : 140;
+      // 4. 🤖 18K 呆萌机 (18K 启蒙小助手 / Novice: 稳健启蒙陪练)
+      const mctsIterations = size === 9 ? 350 : size === 13 ? 200 : 100;
       chosen = this.runMCTS(state, color, opponentColor, legalMoves, mctsIterations, options);
     }
 
@@ -2430,10 +2478,9 @@ export class GoAI {
     const grp1 = GoCore.findGroup(sim1.nextState.grid, escapeMove);
     if (!grp1) return true;
 
-    // 准则 1：逃完后依然 <= 1 气（自杀性逃跑）
-    // 但若该块已是 3 子以上重块，不逃直接被提立遭重创，绝不能弃子放弃抵抗
-    if (grp1.liberties.length <= 1) {
-      return true;
+    // 围棋铁律：凡是 3 子及以上的大块/大龙，绝境中必须全力自救出头，严禁因逃后暂为 1 气而将整条大龙白送给对手！
+    if (grp1.points.length >= 3) {
+      return false;
     }
 
     // 若气数 >= 3，说明逃出重围或者接上了己方大部队，安全！
@@ -2441,57 +2488,13 @@ export class GoAI {
       return false;
     }
 
-    // 准则 2：气数恰好为 2 且已是 3 子以上重块（防送大串糖葫芦）。检测是否落入典型边线死征子陷阱：
+    // 2. 仅对 1 至 2 颗孤卒的一路死爬进行剪枝：在边线一线且逃完后依然 <= 1 气
     const distEdgeX = Math.min(escapeMove.x, size - 1 - escapeMove.x);
     const distEdgeY = Math.min(escapeMove.y, size - 1 - escapeMove.y);
     const line = Math.min(distEdgeX, distEdgeY) + 1;
 
-    if (line <= 2) {
-      for (const lib of grp1.liberties) {
-        const sim2 = GoCore.playMove(sim1.nextState, lib, oppColor);
-        if (!sim2.error) {
-          const nextGrp = GoCore.findGroup(sim2.nextState.grid, escapeMove);
-          if (nextGrp && nextGrp.liberties.length <= 1) {
-            const lastLib = nextGrp.liberties[0];
-            if (lastLib) {
-              const sim3 = GoCore.playMove(sim2.nextState, lastLib, color);
-              if (!sim3.error) {
-                const grp3 = GoCore.findGroup(sim3.nextState.grid, lastLib);
-                if (!grp3 || grp3.liberties.length <= 1) {
-                  return true; // 边线死征子/糖葫芦！
-                }
-              } else {
-                return true;
-              }
-            }
-          }
-        }
-      }
-    }
-
-    // 准则 3：检查局部敌强我弱比例（3x3 邻域）
-    let oppStonesCount = 0;
-    let myStonesCount = 0;
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        if (dx === 0 && dy === 0) continue;
-        const nx = escapeMove.x + dx;
-        const ny = escapeMove.y + dy;
-        if (nx >= 0 && nx < size && ny >= 0 && ny < size) {
-          if (state.grid[ny][nx] === oppColor) oppStonesCount++;
-          else if (state.grid[ny][nx] === color) myStonesCount++;
-        }
-      }
-    }
-
-    if (oppStonesCount >= 5 && myStonesCount <= 1 && grp1.liberties.length <= 2) {
-      const oppLegal = this.getFastLegalMoves(sim1.nextState, oppColor);
-      const oppAtaris = grp1.liberties.filter((lib) =>
-        oppLegal.some((m) => GoCore.pointsEqual(m, lib))
-      );
-      if (oppAtaris.length > 0) {
-        return true;
-      }
+    if (line === 1 && grp1.liberties.length <= 1) {
+      return true;
     }
 
     return false;

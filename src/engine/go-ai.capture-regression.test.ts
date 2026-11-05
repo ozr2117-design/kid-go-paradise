@@ -31,10 +31,14 @@ describe('GoAI capture-mode regression (v9.4)', () => {
     // 难度映射回归（v9.4 修复的 bug）：sparringLevel 必须被显式翻译成合法难度，
     // 而不是 as AIDifficulty 硬转后落到 default（= 最强龙档）。
     const mapping: Record<string, string> = {
-      novice: 'advanced',        // 老鸟 → 狐
-      club: 'master',            // 战灵狐 → 鹰
-      master: 'grandmaster',     // 麒麟 → 龙
-      grandmaster: 'grandmaster', // 龙尊 → 龙
+      '18k': 'beginner',          // 18K 呆萌机
+      '17k': 'intermediate',      // 17K 巡逻机
+      '16k': 'advanced',          // 16K 哨兵机
+      '15k': 'master',            // 15K 冲锋机
+      novice: 'beginner',         // 18K 呆萌机
+      club: 'intermediate',       // 17K 巡逻机
+      master: 'advanced',         // 16K 哨兵机
+      grandmaster: 'master',      // 15K 冲锋机
     };
 
     const buildBoard = (variant: number) => {
