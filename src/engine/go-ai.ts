@@ -130,7 +130,7 @@ export class GoAI {
     // AIDifficulty values — so previously novice (老鸟) and club (战灵狐) fell
     // through to the default dragon tier (the strongest), making them as strong
     // as 龙尊 and collapsing the whole difficulty ladder.
-    const sparringToDifficulty: Record<AISparringLevel, AIDifficulty> = {
+        const sparringToDifficulty: Record<AISparringLevel, AIDifficulty> = {
       '18k': 'beginner',          // 18K 呆萌机
       '17k': 'intermediate',      // 17K 巡逻机
       '16k': 'advanced',          // 16K 哨兵机
@@ -284,6 +284,12 @@ export class GoAI {
       return viableRescues[0];
     }
 
+    // 3.5 紧急自救：大龙（>= 2子）仅剩 2 气生死存亡绝境！必须立即延气
+    const urgentEagleRescues = this.findUrgentTwoLibertyRescueMoves(state, color, legalMoves);
+    if (urgentEagleRescues.length > 0) {
+      return urgentEagleRescues[0];
+    }
+
     // 4. 若无法逃跑（死征子）或单子被叫吃，执行反叫吃以攻代守
     if (counterAtaris.length > 0) {
       const safeCounter = this.pickSafePoint(state, color, counterAtaris);
@@ -350,6 +356,12 @@ export class GoAI {
         (a, b) => this.getEscapeDirectionScore(state, b, color) - this.getEscapeDirectionScore(state, a, color)
       );
       return viableRescues[0];
+    }
+
+    // 3.5 紧急自救：大龙（>= 2子）仅剩 2 气生死存亡绝境！必须立即延气
+    const urgentTwoLibRescues = this.findUrgentTwoLibertyRescueMoves(state, color, legalMoves);
+    if (urgentTwoLibRescues.length > 0) {
+      return urgentTwoLibRescues[0];
     }
 
     // 4. 若无法逃跑（死征子）或单子被叫吃，执行反叫吃以攻代守
@@ -1323,6 +1335,12 @@ export class GoAI {
       return captures[0];
     }
 
+    // 1.5 紧急自救：2 气多子大龙绝境抢救
+    const urgentKylinRescues = this.findUrgentTwoLibertyRescueMoves(state, color, legalMoves);
+    if (urgentKylinRescues.length > 0) {
+      return urgentKylinRescues[0];
+    }
+
     // 2. Opening book priority on empty or early board
     const moveNumber = state.moveHistory.length;
     const hasEmergency = this.hasUrgentAtari(state, color, oppColor);
@@ -1451,6 +1469,12 @@ export class GoAI {
       if (capCount >= 2) {
         return bestCap;
       }
+    }
+
+    // 1.5 紧急自救：2 气多子大龙绝境抢救
+    const urgentFullGameRescues = this.findUrgentTwoLibertyRescueMoves(state, color, legalMoves);
+    if (urgentFullGameRescues.length > 0) {
+      return urgentFullGameRescues[0];
     }
 
     // 2. Opening variety: In the opening phase, pick from top high-macro moves
@@ -2588,6 +2612,66 @@ export class GoAI {
       }
     }
     return list;
+  }
+
+  /**
+   * 紧急自救：挽救只有 2 气的己方多子大龙（>= 2 子，尤其是 >= 3 子的核心棋块）
+   * 当大龙仅剩 2 气时，处于极度危险的准叫吃状态。若不长气，对方下一手紧气叫吃必死。
+   */
+  public static findUrgentTwoLibertyRescueMoves(
+    state: BoardState,
+    color: Color,
+    legalMoves: Point[]
+  ): Point[] {
+    const list: { move: Point; groupSize: number; newLiberties: number }[] = [];
+    const size = state.size;
+    const checked = new Set<string>();
+
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        if (state.grid[y][x] === color) {
+          const key = `${x},${y}`;
+          if (checked.has(key)) continue;
+          const group = GoCore.findGroup(state.grid, { x, y });
+          if (!group) continue;
+          for (const p of group.points) {
+            checked.add(`${p.x},${p.y}`);
+          }
+
+          // 仅关注 >= 2 子且 liberties === 2 的危险大龙/棋块
+          if (group.points.length >= 2 && group.liberties.length === 2) {
+            for (const lib of group.liberties) {
+              if (legalMoves.some((m) => GoCore.pointsEqual(m, lib))) {
+                const sim = GoCore.playMove(state, lib, color);
+                if (!sim.error) {
+                  const newGrp = GoCore.findGroup(sim.nextState.grid, lib);
+                  if (newGrp && (newGrp.liberties.length >= 3 || sim.captured.length > 0)) {
+                    list.push({
+                      move: lib,
+                      groupSize: group.points.length,
+                      newLiberties: newGrp.liberties.length,
+                    });
+                  } else if (newGrp && newGrp.liberties.length === 2 && sim.captured.length === 0) {
+                    list.push({
+                      move: lib,
+                      groupSize: group.points.length,
+                      newLiberties: 2,
+                    });
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    list.sort((a, b) => {
+      if (b.groupSize !== a.groupSize) return b.groupSize - a.groupSize;
+      return b.newLiberties - a.newLiberties;
+    });
+
+    return list.map((item) => item.move);
   }
 
   /**

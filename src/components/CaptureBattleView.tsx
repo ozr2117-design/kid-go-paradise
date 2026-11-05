@@ -106,15 +106,16 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
 
   useEffect(() => {
     if (boardState.turn === 'white' && !boardState.isGameOver) {
-      const timer = setTimeout(() => {
+      const timer = setTimeout(async () => {
         const current = stateRef.current;
         if (current.turn !== 'white' || current.isGameOver) {
           setIsAiThinking(false);
           return;
         }
 
-        const aiMove = GoAI.getBestMove(current, 'white', {
+        const aiMove = await GoAI.getBestMoveAsync(current, 'white', {
           difficulty: selectedAnimal.difficulty,
+          sparringLevel: (selectedAnimal.id.replace('robot-', '') as any),
           captureTarget: effectiveTarget,
         });
 

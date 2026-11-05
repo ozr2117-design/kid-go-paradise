@@ -66,7 +66,7 @@ export const ROBOT_OPPONENTS: AnimalOpponent[] = [
     name: '15K 冲锋机',
     avatar: '⚔️',
     rank: '15K 锐利冲锋官',
-    difficulty: 'master',
+    difficulty: 'grandmaster',
     boardSize: 13,
     captureTarget: 15, // 13路先吃15子获胜
     intro: '轰鸣！我是 15K 冲锋机！KataGo 神经网络直觉加持，短兵相接杀气凶悍！先吃满 15 颗子获胜！',

@@ -219,7 +219,11 @@ export class KataGoONNXEngine {
             if (grp && grp.liberties.length === 1) {
               // Vital rescue move! Scale bonus by dragon size
               const groupSize = grp.points.length;
-              logit += 25.0 + Math.min(50.0, groupSize * 4.0);
+              logit += 35.0 + Math.min(60.0, groupSize * 5.0);
+            } else if (grp && grp.liberties.length === 2 && grp.points.length >= 2) {
+              // Urgent 2-liberty dragon defense! If we don't extend, opponent will atari and kill
+              const groupSize = grp.points.length;
+              logit += 20.0 + Math.min(50.0, groupSize * 4.0);
             }
           }
         }

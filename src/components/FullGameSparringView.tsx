@@ -520,7 +520,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
   useEffect(() => {
     if (boardState.turn === aiColor && !boardState.isGameOver && !isReviewMode) {
       setIsAiThinking(true);
-      const timer = setTimeout(() => {
+      const timer = setTimeout(async () => {
         const current = stateRef.current;
         if (current.turn !== aiColor || current.isGameOver) {
           setIsAiThinking(false);
@@ -531,7 +531,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
         // 避免「吃满 N 子提前终局」——限时模式胜负只看时间到时的吃子数。
         const playTarget = winRule === 'capture' ? captureTarget : undefined;
         const aiTarget = winRule === 'capture' || winRule === 'timed-capture' ? captureTarget : undefined;
-        const aiMove = GoAI.getBestMove(current, aiColor, {
+        const aiMove = await GoAI.getBestMoveAsync(current, aiColor, {
           sparringLevel: aiLevel,
           captureTarget: aiTarget,
           isFullGame: winRule === 'territory',
