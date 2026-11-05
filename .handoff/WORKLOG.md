@@ -56,3 +56,8 @@
   - 新增 `src/engine/go-ai.wolf-tactics.test.ts` 5 个专项测试全部一次性通过；
   - `src/engine/go-ai.capture-regression.test.ts` 10 项回归测试全部通过，阶梯单调性确立；
   - `npm run build` 0 报错打包完成，Service Worker 缓存递增至 `weiqi-kids-offline-v9.21`。
+
+## 2026-11-05 08:24:00 (v9.21 生产发布核验与复盘归档)
+- **线上发布**：代码 commit `97b642c` 成功 push 至 GitHub master 分支，触发 Cloudflare Pages 自动编译部署。
+- **生产验证**：通过 `curl.exe -x http://127.0.0.1:7890` 实测抓取生产环境 `https://weiqi-kids.pages.dev/` 及 `sw.js`，确认 `v9.21` 与 Service Worker 缓存已全量生效。
+- **云端棋谱**：调取 D1 数据库，确认 11-04 孩子实战棋谱秒级完整入库，归档复盘经验并更新交接状态。
