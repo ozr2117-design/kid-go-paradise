@@ -1,7 +1,7 @@
 # 全局交接状态档案 (STATE.md)
-*更新时间：2026-11-05 08:24:00 (UTC+8)*
+*更新时间：2026-11-05 10:45:00 (UTC+8)*
 *项目：森森围棋基地 (kid-go-paradise)*
-*当前版本：v9.21 (已全量部署至生产线)*
+*当前版本：v9.22 (吃子战术深搜剪枝优化与开局近战闭环)*
 *线上服务：https://weiqi-kids.pages.dev/ (生产实测确认为 v9.21)*
 *棋谱接口：https://weiqi-kids.pages.dev/api/record (同源直通，三通道高可用)*
 *Git 仓库：https://github.com/ozr2117-design/kid-go-paradise.git (branch: master)*
