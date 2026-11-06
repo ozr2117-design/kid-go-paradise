@@ -101,41 +101,29 @@ export const KidNavbar: React.FC<KidNavbarProps> = ({
       {/* Mode navigation pills */}
       <nav className="flex items-center gap-1.5 bg-amber-600/40 p-1 rounded-2xl border border-amber-400/40">
         <button
-          onClick={() => onSelectMode('adventure')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-sm transition-all ${
-            currentMode === 'adventure' || currentMode === 'puzzle'
-              ? 'bg-yellow-400 text-amber-950 shadow-md scale-105'
-              : 'hover:bg-amber-500/50 text-amber-100'
-          }`}
-          title="冒险闯关模式（包含关卡地图与做题挑战）"
-        >
-          <Map className="w-4 h-4" />
-          <span>冒险闯关</span>
-        </button>
-
-        <button
           onClick={() => onSelectMode('daily')}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-sm transition-all ${
             currentMode === 'daily'
               ? 'bg-yellow-400 text-amber-950 shadow-md scale-105'
               : 'hover:bg-amber-500/50 text-amber-100'
           }`}
-          title="每日15题死活特训打卡"
+          title="每日15题 101考级真题特训打卡"
         >
           <Sparkles className="w-4 h-4 text-yellow-300 fill-yellow-300" />
           <span>每日打卡⭐</span>
         </button>
 
         <button
-          onClick={() => onSelectMode('battle')}
+          onClick={() => onSelectMode('adventure')}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-sm transition-all ${
-            currentMode === 'battle'
+            currentMode === 'adventure' || currentMode === 'puzzle'
               ? 'bg-yellow-400 text-amber-950 shadow-md scale-105'
               : 'hover:bg-amber-500/50 text-amber-100'
           }`}
+          title="101 吃子考级手筋宝典（八大专题闯关）"
         >
-          <Swords className="w-4 h-4" />
-          <span>萌宠吃子战</span>
+          <Map className="w-4 h-4" />
+          <span>101考级宝典</span>
         </button>
 
         <button
@@ -145,6 +133,7 @@ export const KidNavbar: React.FC<KidNavbarProps> = ({
               ? 'bg-yellow-400 text-amber-950 shadow-md scale-105'
               : 'hover:bg-amber-500/50 text-amber-100'
           }`}
+          title="101 围棋网公开赛实战同款（18K至15K正规点目对弈）"
         >
           <Bot className="w-4 h-4" />
           <span>AI全盘对弈</span>
@@ -157,9 +146,10 @@ export const KidNavbar: React.FC<KidNavbarProps> = ({
               ? 'bg-yellow-400 text-amber-950 shadow-md scale-105'
               : 'hover:bg-amber-500/50 text-amber-100'
           }`}
+          title="自由摆盘复盘沙盒"
         >
           <Grid className="w-4 h-4" />
-          <span>自由棋盘</span>
+          <span>自由沙盒</span>
         </button>
       </nav>
 

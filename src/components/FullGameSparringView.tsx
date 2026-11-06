@@ -77,10 +77,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
   const [boardSize, setBoardSize] = useState<BoardSize>(13);
   const [playerColor, setPlayerColor] = useState<Color>('black');
   const [aiLevel, setAiLevel] = useState<AISparringLevel>('novice');
-  const [winRule, setWinRule] = useState<WinRuleMode>('capture'); // Default to Kid-Friendly Capture Race!
-  const [captureTarget, setCaptureTarget] = useState<number>(5); // Default: First to capture 5 stones wins!
-  const [timedMinutes, setTimedMinutes] = useState<number>(15); // 限时吃子：整局包干时长（分钟）
-  const [timedSecondsLeft, setTimedSecondsLeft] = useState<number>(15 * 60); // 包干剩余秒数
+  const winRule: WinRuleMode = 'territory'; // 纯正 101 公开赛点目制：围地盘数子决胜
   const [handicapCount, setHandicapCount] = useState<number>(0); // 0 = even game (分先), 2, 3, 4, 9 stones
   const [showTerritoryHeatmap, setShowTerritoryHeatmap] = useState<boolean>(false); // 势力地图 / 看地盘视界
 
@@ -92,8 +89,6 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
   const [statusMessage, setStatusMessage] = useState<string>('请在棋盘上落子开始！');
   const [settlementData, setSettlementData] = useState<GameSettlementData | null>(null);
   const [isSettlementOpen, setIsSettlementOpen] = useState<boolean>(false);
-  const [isTargetModalOpen, setIsTargetModalOpen] = useState<boolean>(false);
-  const [customTargetInput, setCustomTargetInput] = useState<string>('5');
 
   // Interactive Replay & Review Mode (建议 3)
   const [isReviewMode, setIsReviewMode] = useState<boolean>(false);
@@ -162,14 +157,12 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
     return b;
   }, [isReviewMode, boardState, boardSize, reviewStep, handicapCount]);
 
-  // Start fresh game
+  // Start fresh game (纯正 101 公开赛标准数子点目对弈)
   const startNewGame = useCallback(
     (
       sz: BoardSize = boardSize,
       pColor: Color = playerColor,
       lvl: AISparringLevel = aiLevel,
-      rule: WinRuleMode = winRule,
-      target: number = captureTarget,
       handicap: number = handicapCount
     ) => {
       // 📝 中途退出也上传棋谱：孩子没下完就重开/换对手，棋谱同样要记录，方便 AI 分析棋路。
@@ -181,7 +174,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           timestamp: Date.now(),
           boardSize,
-          winRule,
+          winRule: 'territory',
           opponent: activeProfile.name,
           aiLevel,
           playerColor,
@@ -198,8 +191,6 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
       setBoardSize(sz);
       setPlayerColor(pColor);
       setAiLevel(lvl);
-      setWinRule(rule);
-      setCaptureTarget(target);
       setHandicapCount(handicap);
 
       const initialBoard = handicap > 0 ? GoCore.createHandicapBoard(sz, handicap) : GoCore.createEmptyBoard(sz);
@@ -210,7 +201,6 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
       setIsReviewMode(false);
       setReviewStep(0);
       setTimeLeft(30);
-      setTimedSecondsLeft(timedMinutes * 60);
       setUndosRemaining(MAX_UNDOS_PER_GAME);
       setCanUndoTurn(false);
       setPlayerAttemptedPass(false);
@@ -228,42 +218,15 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
         } else {
           setStatusMessage('让子已就位，轮到白棋先行，请落子！');
         }
-      } else if (rule === 'timed-capture') {
-        const msg = `限时吃子大作战！整局 ${timedMinutes} 分钟，时间到谁吃得多谁赢，抓紧提子吧！⏱️`;
-        setAiDialogue(msg);
-        SoundEngine.speakText(msg);
-        if (pColor === 'white') {
-          setStatusMessage('你执白后行，AI 正在思考第一手开局...');
-          setIsAiThinking(true);
-        } else {
-          setStatusMessage('你执黑先行，请占角开局！');
-        }
-      } else if (rule === 'capture') {
-        const msg =
-          lvl === 'grandmaster'
-            ? '我是 15K 冲锋机！短兵相接吃子决战，先吃满 5 颗子获胜，拿出全部实力吧！⚔️'
-            : lvl === 'master'
-            ? '我是 16K 哨兵机！防线坚固算气严密，先吃满 5 颗子获胜，看看你的敏锐战术！🛡️'
-            : lvl === 'club'
-            ? '我是 17K 巡逻机！巡逻侦察盯紧断点，先吃满 5 颗子获胜，绝不手软！🚁'
-            : `我是 18K 呆萌机！本盘规则：先吃满 ${target} 颗棋子获胜！看看谁的手法更敏锐～🤖`;
-        setAiDialogue(msg);
-        SoundEngine.speakText(msg);
-        if (pColor === 'white') {
-          setStatusMessage('你执白后行，AI 正在思考第一手开局...');
-          setIsAiThinking(true);
-        } else {
-          setStatusMessage('你执黑先行，请占角开局！');
-        }
       } else {
         const msg =
           lvl === 'grandmaster'
-            ? '我是 15K 冲锋机！搭载 KataGo 直觉网络，来一场全盘高水准对弈！⚔️'
+            ? '我是 15K 冲锋机！搭载 KataGo 大局直觉与点三三破空，来一场 101 高水准点目实战！⚔️'
             : lvl === 'master'
-            ? '我是 16K 哨兵机！金角银边、大局扎实，来一场堂堂正正的对决！🛡️'
+            ? '我是 16K 哨兵机！金角银边、棋形严密，来一场堂堂正正的正规点目对决！🛡️'
             : lvl === 'club'
-            ? '我是 17K 巡逻机！巡逻侦察，小心你的棋子断点被我分断哦！🚁'
-            : '我是 18K 呆萌机！棋局大势平稳，金角银边，占领更多地盘就能赢！🤖';
+            ? '我是 17K 巡逻机！巡逻侦察，争夺地盘，小心你的薄弱连接哦！🚁'
+            : '我是 18K 呆萌机！金角银边、稳健做活，占领更多实地就能获胜！🤖';
         setAiDialogue(msg);
         SoundEngine.speakText(msg);
         if (pColor === 'white') {
@@ -274,7 +237,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
         }
       }
     },
-    [boardSize, playerColor, aiLevel, winRule, captureTarget, handicapCount, timedMinutes, boardState, activeProfile.name]
+    [boardSize, playerColor, aiLevel, handicapCount, boardState, activeProfile.name]
   );
 
   // Directly switch AI Opponent level with immediate voice and audio feedback
@@ -286,9 +249,9 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
       const msg = `【${profile.name}】(${profile.rank.split(' ')[0]}) 已就位，请落子！`;
       setAiDialogue(msg);
       SoundEngine.speakText(msg);
-      startNewGame(boardSize, playerColor, level, winRule, captureTarget, handicapCount);
+      startNewGame(boardSize, playerColor, level, handicapCount);
     },
-    [boardSize, playerColor, winRule, captureTarget, handicapCount, startNewGame]
+    [boardSize, playerColor, handicapCount, startNewGame]
   );
 
   // Handle Restart with Double-Insurance Guard (防手滑误触)
@@ -320,54 +283,8 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
 
       if (manualWinner) {
         winner = manualWinner;
-      } else if (winRule === 'capture') {
-        if (playerCaptures >= captureTarget) {
-          winner = 'player';
-          finalReason = `🎯 率先吃满 ${captureTarget} 颗棋子，达成绝杀！`;
-          titleBadge = captureTarget >= 10 ? '屠龙小神将' : '吃子小神童';
-          stars = 3;
-        } else if (aiCaptures >= captureTarget) {
-          winner = 'ai';
-          finalReason = `${activeProfile.name} 率先吃满了 ${captureTarget} 颗棋子。`;
-          titleBadge = '百折不挠小健将';
-          stars = 1;
-        } else if (playerCaptures > aiCaptures) {
-          // 双方都无棋可下（棋盘下满）而没吃满目标时，按吃子数判——吃子赛吃多者胜
-          winner = 'player';
-          finalReason = `棋盘下满啦！你以 ${playerCaptures} : ${aiCaptures} 的吃子数获胜！`;
-          titleBadge = '吃子小神童';
-          stars = 3;
-        } else if (aiCaptures > playerCaptures) {
-          winner = 'ai';
-          finalReason = `棋盘下满啦！${activeProfile.name} 以 ${aiCaptures} : ${playerCaptures} 的吃子数获胜。`;
-          titleBadge = '百折不挠小健将';
-          stars = 1;
-        } else {
-          winner = 'draw';
-          finalReason = `棋盘下满啦！双方吃子数 ${playerCaptures} : ${aiCaptures} 打平，握手言和！`;
-          titleBadge = '棋逢对手小君子';
-          stars = 2;
-        }
-      } else if (winRule === 'timed-capture') {
-        // 限时吃子：时间到，比吃子数，多者胜；打平判和
-        if (playerCaptures > aiCaptures) {
-          winner = 'player';
-          finalReason = `⏱️ 时间到！你以 ${playerCaptures} : ${aiCaptures} 的吃子数获胜！`;
-          titleBadge = '限时吃子小冠军';
-          stars = 3;
-        } else if (aiCaptures > playerCaptures) {
-          winner = 'ai';
-          finalReason = `⏱️ 时间到！${activeProfile.name} 以 ${aiCaptures} : ${playerCaptures} 的吃子数获胜。`;
-          titleBadge = '分秒必争小健将';
-          stars = 1;
-        } else {
-          winner = 'draw';
-          finalReason = `⏱️ 时间到！双方吃子数 ${playerCaptures} : ${aiCaptures} 打平，握手言和！`;
-          titleBadge = '棋逢对手小君子';
-          stars = 2;
-        }
       } else {
-        // Territory mode
+        // Territory mode (101 公开赛数子点目标准)
         if (playerTerritory > aiTerritory) {
           winner = 'player';
           finalReason = `🏆 终局点目以 ${playerTerritory.toFixed(1)} 目领先 ${activeProfile.name} (${aiTerritory.toFixed(1)} 目)！`;
@@ -433,48 +350,14 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
       // ☁️ 同步上传云端，AI 直接读表分析棋路（失败静默降级到本地，不影响对局）
       uploadGameRecord(record);
     },
-    [boardSize, playerColor, winRule, captureTarget, activeProfile.name, playerAttemptedPass]
+    [boardSize, playerColor, activeProfile.name, playerAttemptedPass]
   );
-
-  // 限时吃子：整局包干倒计时（时间到按吃子数判胜负）
-  useEffect(() => {
-    if (winRule !== 'timed-capture' || isReviewMode || boardState.isGameOver) return;
-    const interval = setInterval(() => {
-      setTimedSecondsLeft((prev) => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [winRule, isReviewMode, boardState.isGameOver]);
-
-  // 时间到 → 锁定棋局并按吃子数判定终局
-  useEffect(() => {
-    if (winRule === 'timed-capture' && timedSecondsLeft === 0 && !boardState.isGameOver && !isReviewMode) {
-      const finalState = GoCore.cloneState(boardState);
-      finalState.isGameOver = true;
-      setBoardState(finalState);
-      triggerEndGame(finalState);
-    }
-  }, [winRule, timedSecondsLeft, boardState, isReviewMode, triggerEndGame]);
-
-  // 限时吃子：轮到小选手却「无棋可下」（全盘已满，或只剩会被马上吃掉的死洞）时给出明确提示，
-  // 否则孩子会以为是程序卡住了。此时「停一手」是可用的；AI 也会对称地停手并结算。
-  useEffect(() => {
-    if (winRule !== 'timed-capture' || isReviewMode || boardState.isGameOver) return;
-    if (boardState.turn !== playerColor) return;
-    if (GoAI.hasMeaningfulMove(boardState, playerColor)) return;
-    const noLegal = GoAI.getFastLegalMoves(boardState, playerColor).length === 0;
-    setStatusMessage(
-      noLegal
-        ? '棋盘已经填满了，没有能落子的点了 —— 点【停一手】把先手让给对手'
-        : '剩下的都是会被马上吃掉的死洞，别填了 —— 点【停一手】把先手让给对手'
-    );
-  }, [winRule, isReviewMode, boardState, playerColor]);
 
   // Player Move Handler
   const handlePlayerMove = (point: Point) => {
     if (boardState.isGameOver || boardState.turn !== playerColor || isAiThinking || isReviewMode) return;
 
-    const targetRule = winRule === 'capture' ? captureTarget : undefined;
-    const res = GoCore.playMove(boardState, point, playerColor, targetRule);
+    const res = GoCore.playMove(boardState, point, playerColor);
     if (res.error) {
       SoundEngine.playErrorSound();
       setStatusMessage(`❌ ${res.error}`);
@@ -487,27 +370,19 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
     // Dynamic positive audio & visual reaction
     if (res.captured.length > 0) {
       SoundEngine.playCaptureSound();
-      const myCaps = playerColor === 'black' ? res.nextState.captures.black : res.nextState.captures.white;
-      if (winRule === 'capture' && myCaps >= captureTarget) {
-        updateAiDialogue('哇！你已经吃满目标了，太厉害了！我甘拜下风！');
-        triggerEndGame(res.nextState);
-        return;
-      } else if (winRule === 'capture' && myCaps === captureTarget - 1) {
-        updateAiDialogue('哎呀！我的大子被你提走了，你只要再吃一颗就赢了！我要拼命防守了！');
-      } else {
-        const reactions = [
-          '哎呀！我的棋子被你吃掉了！这步吃子太漂亮了！',
-          '痛痛痛！你居然看穿了我的断点！',
-          '好厉害的打吃！我得小心了！',
-        ];
-        updateAiDialogue(reactions[Math.floor(Math.random() * reactions.length)]);
-      }
+      const reactions = [
+        '哎呀！我的棋子被你吃掉了！这步吃子太漂亮了！',
+        '痛痛痛！你居然看穿了我的断点！',
+        '好厉害的打吃！我得小心了！',
+      ];
+      updateAiDialogue(reactions[Math.floor(Math.random() * reactions.length)]);
       setStatusMessage(`你提掉了对方 ${res.captured.length} 颗棋子！`);
     } else {
       SoundEngine.playStoneSound();
       setStatusMessage('落子完成，等待 AI 应对...');
     }
 
+    // Check game over
     if (res.nextState.isGameOver) {
       triggerEndGame(res.nextState);
     }
@@ -527,18 +402,13 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
             return;
           }
 
-          // 限时吃子：AI 用吃子策略（传 captureTarget 走吃子体系），但 playMove 不传 captureTarget，
-          // 避免「吃满 N 子提前终局」——限时模式胜负只看时间到时的吃子数。
-          const playTarget = winRule === 'capture' ? captureTarget : undefined;
-          const aiTarget = winRule === 'capture' || winRule === 'timed-capture' ? captureTarget : undefined;
           const aiMove = await GoAI.getBestMoveAsync(current, aiColor, {
             sparringLevel: aiLevel,
-            captureTarget: aiTarget,
-            isFullGame: winRule === 'territory',
+            isFullGame: true,
           });
 
           if (aiMove) {
-            const res = GoCore.playMove(current, aiMove, aiColor, playTarget);
+            const res = GoCore.playMove(current, aiMove, aiColor);
             setBoardState(res.nextState);
 
             // 🛡️ 双脑协同：若小选手上一手试图停一手，AI 绝境打入并进行心理施压
@@ -549,14 +419,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
               setStatusMessage(`🔥 【胜负手打入】${activeProfile.name} 识破停一手，落子于 (${aiMove.x + 1}, ${aiMove.y + 1}) 强势反扑！`);
             } else if (res.captured.length > 0) {
               SoundEngine.playCaptureSound();
-              const aiCaps = aiColor === 'black' ? res.nextState.captures.black : res.nextState.captures.white;
-              if (winRule === 'capture' && aiCaps >= captureTarget) {
-                updateAiDialogue('嘿嘿，我吃满目标子数啦！承让承让～');
-                triggerEndGame(res.nextState);
-                return;
-              } else {
-                updateAiDialogue('嘿嘿，我也吃到了一颗棋子，接下来换你反击啦！');
-              }
+              updateAiDialogue('嘿嘿，我也吃到了一颗棋子，接下来换你反击啦！');
               setStatusMessage(`${activeProfile.name} 提掉了你 ${res.captured.length} 颗棋子！`);
             } else {
               SoundEngine.playStoneSound();
@@ -567,66 +430,31 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
               triggerEndGame(res.nextState);
             }
           } else {
-            // AI 没有合法的非真眼可下之步
-            if (winRule === 'timed-capture') {
-              // 限时吃子：比赛规则是「15 分钟到点比吃子数」，停一手绝不能提前终结棋局。
-              // 否则孩子只要吃子领先，停一手就能直接判赢——这正是他能靠停手打掉龙尊的原因。
-              // 这里让 AI 停手只把先手还给小选手，不累加 pass、不终局。
-              const passed = GoCore.pass(current);
-              passed.consecutivePasses = 0;
-              passed.isGameOver = false;
-              updateAiDialogue('我这里没有能下的有效棋了，先让给你！');
-              setStatusMessage(`${activeProfile.name} 停一手 (Pass)`);
-              // 双方都无棋可下才结算：AI 无棋可下（getBestMove 返回 null 才走到这），
-              // 小选手这边若也只是「送子手/眼位」而无有意义落点，棋局就到此为止，按吃子数结算。
-              if (!GoAI.hasMeaningfulMove(passed, playerColor)) {
-                const finished = GoCore.cloneState(passed);
-                finished.isGameOver = true;
-                triggerEndGame(finished);
-              } else {
-                setBoardState(passed);
-              }
-            } else if (winRule === 'capture') {
-              // 吃子战：AI 无棋可下也停手只交换先手，不累加 pass、不终局。
-              // 双方都无有意义落点（棋盘真正下满/只剩死洞）时，才按吃子数结算。
-              const passed = GoCore.pass(current);
-              passed.consecutivePasses = 0;
-              passed.isGameOver = false;
-              updateAiDialogue('这里没有能下的有效棋了，我停一手！');
-              setStatusMessage(`${activeProfile.name} 停一手 (Pass)`);
-              if (!GoAI.hasMeaningfulMove(passed, playerColor)) {
-                const finished = GoCore.cloneState(passed);
-                finished.isGameOver = true;
-                triggerEndGame(finished);
-              } else {
-                setBoardState(passed);
-              }
-            } else {
-              const est = GoCore.estimateTerritory(current);
-              const komi = current.size === 19 ? 7.5 : current.size === 13 ? 5.5 : 3.5;
-              const myScore = aiColor === 'black' ? est.black : est.white + komi;
-              const oppScore = aiColor === 'black' ? est.white + komi : est.black;
+            // AI 没有合法的非真眼可下之步：正规点目终局处理
+            const est = GoCore.estimateTerritory(current);
+            const komi = current.size === 19 ? 7.5 : current.size === 13 ? 5.5 : 3.5;
+            const myScore = aiColor === 'black' ? est.black : est.white + komi;
+            const oppScore = aiColor === 'black' ? est.white + komi : est.black;
 
-              if (myScore < oppScore) {
-                // 劣势且全盘单官收尽：体面投子认负！
-                const resignMsg = `黑棋大阵坚不可摧，防守滴水不漏！${activeProfile.name} 甘拜下风，投子认负！`;
-                updateAiDialogue(resignMsg);
-                setStatusMessage(`${activeProfile.name} 投子认负（中盘认输）`);
-                const resignedState = GoCore.cloneState(current);
-                resignedState.isGameOver = true;
-                resignedState.winner = playerColor;
-                resignedState.winReason = `对手【${activeProfile.name}】投子认负，中盘胜！`;
-                setBoardState(resignedState);
-                triggerEndGame(resignedState, resignedState.winReason, 'player');
-              } else {
-                // 优势且确实已终局：才选择停一手
-                const passed = GoCore.pass(current);
-                setBoardState(passed);
-                updateAiDialogue('棋局大势已定，边界已经分清，我选择停一手！');
-                setStatusMessage(`${activeProfile.name} 停一手 (Pass)`);
-                if (passed.isGameOver) {
-                  triggerEndGame(passed);
-                }
+            if (myScore < oppScore) {
+              // 劣势且全盘单官收尽：体面投子认负！
+              const resignMsg = `黑棋大阵坚不可摧，防守滴水不漏！${activeProfile.name} 甘拜下风，投子认负！`;
+              updateAiDialogue(resignMsg);
+              setStatusMessage(`${activeProfile.name} 投子认负（中盘认输）`);
+              const resignedState = GoCore.cloneState(current);
+              resignedState.isGameOver = true;
+              resignedState.winner = playerColor;
+              resignedState.winReason = `对手【${activeProfile.name}】投子认负，中盘胜！`;
+              setBoardState(resignedState);
+              triggerEndGame(resignedState, resignedState.winReason, 'player');
+            } else {
+              // 优势且确实已终局：才选择停一手
+              const passed = GoCore.pass(current);
+              setBoardState(passed);
+              updateAiDialogue('棋局大势已定，边界已经分清，我选择停一手！');
+              setStatusMessage(`${activeProfile.name} 停一手 (Pass)`);
+              if (passed.isGameOver) {
+                triggerEndGame(passed);
               }
             }
           }
@@ -644,7 +472,6 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
     aiColor,
     aiLevel,
     winRule,
-    captureTarget,
     activeProfile.name,
     playerColor,
     triggerEndGame,
@@ -660,29 +487,10 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
     triggerEndGame(finalState);
   };
 
-  // Player Pass
+  // Player Pass (标准 101 双 Pass 点目终局)
   const handlePass = () => {
     if (boardState.isGameOver || boardState.turn !== playerColor || isAiThinking || isReviewMode) return;
 
-    // 吃子战 / 限时吃子：停一手只把先手交给对手，绝不终局、不改吃子数。
-    // 吃子赛的胜负只看「吃子数」（限时=到点比吃子，普通=先吃满目标），停手不能提前判胜，
-    // 否则孩子吃子领先时连点停手就能「逼 AI 认输」——这正是他曾经 3 手干掉龙尊的漏洞。
-    if (winRule === 'capture' || winRule === 'timed-capture') {
-      const passed = GoCore.pass(boardState);
-      passed.consecutivePasses = 0;
-      passed.isGameOver = false;
-      setPlayerAttemptedPass(true);
-      setCanUndoTurn(true);
-      setBoardState(passed);
-      setStatusMessage(
-        winRule === 'timed-capture'
-          ? '你停一手 (Pass)，把先手让给对手（比赛规则：15 分钟到点才比吃子数）'
-          : '你停一手 (Pass)，把先手让给对手（吃子赛：先吃满目标子数才分胜负）'
-      );
-      return;
-    }
-
-    // 全盘围空对弈：保留标准「双 pass 点目」终局规则
     setPlayerAttemptedPass(true);
     const next = GoCore.pass(boardState);
     setBoardState(next);
@@ -706,10 +514,9 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
     }
 
     let reverted = GoCore.createEmptyBoard(boardSize);
-    const targetRule = winRule === 'capture' ? captureTarget : undefined;
     const moves = boardState.moveHistory.slice(0, -2);
     for (const m of moves) {
-      reverted = GoCore.playMove(reverted, { x: m.x, y: m.y }, m.color, targetRule).nextState;
+      reverted = GoCore.playMove(reverted, { x: m.x, y: m.y }, m.color).nextState;
     }
     setBoardState(reverted);
 
@@ -725,10 +532,9 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
     setStatusMessage(`已悔棋回上一个回合 (本局还剩 ${nextRemaining} 次悔棋机会)`);
   };
 
-  // Calculate live capture progress & energy bar
+  // Calculate live territory & energy bar
   const myCaptures = playerColor === 'black' ? boardState.captures.black : boardState.captures.white;
   const oppCaptures = playerColor === 'black' ? boardState.captures.white : boardState.captures.black;
-  const timedDisplay = `${Math.floor(timedSecondsLeft / 60)}:${String(timedSecondsLeft % 60).padStart(2, '0')}`;
 
   const territory = GoCore.estimateTerritory(boardState);
   const komi = boardSize === 19 ? 7.5 : boardSize === 13 ? 5.5 : 3.5;
@@ -939,108 +745,34 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
           </div>
         </div>
 
-        {/* Middle Section 1: Capture Status / Live Progress (吃子情况) */}
+        {/* Middle Section 1: Live Territory Progress */}
         <div className="shrink-0">
-          {winRule === 'capture' || winRule === 'timed-capture' ? (
-            /* Capture Race Badge Tracker (含限时吃子) */
-            <div className="bg-gradient-to-r from-yellow-100 via-amber-100 to-orange-100 p-2 rounded-2xl border-2 border-amber-400 shadow-xs flex flex-col gap-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black text-amber-950 font-cartoon flex items-center gap-1">
-                  <Swords className="w-3.5 h-3.5 text-amber-700" />
-                  <span>{winRule === 'timed-capture' ? '限时吃子战况' : '吃子战况'}</span>
-                </span>
-
-                {winRule === 'timed-capture' ? (
-                  /* 限时吃子：显示包干倒计时 */
-                  <span
-                    className={`flex items-center gap-0.5 bg-white px-1.5 py-0.5 rounded-md border border-amber-400 text-[10px] font-bold shadow-xs ${
-                      timedSecondsLeft <= 30 ? 'text-red-600 border-red-400 animate-pulse' : 'text-amber-950'
-                    }`}
-                  >
-                    <Hourglass className="w-3 h-3" />
-                    <span className="font-black font-cartoon text-xs">{timedDisplay}</span>
-                  </span>
-                ) : (
-                  /* Target badge - opens custom input modal */
-                  <button
-                    onClick={() => {
-                      setCustomTargetInput(String(captureTarget));
-                      setIsTargetModalOpen(true);
-                    }}
-                    className="flex items-center gap-0.5 bg-white hover:bg-amber-50 text-amber-950 px-1.5 py-0.5 rounded-md border border-amber-400 text-[10px] font-bold shadow-xs transition"
-                    title="点击修改目标吃子数"
-                  >
-                    <span>先吃满</span>
-                    <span className="font-black text-red-600 font-cartoon text-xs">{captureTarget}</span>
-                    <span>子胜 ✏️</span>
-                  </button>
-                )}
+          <div className="bg-gradient-to-r from-amber-100 via-yellow-100 to-amber-100 p-2 rounded-2xl border-2 border-amber-400 shadow-xs flex flex-col gap-1">
+            <div className="flex items-center justify-between text-[11px] font-black text-amber-950 px-0.5">
+              <div className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-black inline-block border border-gray-700" />
+                <span>黑: {blackScore} 目</span>
               </div>
-
-              {/* Progress Duel Cards */}
-              <div className="grid grid-cols-2 gap-1.5">
-                {/* Player Card */}
-                <div className="bg-white/90 px-2 py-1 rounded-xl border border-amber-200 flex items-center justify-between">
-                  <div className="flex items-center gap-1">
-                    <span className="w-3 h-3 rounded-full bg-black inline-block border border-gray-700 shrink-0" />
-                    <span className="text-[11px] font-bold text-amber-950">你已吃</span>
-                  </div>
-                  <div className="text-xs sm:text-sm font-black text-emerald-700 font-cartoon">
-                    {myCaptures}
-                    {winRule !== 'timed-capture' && <span className="text-[9px] text-gray-500 font-normal">/ {captureTarget}</span>}
-                  </div>
-                </div>
-
-                {/* AI Opponent Card */}
-                <div className="bg-white/90 px-2 py-1 rounded-xl border border-amber-200 flex items-center justify-between">
-                  <div className="flex items-center gap-1">
-                    <span className="w-3 h-3 rounded-full bg-white inline-block border border-gray-300 shrink-0" />
-                    <span className="text-[11px] font-bold text-amber-950">AI已吃</span>
-                  </div>
-                  <div className="text-xs sm:text-sm font-black text-orange-700 font-cartoon">
-                    {oppCaptures}
-                    {winRule !== 'timed-capture' && <span className="text-[9px] text-gray-500 font-normal">/ {captureTarget}</span>}
-                  </div>
-                </div>
+              <div className="flex items-center gap-1 text-amber-800 font-cartoon text-[10px]">
+                <Flame className="w-3 h-3 text-orange-500 fill-orange-500 animate-pulse" />
+                <span>实时地盘</span>
               </div>
-
-              {/* Match point alert if close */}
-              {winRule === 'capture' && myCaptures >= captureTarget - 1 && myCaptures < captureTarget && (
-                <div className="text-[10px] font-black text-red-600 bg-red-100 py-0.5 px-1.5 rounded-md border border-red-300 animate-bounce flex items-center justify-center gap-1">
-                  <Zap className="w-2.5 h-2.5 fill-current" />
-                  <span>赛点！再吃 1 颗直接获胜！</span>
-                </div>
-              )}
-            </div>
-          ) : (
-            /* Territory Live Progress */
-            <div className="bg-gradient-to-r from-amber-100 via-yellow-100 to-amber-100 p-2 rounded-2xl border-2 border-amber-400 shadow-xs flex flex-col gap-1">
-              <div className="flex items-center justify-between text-[11px] font-black text-amber-950 px-0.5">
-                <div className="flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-black inline-block border border-gray-700" />
-                  <span>黑: {blackScore} 目</span>
-                </div>
-                <div className="flex items-center gap-1 text-amber-800 font-cartoon text-[10px]">
-                  <Flame className="w-3 h-3 text-orange-500 fill-orange-500 animate-pulse" />
-                  <span>实时地盘</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span>白: {whiteScore.toFixed(1)} 目</span>
-                  <span className="w-2.5 h-2.5 rounded-full bg-white inline-block border border-gray-300" />
-                </div>
-              </div>
-              <div className="w-full h-2 bg-gray-300 rounded-full overflow-hidden flex shadow-inner border border-amber-300">
-                <div
-                  style={{ width: `${blackPercent}%` }}
-                  className="h-full bg-gray-900 transition-all duration-500"
-                />
-                <div
-                  style={{ width: `${whitePercent}%` }}
-                  className="h-full bg-gray-100 transition-all duration-500"
-                />
+              <div className="flex items-center gap-1">
+                <span>白: {whiteScore.toFixed(1)} 目</span>
+                <span className="w-2.5 h-2.5 rounded-full bg-white inline-block border border-gray-300" />
               </div>
             </div>
-          )}
+            <div className="w-full h-2 bg-gray-300 rounded-full overflow-hidden flex shadow-inner border border-amber-300">
+              <div
+                style={{ width: `${blackPercent}%` }}
+                className="h-full bg-gray-900 transition-all duration-500"
+              />
+              <div
+                style={{ width: `${whitePercent}%` }}
+                className="h-full bg-gray-100 transition-all duration-500"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Middle Section 2: Options & Settings (选项的情况) */}
@@ -1050,47 +782,20 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
             <span>对弈设置与选项</span>
           </div>
 
-          {/* Rule Mode Buttons */}
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => {
-                setCustomTargetInput(String(captureTarget));
-                setIsTargetModalOpen(true);
-              }}
-              className={`flex-1 py-1 px-1 rounded-xl font-bold text-[11px] transition flex items-center justify-center gap-1 ${
-                winRule === 'capture'
-                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-amber-950 font-black shadow border border-amber-500'
-                  : 'bg-amber-100/70 hover:bg-amber-200 text-amber-900 border border-amber-300'
-              }`}
-              title="先吃满指定颗数（如5颗）即判获胜"
-            >
-              <Swords className="w-3 h-3" />
-              <span>🎯 吃子决胜</span>
-            </button>
-            <button
-              onClick={() => startNewGame(boardSize, playerColor, aiLevel, 'territory', captureTarget)}
-              className={`flex-1 py-1 px-1 rounded-xl font-bold text-[11px] transition flex items-center justify-center gap-1 ${
-                winRule === 'territory'
-                  ? 'bg-gradient-to-r from-emerald-400 to-green-500 text-green-950 font-black shadow border border-green-600'
-                  : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300'
-              }`}
-              title="101围棋网公开赛同款：19路黑贴3又3/4子，围地盘数子点目"
-            >
-              <CheckCircle2 className="w-3 h-3 text-emerald-700" />
-              <span>🏰 正规点目(101同款)</span>
-            </button>
-            <button
-              onClick={() => startNewGame(boardSize, playerColor, aiLevel, 'timed-capture', captureTarget)}
-              className={`flex-1 py-1 px-1 rounded-xl font-bold text-[11px] transition flex items-center justify-center gap-1 ${
-                winRule === 'timed-capture'
-                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-amber-950 font-black shadow border border-amber-500'
-                  : 'bg-amber-100/70 hover:bg-amber-200 text-amber-900 border border-amber-300'
-              }`}
-              title="15分钟包干倒计时吃子竞速"
-            >
-              <Hourglass className="w-3 h-3" />
-              <span>⏱️ 限时吃子</span>
-            </button>
+          {/* Tournament Standard Badge */}
+          <div className="flex items-center justify-between bg-gradient-to-r from-emerald-500 to-green-600 text-white px-2.5 py-1.5 rounded-xl shadow-xs border border-emerald-600">
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-100 shrink-0" />
+              <div className="flex flex-col">
+                <span className="font-cartoon font-black text-xs tracking-wide">101 围棋公开赛标准赛制</span>
+                <span className="text-[9px] text-emerald-100 font-medium leading-none">
+                  {boardSize === 19 ? '19路十九道 · 黑贴 3又3/4子 (7.5目)' : '13路十三道 · 黑贴 2又3/4子 (5.5目)'}
+                </span>
+              </div>
+            </div>
+            <span className="bg-emerald-700/80 text-[10px] font-bold px-1.5 py-0.5 rounded-md border border-emerald-400/40">
+              围地盘点目
+            </span>
           </div>
 
           {/* Board Size & Stone Color */}
@@ -1102,7 +807,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
                 {([13, 19] as BoardSize[]).map((sz) => (
                   <button
                     key={sz}
-                    onClick={() => startNewGame(sz, playerColor, aiLevel, sz === 19 && winRule === 'timed-capture' ? 'territory' : winRule, captureTarget)}
+                    onClick={() => startNewGame(sz, playerColor, aiLevel, handicapCount)}
                     className={`px-1.5 py-0.5 rounded-md font-black text-[10px] transition ${
                       boardSize === sz
                         ? 'bg-amber-600 text-white shadow-xs'
@@ -1120,7 +825,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
               <span className="text-[10px] font-bold text-amber-900">执子:</span>
               <div className="flex gap-1">
                 <button
-                  onClick={() => startNewGame(boardSize, 'black', aiLevel, winRule, captureTarget)}
+                  onClick={() => startNewGame(boardSize, 'black', aiLevel, handicapCount)}
                   className={`px-1.5 py-0.5 rounded-md font-black text-[10px] transition ${
                     playerColor === 'black'
                       ? 'bg-black text-white shadow-xs'
@@ -1130,7 +835,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
                   ⚫黑
                 </button>
                 <button
-                  onClick={() => startNewGame(boardSize, 'white', aiLevel, winRule, captureTarget)}
+                  onClick={() => startNewGame(boardSize, 'white', aiLevel, handicapCount)}
                   className={`px-1.5 py-0.5 rounded-md font-black text-[10px] transition ${
                     playerColor === 'white'
                       ? 'bg-white text-gray-900 border border-amber-500 shadow-xs'
@@ -1150,7 +855,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
               {[0, 2, 3, 4].concat(boardSize === 19 ? [9] : []).map((h) => (
                 <button
                   key={h}
-                  onClick={() => startNewGame(boardSize, playerColor, aiLevel, winRule, captureTarget, h)}
+                  onClick={() => startNewGame(boardSize, playerColor, aiLevel, h)}
                   className={`px-1.5 py-0.5 rounded-md font-black text-[10px] transition ${
                     handicapCount === h
                       ? 'bg-amber-600 text-white shadow-xs'
@@ -1226,11 +931,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
             onClick={handlePass}
             disabled={boardState.turn !== playerColor || isAiThinking || isReviewMode}
             className="flex items-center justify-center gap-0.5 py-1.5 px-0.5 bg-white hover:bg-amber-50 disabled:opacity-40 text-amber-900 font-bold rounded-xl border border-amber-300 text-[11px] shadow-xs transition active:scale-95 cursor-pointer"
-            title={
-              winRule === 'timed-capture'
-                ? '停一手：把先手让给对手。限时吃子到点才比吃子数，停手不会提前结束，也不会改变比分'
-                : '放弃本手（停一手）'
-            }
+            title="放弃本手（停一手，双方连续停一手将自动点目终局）"
           >
             <CheckCircle2 className="w-3.5 h-3.5 text-amber-700 shrink-0" />
             <span>停一手</span>
@@ -1297,98 +998,6 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
         onBackToMap={() => setIsSettlementOpen(false)}
       />
 
-      {/* 5. CUSTOM TARGET STONES INPUT MODAL */}
-      {isTargetModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-pop-in">
-          <div className="bg-gradient-to-b from-amber-50 to-orange-100 rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl border-4 border-yellow-400 relative">
-            <h3 className="text-xl sm:text-2xl font-black text-amber-950 font-cartoon flex items-center justify-center gap-2">
-              <Swords className="w-6 h-6 text-amber-600" />
-              <span>设置吃子获胜目标</span>
-            </h3>
-            <p className="text-xs sm:text-sm font-bold text-amber-800 mt-1 mb-4">
-              你想挑战先吃几颗子获胜？请在下方直接输入：
-            </p>
-
-            {/* Input field with plus/minus buttons */}
-            <div className="flex items-center justify-center gap-3 my-3">
-              <button
-                type="button"
-                onClick={() => {
-                  const current = parseInt(customTargetInput, 10) || 1;
-                  setCustomTargetInput(String(Math.max(1, current - 1)));
-                }}
-                className="w-10 h-10 rounded-2xl bg-white hover:bg-gray-100 border-2 border-amber-300 text-amber-950 font-black text-xl flex items-center justify-center shadow-sm active:scale-95"
-              >
-                -
-              </button>
-
-              <div className="relative">
-                <input
-                  type="number"
-                  min="1"
-                  max="99"
-                  value={customTargetInput}
-                  onChange={(e) => setCustomTargetInput(e.target.value)}
-                  className="w-24 h-12 text-center text-3xl font-black font-cartoon text-red-600 bg-white rounded-2xl border-3 border-amber-400 shadow-inner focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                  autoFocus
-                />
-                <span className="text-xs font-bold text-amber-800 block mt-1">颗棋子</span>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  const current = parseInt(customTargetInput, 10) || 1;
-                  setCustomTargetInput(String(Math.min(99, current + 1)));
-                }}
-                className="w-10 h-10 rounded-2xl bg-white hover:bg-gray-100 border-2 border-amber-300 text-amber-950 font-black text-xl flex items-center justify-center shadow-sm active:scale-95"
-              >
-                +
-              </button>
-            </div>
-
-            {/* Quick recommend pills */}
-            <div className="flex items-center justify-center gap-2 mb-5">
-              <span className="text-[11px] font-bold text-gray-500">快捷预设:</span>
-              {[1, 3, 5, 10].map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  onClick={() => setCustomTargetInput(String(preset))}
-                  className="px-2 py-0.5 rounded-lg text-xs font-black bg-amber-200/80 hover:bg-amber-300 text-amber-900 border border-amber-400"
-                >
-                  {preset}子
-                </button>
-              ))}
-            </div>
-
-            {/* Action buttons */}
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  const parsed = parseInt(customTargetInput, 10);
-                  const valid = isNaN(parsed) || parsed < 1 ? 1 : Math.min(parsed, 99);
-                  startNewGame(boardSize, playerColor, aiLevel, 'capture', valid);
-                  setIsTargetModalOpen(false);
-                }}
-                className="flex-1 py-3 px-4 btn-cartoon-yellow text-amber-950 font-black rounded-2xl shadow-md text-sm sm:text-base"
-              >
-                确定开战
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsTargetModalOpen(false)}
-                className="py-3 px-4 bg-white hover:bg-gray-100 text-gray-700 font-bold rounded-2xl border-2 border-gray-300 text-sm"
-              >
-                取消
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* 6. RESTART CONFIRMATION MODAL (防误触双保险弹窗) */}
       {isRestartConfirmOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-pop-in select-none">
@@ -1402,10 +1011,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
                 正在激战中，确定重开吗？
               </h3>
               <p className="text-xs font-bold text-amber-900 mt-2 leading-relaxed bg-amber-100/80 p-3 rounded-2xl border border-amber-300">
-                当前对局已经下了 <span className="text-red-600 font-black">{boardState.moveHistory.length}</span> 手
-                {(winRule === 'capture' || winRule === 'timed-capture') && (
-                  <>，你已经吃了 <span className="text-emerald-700 font-black">{myCaptures}</span> 颗棋子</>
-                )}！<br />
+                当前对局已经下了 <span className="text-red-600 font-black">{boardState.moveHistory.length}</span> 手，双方地盘正在激烈争夺中！<br />
                 重新开局将清空当前棋盘。
               </p>
             </div>

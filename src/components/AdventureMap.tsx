@@ -28,11 +28,11 @@ export const AdventureMap: React.FC<AdventureMapProps> = ({
       <div className="bg-gradient-to-r from-amber-400 via-yellow-300 to-orange-400 rounded-3xl p-5 shadow-lg border-4 border-yellow-500 flex items-center justify-between">
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-amber-950 font-cartoon flex items-center gap-2">
-            <span>🏝️</span>
-            <span>森森少儿围棋启蒙岛</span>
+            <span>🥋</span>
+            <span>101 考级手筋宝典 · 18K至15K必刷</span>
           </h1>
           <p className="text-sm sm:text-base font-bold text-amber-900 mt-1">
-            一步一步闯关摘星星，掌握从吃子到做眼的围棋绝招！
+            直击 11 月 28 日考级！攻克双打吃、门吃、抱吃、枷吃、征子、倒扑、接不归、两眼做活 8 大必考绝招！
           </p>
         </div>
         <div className="flex items-center gap-2">
