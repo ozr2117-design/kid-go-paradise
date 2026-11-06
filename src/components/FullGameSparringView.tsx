@@ -1062,6 +1062,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
                   ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-amber-950 font-black shadow border border-amber-500'
                   : 'bg-amber-100/70 hover:bg-amber-200 text-amber-900 border border-amber-300'
               }`}
+              title="先吃满指定颗数（如5颗）即判获胜"
             >
               <Swords className="w-3 h-3" />
               <span>🎯 吃子决胜</span>
@@ -1070,12 +1071,13 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
               onClick={() => startNewGame(boardSize, playerColor, aiLevel, 'territory', captureTarget)}
               className={`flex-1 py-1 px-1 rounded-xl font-bold text-[11px] transition flex items-center justify-center gap-1 ${
                 winRule === 'territory'
-                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-amber-950 font-black shadow border border-amber-500'
-                  : 'bg-amber-100/70 hover:bg-amber-200 text-amber-900 border border-amber-300'
+                  ? 'bg-gradient-to-r from-emerald-400 to-green-500 text-green-950 font-black shadow border border-green-600'
+                  : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300'
               }`}
+              title="101围棋网公开赛同款：19路黑贴3又3/4子，围地盘数子点目"
             >
-              <CheckCircle2 className="w-3 h-3" />
-              <span>🏰 正规点目</span>
+              <CheckCircle2 className="w-3 h-3 text-emerald-700" />
+              <span>🏰 正规点目(101同款)</span>
             </button>
             <button
               onClick={() => startNewGame(boardSize, playerColor, aiLevel, 'timed-capture', captureTarget)}
@@ -1084,6 +1086,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
                   ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-amber-950 font-black shadow border border-amber-500'
                   : 'bg-amber-100/70 hover:bg-amber-200 text-amber-900 border border-amber-300'
               }`}
+              title="15分钟包干倒计时吃子竞速"
             >
               <Hourglass className="w-3 h-3" />
               <span>⏱️ 限时吃子</span>
@@ -1099,7 +1102,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
                 {([13, 19] as BoardSize[]).map((sz) => (
                   <button
                     key={sz}
-                    onClick={() => startNewGame(sz, playerColor, aiLevel, winRule, captureTarget)}
+                    onClick={() => startNewGame(sz, playerColor, aiLevel, sz === 19 && winRule === 'timed-capture' ? 'territory' : winRule, captureTarget)}
                     className={`px-1.5 py-0.5 rounded-md font-black text-[10px] transition ${
                       boardSize === sz
                         ? 'bg-amber-600 text-white shadow-xs'

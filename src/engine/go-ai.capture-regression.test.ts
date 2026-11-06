@@ -34,11 +34,11 @@ describe('GoAI capture-mode regression (v9.4)', () => {
       '18k': 'beginner',          // 18K 呆萌机
       '17k': 'intermediate',      // 17K 巡逻机
       '16k': 'advanced',          // 16K 哨兵机
-      '15k': 'master',            // 15K 冲锋机
+      '15k': 'grandmaster',       // 15K 冲锋机 (顶级龙尊杀力)
       novice: 'beginner',         // 18K 呆萌机
       club: 'intermediate',       // 17K 巡逻机
       master: 'advanced',         // 16K 哨兵机
-      grandmaster: 'master',      // 15K 冲锋机
+      grandmaster: 'grandmaster', // 15K 冲锋机 (顶级龙尊杀力)
     };
 
     const buildBoard = (variant: number) => {

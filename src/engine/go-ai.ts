@@ -138,14 +138,14 @@ export class GoAI {
     // through to the default dragon tier (the strongest), making them as strong
     // as 龙尊 and collapsing the whole difficulty ladder.
         const sparringToDifficulty: Record<AISparringLevel, AIDifficulty> = {
-      '18k': 'beginner',          // 18K 呆萌机
-      '17k': 'intermediate',      // 17K 巡逻机
-      '16k': 'advanced',          // 16K 哨兵机
-      '15k': 'master',            // 15K 冲锋机
+      '18k': 'beginner',          // 18K 呆萌机 (对标 101 小智 18K：温和稳健，留容错)
+      '17k': 'intermediate',      // 17K 巡逻机 (争夺角地，适度接触战)
+      '16k': 'advanced',          // 16K 哨兵机 (棋形紧凑，严防断点)
+      '15k': 'grandmaster',       // 15K 冲锋机 (对标 101 冲锋机：龙尊杀神，大龙死守，主动绝杀)
       novice: 'beginner',         // 兼容旧 ID 18K 呆萌机
       club: 'intermediate',       // 兼容旧 ID 17K 巡逻机
       master: 'advanced',         // 兼容旧 ID 16K 哨兵机
-      grandmaster: 'master',      // 兼容旧 ID 15K 冲锋机
+      grandmaster: 'grandmaster', // 兼容旧 ID 15K 冲锋机 (龙尊杀力)
     };
     const diff =
       options.difficulty ||
@@ -1213,16 +1213,16 @@ export class GoAI {
 
     if (stonesInCornerSector === 0) {
       if (isCornerPoint) {
-        score += 340; // Massive opening prior for empty corners (金角)
+        score += 480; // 抢占空角星位/小目 (金角大局观)
       } else if (line === 3 || line === 4) {
-        score += 220;
+        score += 260;
       }
     } else if (stonesInCornerSector === 1 && oppStonesInSector === 1) {
       const is33 = distToEdgeX === 2 && distToEdgeY === 2;
       if (is33) {
-        score += 260; // 3-3 invasion
+        score += 380; // 点三三直捣黄龙破空 (101 15K 经典战术)
       } else if (isCornerPoint) {
-        score += 230; // Approach
+        score += 310; // 挂角紧逼
       }
     }
 
@@ -1236,17 +1236,22 @@ export class GoAI {
         return Math.min(ndX, ndY) + 1 === 2;
       });
       if (connectsToLine2Friendly) {
-        score += 140; // Turning head to center instead of crawling along edge!
+        score += 150; // Turning head to center instead of crawling along edge!
       }
     }
 
-    // 7. Sabaki & Invasion into opponent's giant territory (反包围与深入敌阵腾挪)
+    // 7. Sabaki & Invasion into opponent's giant territory (破空打入与消势腾挪)
     const territoryEst = cachedTerritory || GoCore.estimateTerritory(state);
     const oppTerritory = oppColor === 'black' ? territoryEst.black : territoryEst.white;
-    if (oppTerritory > (size * size) * 0.35) {
-      // Opponent is growing huge! 龙尊 actively dives into open spaces (3rd line) to make bases!
-      if (line === 3 && distToEdgeX >= 2 && distToEdgeY >= 2) {
-        score += 90;
+    if (oppTerritory > (size * size) * 0.25) {
+      // 对手大模样形成（例如占了半盘）！15K 绝不旁观，敏锐打入三三与三四路生根！
+      const is33Invasion = distToEdgeX === 2 && distToEdgeY === 2;
+      if (is33Invasion && state.grid[move.y][move.x] === null) {
+        score += 420; // 强力点三三破坏大空！
+      } else if (line === 3 && distToEdgeX >= 2 && distToEdgeY >= 2) {
+        score += 280; // 三路拆二扎根做活
+      } else if (line === 4 && distToEdgeX >= 3 && distToEdgeY >= 3) {
+        score += 220; // 四路肩冲削减大模样
       }
     }
 
