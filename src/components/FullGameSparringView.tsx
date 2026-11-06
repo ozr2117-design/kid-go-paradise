@@ -521,118 +521,118 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
     if (boardState.turn === aiColor && !boardState.isGameOver && !isReviewMode) {
       setIsAiThinking(true);
       const timer = setTimeout(async () => {
-        const current = stateRef.current;
-        if (current.turn !== aiColor || current.isGameOver) {
-          setIsAiThinking(false);
-          return;
-        }
+        try {
+          const current = stateRef.current;
+          if (current.turn !== aiColor || current.isGameOver) {
+            return;
+          }
 
-        // 限时吃子：AI 用吃子策略（传 captureTarget 走吃子体系），但 playMove 不传 captureTarget，
-        // 避免「吃满 N 子提前终局」——限时模式胜负只看时间到时的吃子数。
-        const playTarget = winRule === 'capture' ? captureTarget : undefined;
-        const aiTarget = winRule === 'capture' || winRule === 'timed-capture' ? captureTarget : undefined;
-        const aiMove = await GoAI.getBestMoveAsync(current, aiColor, {
-          sparringLevel: aiLevel,
-          captureTarget: aiTarget,
-          isFullGame: winRule === 'territory',
-        });
+          // 限时吃子：AI 用吃子策略（传 captureTarget 走吃子体系），但 playMove 不传 captureTarget，
+          // 避免「吃满 N 子提前终局」——限时模式胜负只看时间到时的吃子数。
+          const playTarget = winRule === 'capture' ? captureTarget : undefined;
+          const aiTarget = winRule === 'capture' || winRule === 'timed-capture' ? captureTarget : undefined;
+          const aiMove = await GoAI.getBestMoveAsync(current, aiColor, {
+            sparringLevel: aiLevel,
+            captureTarget: aiTarget,
+            isFullGame: winRule === 'territory',
+          });
 
-        if (aiMove) {
-          const res = GoCore.playMove(current, aiMove, aiColor, playTarget);
-          setBoardState(res.nextState);
+          if (aiMove) {
+            const res = GoCore.playMove(current, aiMove, aiColor, playTarget);
+            setBoardState(res.nextState);
 
-          // 🛡️ 双脑协同：若小选手上一手试图停一手，AI 绝境打入并进行心理施压
-          if (current.consecutivePasses > 0) {
-            const isDragon = aiLevel === 'grandmaster';
-            const antiPassText = AiSensei.getAntiPassSpeech(activeProfile.name, isDragon);
-            updateAiDialogue(antiPassText);
-            setStatusMessage(`🔥 【胜负手打入】${activeProfile.name} 识破停一手，落子于 (${aiMove.x + 1}, ${aiMove.y + 1}) 强势反扑！`);
-          } else if (res.captured.length > 0) {
-            SoundEngine.playCaptureSound();
-            const aiCaps = aiColor === 'black' ? res.nextState.captures.black : res.nextState.captures.white;
-            if (winRule === 'capture' && aiCaps >= captureTarget) {
-              updateAiDialogue('嘿嘿，我吃满目标子数啦！承让承让～');
+            // 🛡️ 双脑协同：若小选手上一手试图停一手，AI 绝境打入并进行心理施压
+            if (current.consecutivePasses > 0) {
+              const isDragon = aiLevel === 'grandmaster';
+              const antiPassText = AiSensei.getAntiPassSpeech(activeProfile.name, isDragon);
+              updateAiDialogue(antiPassText);
+              setStatusMessage(`🔥 【胜负手打入】${activeProfile.name} 识破停一手，落子于 (${aiMove.x + 1}, ${aiMove.y + 1}) 强势反扑！`);
+            } else if (res.captured.length > 0) {
+              SoundEngine.playCaptureSound();
+              const aiCaps = aiColor === 'black' ? res.nextState.captures.black : res.nextState.captures.white;
+              if (winRule === 'capture' && aiCaps >= captureTarget) {
+                updateAiDialogue('嘿嘿，我吃满目标子数啦！承让承让～');
+                triggerEndGame(res.nextState);
+                return;
+              } else {
+                updateAiDialogue('嘿嘿，我也吃到了一颗棋子，接下来换你反击啦！');
+              }
+              setStatusMessage(`${activeProfile.name} 提掉了你 ${res.captured.length} 颗棋子！`);
+            } else {
+              SoundEngine.playStoneSound();
+              setStatusMessage(`${activeProfile.name} 落子于 (${aiMove.x + 1}, ${aiMove.y + 1})`);
+            }
+
+            if (res.nextState.isGameOver) {
               triggerEndGame(res.nextState);
-              setIsAiThinking(false);
-              return;
-            } else {
-              updateAiDialogue('嘿嘿，我也吃到了一颗棋子，接下来换你反击啦！');
-            }
-            setStatusMessage(`${activeProfile.name} 提掉了你 ${res.captured.length} 颗棋子！`);
-          } else {
-            SoundEngine.playStoneSound();
-            setStatusMessage(`${activeProfile.name} 落子于 (${aiMove.x + 1}, ${aiMove.y + 1})`);
-          }
-
-          if (res.nextState.isGameOver) {
-            triggerEndGame(res.nextState);
-          }
-        } else {
-          // AI 没有合法的非真眼可下之步
-          if (winRule === 'timed-capture') {
-            // 限时吃子：比赛规则是「15 分钟到点比吃子数」，停一手绝不能提前终结棋局。
-            // 否则孩子只要吃子领先，停一手就能直接判赢——这正是他能靠停手打掉龙尊的原因。
-            // 这里让 AI 停手只把先手还给小选手，不累加 pass、不终局。
-            const passed = GoCore.pass(current);
-            passed.consecutivePasses = 0;
-            passed.isGameOver = false;
-            updateAiDialogue('我这里没有能下的有效棋了，先让给你！');
-            setStatusMessage(`${activeProfile.name} 停一手 (Pass)`);
-            // 双方都无棋可下才结算：AI 无棋可下（getBestMove 返回 null 才走到这），
-            // 小选手这边若也只是「送子手/眼位」而无有意义落点，棋局就到此为止，按吃子数结算。
-            if (!GoAI.hasMeaningfulMove(passed, playerColor)) {
-              const finished = GoCore.cloneState(passed);
-              finished.isGameOver = true;
-              triggerEndGame(finished);
-            } else {
-              setBoardState(passed);
-            }
-          } else if (winRule === 'capture') {
-            // 吃子战：AI 无棋可下也停手只交换先手，不累加 pass、不终局。
-            // 双方都无有意义落点（棋盘真正下满/只剩死洞）时，才按吃子数结算。
-            const passed = GoCore.pass(current);
-            passed.consecutivePasses = 0;
-            passed.isGameOver = false;
-            updateAiDialogue('这里没有能下的有效棋了，我停一手！');
-            setStatusMessage(`${activeProfile.name} 停一手 (Pass)`);
-            if (!GoAI.hasMeaningfulMove(passed, playerColor)) {
-              const finished = GoCore.cloneState(passed);
-              finished.isGameOver = true;
-              triggerEndGame(finished);
-            } else {
-              setBoardState(passed);
             }
           } else {
-            const est = GoCore.estimateTerritory(current);
-            const komi = current.size === 19 ? 7.5 : current.size === 13 ? 5.5 : 3.5;
-            const myScore = aiColor === 'black' ? est.black : est.white + komi;
-            const oppScore = aiColor === 'black' ? est.white + komi : est.black;
-
-            if (myScore < oppScore) {
-              // 劣势且全盘单官收尽：体面投子认负！
-              const resignMsg = `黑棋大阵坚不可摧，防守滴水不漏！${activeProfile.name} 甘拜下风，投子认负！`;
-              updateAiDialogue(resignMsg);
-              setStatusMessage(`${activeProfile.name} 投子认负（中盘认输）`);
-              const resignedState = GoCore.cloneState(current);
-              resignedState.isGameOver = true;
-              resignedState.winner = playerColor;
-              resignedState.winReason = `对手【${activeProfile.name}】投子认负，中盘胜！`;
-              setBoardState(resignedState);
-              triggerEndGame(resignedState, resignedState.winReason, 'player');
-            } else {
-              // 优势且确实已终局：才选择停一手
+            // AI 没有合法的非真眼可下之步
+            if (winRule === 'timed-capture') {
+              // 限时吃子：比赛规则是「15 分钟到点比吃子数」，停一手绝不能提前终结棋局。
+              // 否则孩子只要吃子领先，停一手就能直接判赢——这正是他能靠停手打掉龙尊的原因。
+              // 这里让 AI 停手只把先手还给小选手，不累加 pass、不终局。
               const passed = GoCore.pass(current);
-              setBoardState(passed);
-              updateAiDialogue('棋局大势已定，边界已经分清，我选择停一手！');
+              passed.consecutivePasses = 0;
+              passed.isGameOver = false;
+              updateAiDialogue('我这里没有能下的有效棋了，先让给你！');
               setStatusMessage(`${activeProfile.name} 停一手 (Pass)`);
-              if (passed.isGameOver) {
-                triggerEndGame(passed);
+              // 双方都无棋可下才结算：AI 无棋可下（getBestMove 返回 null 才走到这），
+              // 小选手这边若也只是「送子手/眼位」而无有意义落点，棋局就到此为止，按吃子数结算。
+              if (!GoAI.hasMeaningfulMove(passed, playerColor)) {
+                const finished = GoCore.cloneState(passed);
+                finished.isGameOver = true;
+                triggerEndGame(finished);
+              } else {
+                setBoardState(passed);
+              }
+            } else if (winRule === 'capture') {
+              // 吃子战：AI 无棋可下也停手只交换先手，不累加 pass、不终局。
+              // 双方都无有意义落点（棋盘真正下满/只剩死洞）时，才按吃子数结算。
+              const passed = GoCore.pass(current);
+              passed.consecutivePasses = 0;
+              passed.isGameOver = false;
+              updateAiDialogue('这里没有能下的有效棋了，我停一手！');
+              setStatusMessage(`${activeProfile.name} 停一手 (Pass)`);
+              if (!GoAI.hasMeaningfulMove(passed, playerColor)) {
+                const finished = GoCore.cloneState(passed);
+                finished.isGameOver = true;
+                triggerEndGame(finished);
+              } else {
+                setBoardState(passed);
+              }
+            } else {
+              const est = GoCore.estimateTerritory(current);
+              const komi = current.size === 19 ? 7.5 : current.size === 13 ? 5.5 : 3.5;
+              const myScore = aiColor === 'black' ? est.black : est.white + komi;
+              const oppScore = aiColor === 'black' ? est.white + komi : est.black;
+
+              if (myScore < oppScore) {
+                // 劣势且全盘单官收尽：体面投子认负！
+                const resignMsg = `黑棋大阵坚不可摧，防守滴水不漏！${activeProfile.name} 甘拜下风，投子认负！`;
+                updateAiDialogue(resignMsg);
+                setStatusMessage(`${activeProfile.name} 投子认负（中盘认输）`);
+                const resignedState = GoCore.cloneState(current);
+                resignedState.isGameOver = true;
+                resignedState.winner = playerColor;
+                resignedState.winReason = `对手【${activeProfile.name}】投子认负，中盘胜！`;
+                setBoardState(resignedState);
+                triggerEndGame(resignedState, resignedState.winReason, 'player');
+              } else {
+                // 优势且确实已终局：才选择停一手
+                const passed = GoCore.pass(current);
+                setBoardState(passed);
+                updateAiDialogue('棋局大势已定，边界已经分清，我选择停一手！');
+                setStatusMessage(`${activeProfile.name} 停一手 (Pass)`);
+                if (passed.isGameOver) {
+                  triggerEndGame(passed);
+                }
               }
             }
           }
+        } finally {
+          setIsAiThinking(false);
         }
-
-        setIsAiThinking(false);
       }, 450);
 
       return () => clearTimeout(timer);

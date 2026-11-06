@@ -24,6 +24,13 @@ export class KataGoONNXEngine {
   }
 
   /**
+   * Check if ONNX model session is loaded and ready for real-time inference
+   */
+  static isReady(): boolean {
+    return !!(this.instance && this.instance.session);
+  }
+
+  /**
    * Initialize ONNX Runtime Web session
    */
   async init(): Promise<void> {
@@ -42,6 +49,7 @@ export class KataGoONNXEngine {
         if (typeof window !== 'undefined') {
           // In Browser PWA
           const response = await fetch('/models/katago-human-sl-18k-15k.onnx');
+          if (!response.ok) throw new Error(`Model fetch failed: ${response.status}`);
           modelData = await response.arrayBuffer();
         } else {
           // In Node / Headless Vitest
@@ -52,10 +60,16 @@ export class KataGoONNXEngine {
           modelData = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
         }
 
-        this.session = await ort.InferenceSession.create(modelData, {
+        // Add 3-second timeout protection to avoid infinite hang on mobile/unsupported browsers
+        const sessionPromise = ort.InferenceSession.create(modelData, {
           executionProviders: ['wasm'],
           graphOptimizationLevel: 'all',
         });
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('ONNX InferenceSession creation timeout')), 3000)
+        );
+
+        this.session = await Promise.race([sessionPromise, timeoutPromise]);
         // eslint-disable-next-line no-console
         console.log('[KataGo Human-SL] ONNX session initialized successfully');
       } catch (err) {
@@ -180,13 +194,15 @@ export class KataGoONNXEngine {
       rawLogits = (results.policy_logits.data as Float32Array).slice();
       rawValue = (results.value.data as Float32Array)[0];
     } else {
-      // Fallback policy generator if session is unavailable
+      // Fast tactical prior heuristic if ONNX session is unavailable
       rawLogits = new Float32Array(362);
       for (let cy = 0; cy < size; cy++) {
         for (let cx = 0; cx < size; cx++) {
           const tx = cx + padX;
           const ty = cy + padY;
-          rawLogits[ty * 19 + tx] = Math.random() * 2.0;
+          const edgeDist = Math.min(cx, size - 1 - cx, cy, size - 1 - cy);
+          const lineBonus = edgeDist === 2 || edgeDist === 3 ? 4.0 : edgeDist === 1 ? 1.5 : 2.0;
+          rawLogits[ty * 19 + tx] = lineBonus + Math.random() * 0.5;
         }
       }
     }

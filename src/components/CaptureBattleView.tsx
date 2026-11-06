@@ -107,58 +107,59 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
   useEffect(() => {
     if (boardState.turn === 'white' && !boardState.isGameOver) {
       const timer = setTimeout(async () => {
-        const current = stateRef.current;
-        if (current.turn !== 'white' || current.isGameOver) {
-          setIsAiThinking(false);
-          return;
-        }
+        try {
+          const current = stateRef.current;
+          if (current.turn !== 'white' || current.isGameOver) {
+            return;
+          }
 
-        const aiMove = await GoAI.getBestMoveAsync(current, 'white', {
-          difficulty: selectedAnimal.difficulty,
-          sparringLevel: (selectedAnimal.id.replace('robot-', '') as any),
-          captureTarget: effectiveTarget,
-        });
+          const aiMove = await GoAI.getBestMoveAsync(current, 'white', {
+            difficulty: selectedAnimal.difficulty,
+            sparringLevel: (selectedAnimal.id.replace('robot-', '') as any),
+            captureTarget: effectiveTarget,
+          });
 
-        if (aiMove) {
-          const aiResult = GoCore.playMove(
-            current,
-            aiMove,
-            'white',
-            effectiveTarget
-          );
-          setBoardState(aiResult.nextState);
+          if (aiMove) {
+            const aiResult = GoCore.playMove(
+              current,
+              aiMove,
+              'white',
+              effectiveTarget
+            );
+            setBoardState(aiResult.nextState);
 
-          if (aiResult.captured.length > 0) {
-            SoundEngine.playCaptureSound();
-            updateDialogue('嘿嘿，我吃到你的棋子啦！不过不要灰心哦～');
+            if (aiResult.captured.length > 0) {
+              SoundEngine.playCaptureSound();
+              updateDialogue('嘿嘿，我吃到你的棋子啦！不过不要灰心哦～');
+            } else {
+              SoundEngine.playStoneSound();
+              if (Math.random() < 0.3) {
+                const taunt =
+                  selectedAnimal.taunts[Math.floor(Math.random() * selectedAnimal.taunts.length)];
+                updateDialogue(taunt);
+              }
+            }
+
+            if (aiResult.nextState.isGameOver) {
+              if (aiResult.nextState.winner === 'black') {
+                SoundEngine.playVictoryFanfare();
+                onWinRecord(selectedAnimal.id);
+                setIsWinModalOpen(true);
+              } else if (aiResult.nextState.winner === 'white') {
+                SoundEngine.playErrorSound();
+                setIsDefeatModalOpen(true);
+                updateDialogue(`哎呀，我先吃满 ${effectiveTarget} 颗子啦！不过你包围的大龙太惊险了！`);
+              }
+            }
           } else {
-            SoundEngine.playStoneSound();
-            if (Math.random() < 0.3) {
-              const taunt =
-                selectedAnimal.taunts[Math.floor(Math.random() * selectedAnimal.taunts.length)];
-              updateDialogue(taunt);
-            }
+            // AI passes
+            const passed = GoCore.pass(current);
+            setBoardState(passed);
+            updateDialogue('我找不到合适的地方下了，这一手我虚手（Pass）～');
           }
-
-          if (aiResult.nextState.isGameOver) {
-            if (aiResult.nextState.winner === 'black') {
-              SoundEngine.playVictoryFanfare();
-              onWinRecord(selectedAnimal.id);
-              setIsWinModalOpen(true);
-            } else if (aiResult.nextState.winner === 'white') {
-              SoundEngine.playErrorSound();
-              setIsDefeatModalOpen(true);
-              updateDialogue(`哎呀，我先吃满 ${effectiveTarget} 颗子啦！不过你包围的大龙太惊险了！`);
-            }
-          }
-        } else {
-          // AI passes
-          const passed = GoCore.pass(current);
-          setBoardState(passed);
-          updateDialogue('我找不到合适的地方下了，这一手我虚手（Pass）～');
+        } finally {
+          setIsAiThinking(false);
         }
-
-        setIsAiThinking(false);
       }, 500);
 
       return () => clearTimeout(timer);

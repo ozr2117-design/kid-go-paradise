@@ -90,26 +90,33 @@ export class GoAI {
   ): Promise<Point | null> {
     if (state.isGameOver) return null;
 
-    try {
-      const tier: RobotTier =
-        options.sparringLevel === '15k' || options.sparringLevel === 'grandmaster'
-          ? '15k'
-          : options.sparringLevel === '16k' || options.sparringLevel === 'master'
-          ? '16k'
-          : options.sparringLevel === '17k' || options.sparringLevel === 'club'
-          ? '17k'
-          : '18k';
+    // 1. 若本地 KataGo ONNX 神经网络已就绪，优先采用直觉预测
+    if (KataGoONNXEngine.isReady()) {
+      try {
+        const tier: RobotTier =
+          options.sparringLevel === '15k' || options.sparringLevel === 'grandmaster'
+            ? '15k'
+            : options.sparringLevel === '16k' || options.sparringLevel === 'master'
+            ? '16k'
+            : options.sparringLevel === '17k' || options.sparringLevel === 'club'
+            ? '17k'
+            : '18k';
 
-      const engine = KataGoONNXEngine.getInstance();
-      const res = await engine.predict(state, color, tier);
-      if (res.bestMove) {
-        return res.bestMove;
+        const engine = KataGoONNXEngine.getInstance();
+        const res = await engine.predict(state, color, tier);
+        if (res && res.bestMove) {
+          return res.bestMove;
+        }
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn('[GoAI.getBestMoveAsync] ONNX inference fallback:', e);
       }
-    } catch (e) {
-      // eslint-disable-next-line no-console
-      console.warn('[GoAI.getBestMoveAsync] ONNX inference fallback:', e);
+    } else {
+      // 在后台静默预热初始化，不阻塞当前对局
+      KataGoONNXEngine.getInstance().init().catch(() => {});
     }
 
+    // 2. 核心保障：本地瞬时战术引擎（0延时，100%可靠，大龙2气死守）
     return this.getBestMove(state, color, options);
   }
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'weiqi-kids-offline-v9.31';
+const CACHE_NAME = 'weiqi-kids-offline-v9.32';
 
 const PRECACHE_ASSETS = [
   './',

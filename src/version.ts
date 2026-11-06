@@ -1,3 +1,3 @@
-export const APP_VERSION = 'v9.31';
-export const APP_VERSION_DATE = '2026-11-05';
-export const APP_VERSION_TITLE = 'KataGo Human-SL 异步引擎直通 · 2 气大龙生死绝境防守';
+export const APP_VERSION = 'v9.32';
+export const APP_VERSION_DATE = '2026-11-06';
+export const APP_VERSION_TITLE = '极速零阻塞战术引擎 · 双核无缝熔断守护';
