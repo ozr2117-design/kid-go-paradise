@@ -40,6 +40,12 @@ describe('101 Weiqi Official Question Bank Mathematical Verification', () => {
       const res = GoCore.playMove(state, sol, puzzle.initialTurn);
       expect(res.error).toBeUndefined();
       expect(res.nextState).toBeDefined();
+
+      // 5. Verify hint and explanation exist
+      expect(puzzle.hint).toBeDefined();
+      expect(puzzle.hint.length).toBeGreaterThan(0);
+      expect(puzzle.explanation).toBeDefined();
+      expect(puzzle.explanation!.length).toBeGreaterThan(0);
     });
   }
 });

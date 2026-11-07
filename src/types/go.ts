@@ -88,6 +88,7 @@ export interface PuzzleData {
   description: string;
   voicePrompt?: string; // Kid-friendly colloquial voice reading text
   hint: string;
+  explanation?: string; // Detailed teacher analysis and solution breakdown
   initialBoard: {
     black: Point[];
     white: Point[];

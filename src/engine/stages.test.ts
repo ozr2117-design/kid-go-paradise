@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { ADVENTURE_STAGES } from '../data/stages';
 import { GoCore } from './go-core';
 
-describe('Adventure Stages Validation (All 6 Chapters & 24 Puzzles)', () => {
-  it('should have exactly 6 chapters', () => {
-    expect(ADVENTURE_STAGES.length).toBe(6);
+describe('Adventure Stages Validation (All 7 Chapters & Authentic Puzzles)', () => {
+  it('should have exactly 7 chapters', () => {
+    expect(ADVENTURE_STAGES.length).toBe(7);
   });
 
   it('Chapter 1 should contain the 8 digitized ladder homework & mastery problems', () => {

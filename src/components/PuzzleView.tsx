@@ -20,6 +20,7 @@ import {
   Volume2,
   ChevronDown,
   ChevronUp,
+  BookOpen,
 } from 'lucide-react';
 
 interface PuzzleViewProps {
@@ -521,6 +522,26 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({
                   <span>💡 灵感锦囊：</span>
                 </div>
                 <p className="text-xs font-bold text-amber-900 leading-relaxed">{puzzle.hint}</p>
+              </div>
+            )}
+
+            {/* Level 4: Full Answer Explanation Card */}
+            {(hintVisible || usedHint) && puzzle.explanation && (
+              <div className="bg-orange-50 rounded-xl p-2.5 shadow-xs border border-orange-300 animate-pop-in text-xs text-amber-950 leading-relaxed">
+                <div className="flex items-center justify-between font-black text-orange-800 mb-1">
+                  <span className="flex items-center gap-1">
+                    <BookOpen className="w-3.5 h-3.5 text-orange-700" />
+                    <span>👨‍🏫 名师棋理解析：</span>
+                  </span>
+                  <button
+                    onClick={() => SoundEngine.speakText(puzzle.explanation || '')}
+                    className="p-1 rounded bg-orange-200 hover:bg-orange-300 text-orange-950"
+                    title="朗读棋理解析"
+                  >
+                    <Volume2 className="w-3 h-3" />
+                  </button>
+                </div>
+                <p className="text-[11px] font-medium text-amber-900">{puzzle.explanation}</p>
               </div>
             )}
           </div>

@@ -1,4 +1,5 @@
 import { StageInfo } from '../types/go';
+import { AUTHENTIC_101_PUZZLES_BANK } from './puzzles-101-bank';
 
 export const ADVENTURE_STAGES: StageInfo[] = [
   // ==========================================
@@ -775,5 +776,16 @@ export const ADVENTURE_STAGES: StageInfo[] = [
         },
       },
     ],
+  },
+  // ==========================================
+  // 第七章：名师专项·真假断点与叫吃要领
+  // ==========================================
+  {
+    id: 7,
+    title: '第七章：名师专项·真假断点与叫吃要领',
+    subtitle: '攻防分水岭！看清气数辨认真假断点，掌握向一线死亡线与向友军怀抱叫吃的方向绝招！',
+    icon: '⚔️',
+    themeColor: 'from-rose-500 to-amber-600',
+    puzzles: AUTHENTIC_101_PUZZLES_BANK.filter((p) => p.id.startsWith('101-teacher-')),
   },
 ];

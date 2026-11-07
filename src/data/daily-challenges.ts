@@ -654,9 +654,10 @@ export function getDaily15Puzzles(dateStr?: string): { theme: DayThemeInfo; puzz
   const rotatedMatching = rotateArray(matching, dayOfYear % Math.max(1, matching.length));
   const rotatedOthers = rotateArray(others, (dayOfYear * 3) % Math.max(1, others.length));
 
-  // Prioritize recently synchronized classroom test puzzles at the top
+  // Prioritize teacher cutting & directional atari puzzles at the top
+  const teacherPuzzles = AUTHENTIC_101_PUZZLES_BANK.filter((p) => p.id.startsWith('101-teacher-'));
   const cutPuzzles = SUPPLEMENTARY_DAILY_PUZZLES.filter((p) => p.id.startsWith('daily-cut-'));
-  const pool = [...cutPuzzles, ...rotatedMatching, ...rotatedOthers];
+  const pool = [...teacherPuzzles, ...cutPuzzles, ...rotatedMatching, ...rotatedOthers];
 
   // Return exactly 15 unique puzzles
   const selected: PuzzleData[] = [];

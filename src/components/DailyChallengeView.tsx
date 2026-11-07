@@ -19,6 +19,9 @@ import {
   Swords,
   Bot,
   Zap,
+  BookOpen,
+  HelpCircle,
+  Play,
 } from 'lucide-react';
 
 interface DailyChallengeViewProps {
@@ -36,6 +39,8 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
   const [dailyRecord, setDailyRecord] = useState<DailyChallengeRecord>(() => ProgressStore.getDailyRecord());
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [hintVisible, setHintVisible] = useState<boolean>(false);
+  const [solutionVisible, setSolutionVisible] = useState<boolean>(false);
+  const [demoActive, setDemoActive] = useState<boolean>(false);
   const [feedback, setFeedback] = useState<string>('');
   const [isCompletedModalOpen, setIsCompletedModalOpen] = useState<boolean>(false);
 
@@ -65,8 +70,40 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
     b.turn = puzzle.initialTurn;
     setBoardState(b);
     setHintVisible(false);
+    setSolutionVisible(false);
+    setDemoActive(false);
     setFeedback('');
   }, []);
+
+  const handleShowAnswerAndDemo = () => {
+    const sol = currentPuzzle.solutionTree.move;
+    if (!sol) return;
+
+    if (solutionVisible) {
+      setSolutionVisible(false);
+      return;
+    }
+
+    if (!demoActive) {
+      const res = GoCore.playMove(boardState, sol, currentPuzzle.initialTurn);
+      setBoardState(res.nextState);
+      if (res.captured.length > 0) {
+        SoundEngine.playCaptureSound();
+      } else {
+        SoundEngine.playStoneSound();
+      }
+      setDemoActive(true);
+    }
+    setSolutionVisible(true);
+    setFeedback('👨‍🏫 答案已展示：棋盘上已高亮标出正解落子！');
+    const speech = currentPuzzle.explanation || currentPuzzle.solutionTree.comment || '这就是正解下法！看懂了吗？点击重新挑战自己试一次吧！';
+    SoundEngine.speakText(speech);
+  };
+
+  const handleTryMyselfAfterAnswer = () => {
+    resetCurrentBoard(currentPuzzle);
+    SoundEngine.speakText('现在换你来下这一步！加油！');
+  };
 
   // When currentIndex changes, reset board
   useEffect(() => {
@@ -200,6 +237,13 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
             onPlayMove={handlePlayMove}
             showCoordinates={showCoordinates}
             singleTapToPlay={true}
+            highlightPoints={
+              demoActive || solutionVisible
+                ? currentPuzzle.solutionTree.move
+                  ? [currentPuzzle.solutionTree.move]
+                  : []
+                : []
+            }
           />
         </div>
 
@@ -253,6 +297,63 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
                 <span>{currentPuzzle.hint}</span>
               </div>
             )}
+
+            {/* 👨‍🏫 Teacher Answer & Full Analysis Card */}
+            {solutionVisible && (
+              <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-orange-400 rounded-2xl p-2.5 text-xs text-amber-950 mt-2 shadow-md animate-in fade-in slide-in-from-top-2">
+                <div className="flex items-center justify-between pb-1.5 border-b border-orange-200">
+                  <span className="font-black flex items-center gap-1 text-orange-700">
+                    <BookOpen className="w-4 h-4 text-orange-600" />
+                    <span>名师解答与棋理精析</span>
+                  </span>
+                  <button
+                    onClick={() =>
+                      SoundEngine.speakText(
+                        currentPuzzle.explanation || currentPuzzle.solutionTree.comment || ''
+                      )
+                    }
+                    className="p-1 rounded-md bg-orange-200 hover:bg-orange-300 text-orange-900"
+                    title="朗读解析"
+                  >
+                    <Volume2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <div className="mt-2 space-y-1.5 leading-relaxed font-medium">
+                  <div className="bg-white/80 p-2 rounded-xl border border-orange-200">
+                    <div className="text-[11px] font-black text-amber-800">🎯 正解落子：</div>
+                    <div className="text-xs font-bold text-emerald-700">
+                      落子在坐标 (
+                      {currentPuzzle.solutionTree.move
+                        ? `${currentPuzzle.solutionTree.move.x + 1}, ${
+                            currentPuzzle.solutionTree.move.y + 1
+                          }`
+                        : '中腹'}
+                      ) · {currentPuzzle.solutionTree.comment || '切中要害！'}
+                    </div>
+                  </div>
+
+                  <div className="bg-white/80 p-2 rounded-xl border border-orange-200 text-amber-900">
+                    <div className="text-[11px] font-black text-amber-800">👨‍🏫 棋理精析：</div>
+                    <div>{currentPuzzle.explanation || currentPuzzle.description}</div>
+                  </div>
+
+                  {currentPuzzle.hint && (
+                    <div className="text-[11px] text-amber-700 bg-amber-100/60 p-1.5 rounded-lg">
+                      💡 核心要诀：{currentPuzzle.hint}
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  onClick={handleTryMyselfAfterAnswer}
+                  className="w-full mt-2.5 py-1.5 px-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black rounded-xl text-xs transition shadow-xs flex items-center justify-center gap-1 active:scale-95"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>我懂了，重新挑战自己走！</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Action buttons */}
@@ -267,8 +368,20 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
               </button>
 
               <button
+                onClick={handleShowAnswerAndDemo}
+                className={`flex-1 flex items-center justify-center gap-1 py-2 px-2 font-black rounded-xl text-xs transition active:scale-95 border ${
+                  solutionVisible
+                    ? 'bg-orange-500 text-white border-orange-600 shadow-inner'
+                    : 'bg-orange-100 hover:bg-orange-200 text-orange-950 border-orange-300 shadow-xs'
+                }`}
+              >
+                <BookOpen className="w-3.5 h-3.5 text-orange-700" />
+                <span>{solutionVisible ? '收起答案' : '💡 看答案解答'}</span>
+              </button>
+
+              <button
                 onClick={() => resetCurrentBoard(currentPuzzle)}
-                className="flex items-center justify-center gap-1 py-2 px-3 bg-white hover:bg-amber-50 text-amber-900 font-bold rounded-xl text-xs transition active:scale-95 border border-amber-300"
+                className="flex items-center justify-center gap-1 py-2 px-2.5 bg-white hover:bg-amber-50 text-amber-900 font-bold rounded-xl text-xs transition active:scale-95 border border-amber-300"
                 title="重新摆盘"
               >
                 <RotateCcw className="w-3.5 h-3.5 text-amber-700" />
