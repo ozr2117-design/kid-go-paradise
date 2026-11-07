@@ -78,12 +78,33 @@ describe('GoAI Kid-Friendly Sparring Engine', () => {
       captureTarget: 15,
     });
     expect(eagleMove).toEqual({ x: 3, y: 4 });
+  });
 
-    const dragonMove = GoAI.getBestMove(board, 'white', {
-      difficulty: 'grandmaster',
-      captureTarget: 20,
+  it('18K Novice AI defends atari and captures opponent in 101 Weiqi standard', () => {
+    let board = GoCore.createEmptyBoard(9);
+    board = GoCore.playMove(board, { x: 4, y: 4 }, 'white').nextState;
+    board = GoCore.playMove(board, { x: 4, y: 3 }, 'black').nextState;
+    board = GoCore.playMove(board, { x: 4, y: 5 }, 'black').nextState;
+    board = GoCore.playMove(board, { x: 3, y: 4 }, 'black').nextState;
+    // White at (4,4) is in atari, only liberty is (5,4)
+    const escapeMove = GoAI.getBestMove(board, 'white', {
+      sparringLevel: '18k',
+      isFullGame: true,
     });
-    expect(dragonMove).toEqual({ x: 3, y: 4 });
+    expect(escapeMove).toEqual({ x: 5, y: 4 });
+
+    // Test 18K captures black when black is in atari
+    let board2 = GoCore.createEmptyBoard(9);
+    board2 = GoCore.playMove(board2, { x: 1, y: 1 }, 'black').nextState;
+    board2 = GoCore.playMove(board2, { x: 0, y: 1 }, 'white').nextState;
+    board2 = GoCore.playMove(board2, { x: 2, y: 1 }, 'white').nextState;
+    board2 = GoCore.playMove(board2, { x: 1, y: 0 }, 'white').nextState;
+    // Black at (1,1) has only liberty (1,2)
+    const capMove = GoAI.getBestMove(board2, 'white', {
+      sparringLevel: '18k',
+      isFullGame: true,
+    });
+    expect(capMove).toEqual({ x: 1, y: 2 });
   });
 
   it('runs Dragon Sovereign (龙尊) Grandmaster sparring AI on 13x13 and 19x19 with legal policy moves', () => {

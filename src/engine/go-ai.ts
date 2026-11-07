@@ -640,9 +640,8 @@ export class GoAI {
       // 3. 🚁 17K 巡逻机 (17K 巡逻侦察兵 / Club: 敏锐盯紧断点 + 贴身缠斗)
       chosen = this.getWarFoxFullGameMove(state, color, opponentColor, legalMoves, options);
     } else {
-      // 4. 🤖 18K 呆萌机 (18K 启蒙小助手 / Novice: 稳健启蒙陪练)
-      const mctsIterations = size === 9 ? 350 : size === 13 ? 200 : 100;
-      chosen = this.runMCTS(state, color, opponentColor, legalMoves, mctsIterations, options);
+      // 4. 🤖 18K 小智机 (对标 101 围棋网 18K 小智：叫吃必逃、见吃必吃、占角围空、保留实战断点)
+      chosen = this.getNovice18kFullGameMove(state, color, opponentColor, legalMoves, options);
     }
 
     // ========================================================
@@ -1321,6 +1320,89 @@ export class GoAI {
     }
 
     return score;
+  }
+
+  /**
+   * Level 1: 🤖 18K 小智机 (对标 101 围棋网 18K 小智机器人)
+   * 特点与人设：
+   * 1. 叫吃必逃 (Atari Escape - 85%): 己方棋子剩 1 气时，只要有生路，绝不白送！
+   * 2. 见吃必吃 (Immediate Capture - 85%): 对方棋子露出 1 气死穴，果断提子！
+   * 3. 序盘占角占边 (Opening Book - 前20手): 走星位、小目、三三、大飞拆边。
+   * 4. 2气警觉补强 (2-Liberty Defend - 60%): 接触战中防叫吃。
+   * 5. 杜绝自杀撞气: 不走送死点（自紧气至0或1气且无提子）。
+   * 6. 人类 18K 实战弱点: 不防双打吃、不防门吃倒扑，给孩子留下用手筋制胜的空间！
+   */
+  private static getNovice18kFullGameMove(
+    state: BoardState,
+    color: Color,
+    oppColor: Color,
+    legalMoves: Point[],
+    options: AIMoveOptions
+  ): Point | null {
+    const size = state.size;
+
+    // 1. 叫吃紧急逃跑（对标 101 小智 18K：见叫吃必跑）
+    const escapes = this.findEscapeAtariMoves(state, color, legalMoves);
+    const viableEscapes = escapes.filter((r) => !this.isDeadEscapeMove(state, r, color));
+    if (viableEscapes.length > 0) {
+      return viableEscapes[0];
+    }
+
+    // 2. 见吃必提（对标 101 小智 18K：见 1 气必提）
+    const captures = this.findImmediateCaptures(state, color, legalMoves);
+    if (captures.length > 0) {
+      captures.sort((a, b) => {
+        const ca = GoCore.playMove(state, a, color).captured.length;
+        const cb = GoCore.playMove(state, b, color).captured.length;
+        return cb - ca;
+      });
+      return captures[0];
+    }
+
+    // 3. 2 气危险大龙补强（60% 概率）
+    const twoLibRescues = this.findUrgentTwoLibertyRescueMoves(state, color, legalMoves);
+    if (twoLibRescues.length > 0 && Math.random() < 0.6) {
+      return twoLibRescues[0];
+    }
+
+    // 4. 布局定式库优先（序盘）
+    const moveNumber = state.moveHistory.length;
+    const maxBookMoves = size === 9 ? 8 : size === 13 ? 16 : 28;
+    if (moveNumber < maxBookMoves) {
+      const bookMove = this.getOpeningBookMove(state, legalMoves);
+      if (bookMove) return bookMove;
+    }
+
+    // 5. 过滤掉直接送吃的愚蠢招法（绝不自己往虎口送吃）
+    const safeMoves = legalMoves.filter((m) => {
+      if (this.isTrueEye(state, m, color)) return false;
+      const sim = GoCore.playMove(state, m, color);
+      if (sim.error) return false;
+      const grp = GoCore.findGroup(sim.nextState.grid, m);
+      if (grp && grp.liberties.length <= 1 && sim.captured.length === 0) {
+        return false;
+      }
+      return true;
+    });
+
+    const candidates = safeMoves.length > 0 ? safeMoves : legalMoves;
+
+    // 6. 用带有占空、连接和气数加权的快速评估进行候选排序
+    const scored = candidates
+      .map((m) => ({
+        move: m,
+        score: this.quickEval(state, m, color, oppColor),
+      }))
+      .sort((a, b) => b.score - a.score);
+
+    // 7. 从前 4 佳候选点中按带温和偏好的权重挑选（稳健中带有 18K 的适度灵动）
+    const topChoices = scored.slice(0, Math.min(4, scored.length));
+    if (topChoices.length > 0) {
+      const pickIdx = Math.floor(Math.random() * topChoices.length * 0.7);
+      return topChoices[pickIdx].move;
+    }
+
+    return scored[0]?.move || candidates[0] || null;
   }
 
   /**

@@ -40,10 +40,10 @@ import {
 const SPARRING_PROFILES: SparringProfile[] = [
   {
     id: 'novice',
-    name: '18K 呆萌机',
+    name: '18K 小智机',
     avatar: '🤖',
-    rank: '18K 启蒙小助手',
-    description: '101 围棋经典呆萌机！棋风温和呆萌，专注基础落子与基本死活，冲刺吃子战信心的第一站！',
+    rank: '18K 经典对标',
+    description: '对标 101 围棋网 18K 小智！会逃跑会吃子，稳健占角，中盘留有实战断点，是检验吃子战基本功的最佳练手！',
   },
   {
     id: 'club',
@@ -226,7 +226,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
             ? '我是 16K 哨兵机！金角银边、棋形严密，来一场堂堂正正的正规点目对决！🛡️'
             : lvl === 'club'
             ? '我是 17K 巡逻机！巡逻侦察，争夺地盘，小心你的薄弱连接哦！🚁'
-            : '我是 18K 呆萌机！金角银边、稳健做活，占领更多实地就能获胜！🤖';
+            : '我是 18K 小智机！对标 101 小智，金角银边、稳健做活，占领更多实地就能获胜！🤖';
         setAiDialogue(msg);
         SoundEngine.speakText(msg);
         if (pColor === 'white') {

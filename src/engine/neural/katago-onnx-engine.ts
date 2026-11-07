@@ -267,11 +267,11 @@ export class KataGoONNXEngine {
     }
 
     // Rank temperature sampling
-    // 18K: 1.4 (softer, occasional inaccuracy)
-    // 17K: 1.1
-    // 16K: 0.8
-    // 15K: 0.35 (sharp, almost greedy)
-    const tau = tier === '18k' ? 1.4 : tier === '17k' ? 1.1 : tier === '16k' ? 0.8 : 0.35;
+    // 18K: 0.9 (对标 101 小智 18K：落子合理稳健，少无谓乱扔子)
+    // 17K: 0.75
+    // 16K: 0.55
+    // 15K: 0.3 (锐利果决，顶峰实战)
+    const tau = tier === '18k' ? 0.9 : tier === '17k' ? 0.75 : tier === '16k' ? 0.55 : 0.3;
 
     // Softmax over candidates
     let sumExp = 0;

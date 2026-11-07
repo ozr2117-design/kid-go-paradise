@@ -1,5 +1,6 @@
 import { PuzzleData } from '../types/go';
 import { ADVENTURE_STAGES } from './stages';
+import { AUTHENTIC_101_PUZZLES_BANK } from './puzzles-101-bank';
 
 // Flatten all adventure stage puzzles as our primary base pool
 const ALL_STAGE_PUZZLES: PuzzleData[] = ADVENTURE_STAGES.flatMap((stage) => stage.puzzles);
@@ -605,8 +606,12 @@ export const SUPPLEMENTARY_DAILY_PUZZLES: PuzzleData[] = [
   },
 ];
 
-// Combine all puzzle sources
-export const FULL_PUZZLE_BANK: PuzzleData[] = [...ALL_STAGE_PUZZLES, ...SUPPLEMENTARY_DAILY_PUZZLES];
+// Combine all puzzle sources: authentic 101 exam bank + adventure stages + supplementary
+export const FULL_PUZZLE_BANK: PuzzleData[] = [
+  ...AUTHENTIC_101_PUZZLES_BANK,
+  ...ALL_STAGE_PUZZLES,
+  ...SUPPLEMENTARY_DAILY_PUZZLES,
+];
 
 export interface DayThemeInfo {
   dayName: string;
