@@ -1387,16 +1387,29 @@ export class GoAI {
 
     const candidates = safeMoves.length > 0 ? safeMoves : legalMoves;
 
-    // 6. 用带有占空、连接和气数加权的快速评估进行候选排序
+    // 6. 核心赋能：全面加载 Dragon Policy 大师大局观骨架（金角银边、三四路实地势力、严惩爬二路、大场优先）
+    const territoryEst = GoCore.estimateTerritory(state);
     const scored = candidates
       .map((m) => ({
         move: m,
-        score: this.quickEval(state, m, color, oppColor),
+        score: this.evaluateDragonPolicy(state, m, color, oppColor, territoryEst),
       }))
       .sort((a, b) => b.score - a.score);
 
-    // 7. 从前 4 佳候选点中按带温和偏好的权重挑选（稳健中带有 18K 的适度灵动）
-    const topChoices = scored.slice(0, Math.min(4, scored.length));
+    // 7. 序盘大局观（前 20 至 32 手）：优先抢占大师大场（星位、小目、空角、拆边）
+    const openingLimit = size === 9 ? 8 : size === 13 ? 20 : 32;
+    if (moveNumber < openingLimit && scored.length > 0) {
+      const topScore = scored[0].score;
+      if (topScore >= 180) {
+        const topPool = scored.filter((c) => c.score >= topScore - 50);
+        if (topPool.length > 0) {
+          return topPool[Math.floor(Math.random() * topPool.length)].move;
+        }
+      }
+    }
+
+    // 8. 中盘与官子：从前 3 佳具备大师风范的厚重选点中挑选（兼具沉稳与 18K 的适度灵动）
+    const topChoices = scored.slice(0, Math.min(3, scored.length));
     if (topChoices.length > 0) {
       const pickIdx = Math.floor(Math.random() * topChoices.length * 0.7);
       return topChoices[pickIdx].move;
@@ -1488,7 +1501,7 @@ export class GoAI {
       .map((m) => {
         const sim = GoCore.playMove(state, m, color);
         const cutBonus = sim.error ? -9999 : this.evaluateCutsAndPunish(state, sim, m, color, oppColor);
-        const baseScore = this.quickEval(state, m, color, oppColor);
+        const baseScore = this.evaluateDragonPolicy(state, m, color, oppColor);
         return {
           move: m,
           score: baseScore + cutBonus * 1.5,

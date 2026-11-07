@@ -1,3 +1,3 @@
-export const APP_VERSION = 'v9.41';
+export const APP_VERSION = 'v9.42';
 export const APP_VERSION_DATE = '2026-11-07';
-export const APP_VERSION_TITLE = '101 官方真题库接入 · 对标 101 小智 18K 全盘稳健实战';
+export const APP_VERSION_TITLE = '全员大师大局观架构 · 18K至15K金角银边与手筋对弈';

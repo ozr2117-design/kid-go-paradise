@@ -60,13 +60,13 @@ export class KataGoONNXEngine {
           modelData = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
         }
 
-        // Add 3-second timeout protection to avoid infinite hang on mobile/unsupported browsers
+        // Add 10-second timeout protection to avoid infinite hang on mobile/unsupported browsers
         const sessionPromise = ort.InferenceSession.create(modelData, {
           executionProviders: ['wasm'],
           graphOptimizationLevel: 'all',
         });
         const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('ONNX InferenceSession creation timeout')), 3000)
+          setTimeout(() => reject(new Error('ONNX InferenceSession creation timeout')), 10000)
         );
 
         this.session = await Promise.race([sessionPromise, timeoutPromise]);
