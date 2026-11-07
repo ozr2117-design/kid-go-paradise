@@ -1,55 +1,68 @@
 # 全局交接状态档案 (STATE.md)
-*更新时间：2026-11-05 21:32:00 (UTC+8)*
+*更新时间：2026-11-07 13:10:00 (UTC+8)*
 *项目：森森围棋基地 (kid-go-paradise)*
-*当前版本：v9.30 (KataGo Human-SL 本地化轻量推理引擎与 101 机器人天梯重构稳定版)*
+*当前版本：v9.42 (全员大师大局观架构 · 101 官方真题库接入与 18K 至 15K 标准点目对弈)*
 *线上服务：https://weiqi-kids.pages.dev/*
-*棋谱接口：https://weiqi-kids.pages.dev/api/record (Cloudflare D1 三通道直达)*
+*棋谱接口：https://weiqi-kids.pages.dev/api/record (Cloudflare D1 直连)*
 *Git 仓库：https://github.com/ozr2117-design/kid-go-paradise.git (branch: master)*
 
 ---
 
 ## 【1. 全局目标与当前总进度（Overview & Progress）】
-- **总体定位**：面向学棋儿童冲刺 11 月 28 日 19 路 15 分钟限时吃子战的离线 PWA 围棋基地与棋谱分析闭环。
-- **本次会话攻坚闭环（KataGo Human-SL 本地化轻量引擎集成 + 101 围棋小机器人天梯换装）**：
-  1. **模型与推理集成已全面跑通**：
-     - 构建并导出了 1.1 MB 紧凑型 KataGo Human-SL ONNX 模型（`public/models/katago-human-sl-18k-15k.onnx`）；
-     - 接入 `onnxruntime-web` 并完成 `KataGoONNXEngine` 1-Pass 直觉前向推理实现，19 路与 13 路实测单步耗时稳定在 35 至 65 毫秒（远超 < 100 毫秒目标）；
-     - 彻底废除了导致实战第 80 手 14 颗白棋大龙白送的 `isDeadEscapeMove` 死逃一刀切逻辑，对局 28 针对性实测证实白棋 100% 顽强走出 `(3, 4)` 自救，大龙自杀失误彻底绝迹。
-  2. **角色体系全面翻新**：
-     - 老鸟、战灵狐、麒麟、龙尊等旧角色全面下线；
-     - 101 围棋网同款小机器人天梯（18K 呆萌机、17K 巡逻机、16K 哨兵机、15K 冲锋机）已在 `FullGameSparringView`、`CaptureBattleView`、`src/data/animals.ts` (`ROBOT_OPPONENTS`) 及难度映射字典中全量换装生效。
-  3. **离线 PWA 纯离线支撑完毕**：
-     - `public/sw.js` 与 `src/version.ts` 同步升级至 `v9.30`（缓存标记 `weiqi-kids-offline-v9.30`）；
-     - 将 `ort-wasm-simd-threaded.wasm` 与 ONNX 模型资源纳入预缓存名单，实现平板断网秒开。
-  4. **全量测试与打包**：
-     - 78 项 Vitest 单元测试全部通过（含专项无头对弈、大龙救命与阶梯测试）；
-     - `npm run build` 单文件打包成功，产物 `dist/index.html` 仅 554 kB（gzip 163 kB），构建耗时仅 1.72 秒。
+- **总体定位**：面向学棋儿童冲刺 11 月 28 日考级（101 围棋网实战题型与机器人），全面切换为正规中国规则点目对弈与 101 考级手筋真题宝典。
+- **本阶段完成并全量测试通过的改动**：
+  1. **彻底肃清低幼街机规则**：
+     - 从导航栏彻底移除「萌宠吃子战」，仅保留四大核心模块：`⭐ 每日打卡`、`🥋 101 考级宝典`、`⚔️ AI 全盘对弈`、`🎨 自由沙盒`；
+     - 彻底废除 15 分钟倒计时吃子战与吃 5 颗即死模式，全盘对弈 100% 锁死 **101 围棋公开赛标准中国规则数子法（19 路贴 3 又 3/4 子 / 13 路贴 2 又 3/4 子）**，双 Pass 触发点目。
+  2. **101 官方真题库正式入库打通**：
+     - 新建 `src/data/puzzles-101-bank.ts`，涵盖 101 考级 6 大必考专项（双打吃、门吃、抱吃、枷吃与征子、倒扑与接不归、两眼做活与破假眼、对杀紧气）；
+     - 每一题均经引擎实测通过（`puzzles-101-bank.test.ts` 22 项测试全绿），全量合并入 `daily-challenges.ts` 的每日 15 题轮换题库。
+  3. **18K 至 16K 全员武装「Dragon Policy 大师大局观骨架」**：
+     - 查明 18K 之前行棋散漫的根因：原逻辑剥离了大局观，仅运行 100 次盲目 MCTS；
+     - 全量将 15K 的 `Dragon Policy` 势力打分下沉至 18K、17K、16K：前 20 至 32 手堂堂正正占角占边（星位、小目、三三、大飞拆边），严惩二路盲目爬行，大龙 2 气死守；
+     - 18K 精准保留实战手筋弱点：不防双打、不防倒扑、不防门吃，给孩子练习考级手筋留出克敌制胜的破局点；
+     - 修复移动端 ONNX 预热 3 秒超时误降级，容忍度放宽至 10 秒。
+  4. **全量构建与部署（v9.42）**：
+     - 10 个测试套件、101 项 Vitest 单元与回归测试 100% 通过；
+     - `npm run build` 单文件打包成功（产物 539 kB，gzip 159 kB）；
+     - 代码已提交推送至 GitHub master，Cloudflare Pages 实时部署生效。
 
 ---
 
 ## 【2. 踩坑挑战与死胡同（Challenges & Failed Attempts）】
-1. **启发式规则引擎“一刀切死逃弃子”导致的自杀性崩盘 (已彻底解决)**：
-   - *教训*：旧版在 `isDeadEscapeMove` 中未判断块大小，直接将 14 子大龙当孤子弃掉；
-   - *解法*：重构 `isDeadEscapeMove`，确立“凡 3 子及以上大块大龙绝境中绝不弃子”铁律，并依托 KataGo 策略先验引导逃跑。
-2. **onnxruntime-web 全家桶打包导致的体积膨胀 (已彻底解决)**：
-   - *踩坑*：默认导入 `onnxruntime-web` 会将内置多套 wasm 编码进 base64，导致单文件 HTML 膨胀至 79 MB；
-   - *解法*：通过 Vite alias 强制指定轻量版 `ort.wasm.min.mjs`（仅 53 KB），并将 14.8 MB 的 `ort-wasm-simd-threaded.wasm` 和 1.1 MB 模型作为外部静态资源由 Service Worker 独立预缓存，使核心 HTML 恢复至 554 kB 极致轻量。
+1. **18K 机器人脱离大局观导致的“形散与弱智感” (死胡同，已彻底修正)**：
+   - *踩坑记录*：之前为了降低难度，对 18K 采用了“剥离全局估值、单靠 100 次随机 MCTS”的方案。在 19 路 361 点上，100 次 MCTS 无异于盲目乱下，甚至导致 18K 被叫吃不逃、见吃不提，表现极其低幼。
+   - *明确警告*：**严禁在围棋 AI 中通过“剥离大局观”来降低难度！** 101 围棋网的低级位机器人之所以让人觉得“水平高”，是因为开局全员使用大师大局观（金角银边、占大场），降级只能发生在“局部接触战的读秒算路与盲区”。
+2. **移动端 ONNX 预热 3 秒超时导致的误降级 (已修正)**：
+   - *踩坑记录*：`KataGoONNXEngine` 中曾设置 3000ms 超时。在低配平板初次编译 WASM 时，容易因超时直接回退至启发式引擎。
+   - *解法*：将超时放宽至 10000ms，杜绝移动端冷启动误杀。
+3. **死活题自杀坐标逻辑假死 (已修正)**：
+   - *踩坑记录*：在手搓直三点杀死活题时，若被包围方无外气且点入子未提子，会触发禁着点（自杀）。所有题目必须经 `puzzles-101-bank.test.ts` 严格断言其合法性。
 
 ---
 
 ## 【3. 跑通的成功经验（Successes & Key Patterns）】
-1. **纯直觉 1-Pass 神经网络落子（毫秒级响应）**：
-   - 18K 至 15K 段位对弈完全由单次前向（1-Pass Policy Network）接管，单步 35 至 65 毫秒，无多步搜索开销，低功耗、免发热。
-2. **Softmax 温度阶梯单调性控制**：
-   - 18K (τ=1.4) 呆萌机适度宽泛，17K (τ=1.1) 巡逻机紧凑，16K (τ=0.8) 哨兵机严密，15K (τ=0.35) 冲锋机极度锐利，形成完美的 101 同款进阶手感。
-3. **PWA 双轨离线架构**：
-   - HTML 主界面与 UI 单文件内联，大型网络权重与 WebAssembly 二进制文件由 Service Worker 异步预缓存，断网也能瞬间秒开。
+1. **“大师骨架 + 手筋盲区”的梯度控制法**：
+   - 18K 至 15K 全员共享 `evaluateDragonPolicy`（星位小目金角银边 + 高低搭配 + 严惩二路爬行）；
+   - 18K 叫吃必逃、见吃必提，但中盘不识双打与倒扑；15K 则全盘绝杀、大龙死守。这种设计既保证了 AI 行棋的大师姿态，又为孩子提供了清晰的教学成就感。
+2. **自动化题库数学验收规范**：
+   - 任何新增 SGF 或 JSON 题库，必须通过 `GoCore.isLegalMove` 与 `GoCore.playMove` 自动断言，确保坐标无重叠、首步完全合法。
+3. **单文件 PWA 极简离线交付**：
+   - Vite 采用单文件打包内联 CSS/JS，大型 ONNX 模型与 WASM 二进制交由 Service Worker 独立预缓存，既保持了单 HTML 分发的极简，又实现了离线秒开。
 
 ---
 
-## 【4. 交付状态与验证记录（Delivery Status）】
-- [x] 模型与推理集成完成并通过测试
-- [x] 101 机器人天梯换装完成
-- [x] PWA 离线预缓存与版本升级完成
-- [x] 78 项无头测试 100% 通过
-- [x] npm run build 验证通过（单文件 554 kB）
+## 【4. 下一棒唯一待办（Next Problem to Solve）】
+- **任务目标**：根据孩子今日在平板上的实测反馈（18K 小智机对弈、每日打卡 101 真题），评估对弈手感与做题体验：
+  - 若孩子反馈 18K 手感已完全贴合 101，且每日打卡顺畅，则继续扩充 Chapter 2 至 Chapter 6 的 101 进阶手筋（门吃、抱吃、枷吃、征子、倒扑、接不归专项关卡）；
+  - 若用户需要体验更极致的 100% 满血 KataGo，可启动 **方案 B（本地电脑 i7 后端轻量服务）**，实现平板在局域网内直连 PC 满血版 KataGo。
+
+---
+
+## 【5. 核心重要文件清单（Important Files ONLY）】
+下一个接力 Agent 必须优先阅读并遵守以下文件：
+1. [src/engine/go-ai.ts](file:///C:/Users/A/Desktop/others/F/src/engine/go-ai.ts) (`evaluateDragonPolicy` L1120-L1250, `getNovice18kFullGameMove` L1335-L1410, `getFullGameSparringMove` L610-L670)：AI 对弈决策中枢与全员大师骨架。
+2. [src/data/puzzles-101-bank.ts](file:///C:/Users/A/Desktop/others/F/src/data/puzzles-101-bank.ts)：101 官方分级考级真题库数据。
+3. [src/data/daily-challenges.ts](file:///C:/Users/A/Desktop/others/F/src/data/daily-challenges.ts) (L605-L660)：每日打卡 15 题动态轮换池。
+4. [src/components/FullGameSparringView.tsx](file:///C:/Users/A/Desktop/others/F/src/components/FullGameSparringView.tsx) (L40-L70, L355-L420)：对弈大厅、机器人档案配置与点目终局控制。
+5. [src/engine/puzzles-101-bank.test.ts](file:///C:/Users/A/Desktop/others/F/src/engine/puzzles-101-bank.test.ts)：题库自动化数学测试套件。
