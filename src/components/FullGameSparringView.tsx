@@ -15,6 +15,7 @@ import { AiSensei } from '../engine/ai-sensei';
 import { SoundEngine } from '../engine/sound-engine';
 import { saveGameRecord, GameRecord } from '../engine/game-recorder';
 import { uploadGameRecord } from '../engine/cloud-recorder';
+import { PcKataGoClient } from '../engine/pc-katago-client';
 import { GoBoard } from './GoBoard';
 import { SparringSettlementModal } from './SparringSettlementModal';
 import {
@@ -108,6 +109,23 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
 
   // 记录小选手是否在对局中使用了停一手（用于名师复盘与投机诊断）
   const [playerAttemptedPass, setPlayerAttemptedPass] = useState<boolean>(false);
+
+  // 局域网 PC 满血 KataGo 算力连接状态
+  const [isPcConnected, setIsPcConnected] = useState<boolean>(false);
+
+  useEffect(() => {
+    let mounted = true;
+    const checkPc = async () => {
+      const ok = await PcKataGoClient.probeStatus();
+      if (mounted) setIsPcConnected(ok);
+    };
+    checkPc();
+    const interval = setInterval(checkPc, 10000);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   const activeProfile = SPARRING_PROFILES.find((p) => p.id === aiLevel) || SPARRING_PROFILES[1];
   const aiColor: Color = playerColor === 'black' ? 'white' : 'black';
@@ -637,9 +655,28 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
             <span className="text-xs font-black text-amber-950 font-cartoon flex items-center gap-1">
               <span>🥋 挑选对弈对手</span>
             </span>
-            <span className="text-[10px] font-bold text-amber-800 bg-amber-100/90 px-1.5 py-0.5 rounded-full">
-              当前: {activeProfile.name} ({activeProfile.rank.split(' ')[0]})
-            </span>
+            <div className="flex items-center gap-1.5">
+              {isPcConnected ? (
+                <span
+                  className="text-[9px] font-bold text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-1.5 py-0.5 rounded-full flex items-center gap-1 shadow-2xs"
+                  title="已直连局域网 PC 满血 KataGo Human-SL 算力 (192.168.10.135:8765)"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span>PC满血算力</span>
+                </span>
+              ) : (
+                <span
+                  className="text-[9px] font-bold text-amber-800/80 bg-amber-100/70 border border-amber-200 px-1.5 py-0.5 rounded-full flex items-center gap-1"
+                  title="移动端单机模式（内置启发式引擎与轻量神经策略）"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                  <span>单机模式</span>
+                </span>
+              )}
+              <span className="text-[10px] font-bold text-amber-800 bg-amber-100/90 px-1.5 py-0.5 rounded-full">
+                当前: {activeProfile.name} ({activeProfile.rank.split(' ')[0]})
+              </span>
+            </div>
           </div>
 
           <div className="grid grid-cols-4 gap-1">

@@ -1,6 +1,7 @@
 import { BoardSize, BoardState, Color, Point } from '../types/go';
 import { GoCore } from './go-core';
 import { KataGoONNXEngine, RobotTier } from './neural/katago-onnx-engine';
+import { PcKataGoClient } from './pc-katago-client';
 
 export type AIDifficulty = 'beginner' | 'intermediate' | 'advanced' | 'master' | 'grandmaster';
 export type AISparringLevel = '18k' | '17k' | '16k' | '15k' | 'novice' | 'club' | 'master' | 'grandmaster';
@@ -89,6 +90,21 @@ export class GoAI {
     options: AIMoveOptions = { difficulty: 'beginner' }
   ): Promise<Point | null> {
     if (state.isGameOver) return null;
+
+    // 0. 优先检测局域网 PC 满血 KataGo Human-SL 算力服务 (192.168.10.135:8765)
+    // 毫秒级即时响应，原汁原味真实人类棋风，支持 18K 至 15K 等各级段位
+    if (options.isFullGame || !options.captureTarget) {
+      try {
+        const targetLevel = options.sparringLevel || (options.difficulty === 'grandmaster' ? '15k' : '18k');
+        const pcMove = await PcKataGoClient.requestMove(state, color, targetLevel);
+        if (pcMove) {
+          return pcMove;
+        }
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn('[GoAI.getBestMoveAsync] PC KataGo fallback:', e);
+      }
+    }
 
     // 1. 若本地 KataGo ONNX 神经网络已就绪，优先采用直觉预测
     if (KataGoONNXEngine.isReady()) {
@@ -1189,6 +1205,10 @@ export class GoAI {
     }
 
     // 5. Macro Corner Prior (金角银边): Empty corners, approach & 3-3 invasion
+    // 🛡️ 局部接触战防御铁律：若我方弱子正遭受对手上一手贴身紧逼（<=3气），
+    // 严禁大局观空角加分诱导脱先，必须集中火力进行局部作战！
+    const isUnderPressure = this.isFriendlyStoneUnderContactPressure(state, color, oppColor);
+
     const cornerSpan = size === 19 ? 6 : size === 13 ? 5 : 4;
     const cornerStartX = move.x < size / 2 ? 0 : size - cornerSpan;
     const cornerEndX = move.x < size / 2 ? cornerSpan - 1 : size - 1;
@@ -1211,17 +1231,34 @@ export class GoAI {
       (distToEdgeX === 2 || distToEdgeX === 3) && (distToEdgeY === 2 || distToEdgeY === 3);
 
     if (stonesInCornerSector === 0) {
-      if (isCornerPoint) {
-        score += 480; // 抢占空角星位/小目 (金角大局观)
-      } else if (line === 3 || line === 4) {
-        score += 260;
+      if (!isUnderPressure) {
+        if (isCornerPoint) {
+          score += 480; // 抢占空角星位/小目 (金角大局观)
+        } else if (line === 3 || line === 4) {
+          score += 260;
+        }
       }
     } else if (stonesInCornerSector === 1 && oppStonesInSector === 1) {
-      const is33 = distToEdgeX === 2 && distToEdgeY === 2;
-      if (is33) {
-        score += 380; // 点三三直捣黄龙破空 (101 15K 经典战术)
-      } else if (isCornerPoint) {
-        score += 310; // 挂角紧逼
+      if (!isUnderPressure) {
+        const is33 = distToEdgeX === 2 && distToEdgeY === 2;
+        if (is33) {
+          score += 380; // 点三三直捣黄龙破空 (101 15K 经典战术)
+        } else if (isCornerPoint) {
+          score += 310; // 挂角紧逼
+        }
+      }
+    }
+
+    // 5.5 贴身肉搏局部应手强行提升（若敌紧逼，应在局部就地做活或长气缠斗）
+    if (isUnderPressure && state.lastMove) {
+      const distToLast = Math.abs(move.x - state.lastMove.x) + Math.abs(move.y - state.lastMove.y);
+      if (distToLast <= 2) {
+        const afterGrp = GoCore.findGroup(sim.nextState.grid, move);
+        if (afterGrp && afterGrp.liberties.length >= 3) {
+          score += 520; // 局部作战防守反击最高优先级！
+        } else {
+          score += 320;
+        }
       }
     }
 
@@ -1332,6 +1369,44 @@ export class GoAI {
    * 5. 杜绝自杀撞气: 不走送死点（自紧气至0或1气且无提子）。
    * 6. 人类 18K 实战弱点: 不防双打吃、不防门吃倒扑，给孩子留下用手筋制胜的空间！
    */
+  /**
+   * 🛡️ 战术警戒检测：对手上一手是否贴身紧逼我方气数不足（<=3气）的棋子？
+   * 仅局部扫描对手落子周围曼哈顿距离 <= 2 的邻域，若存在 <= 3 气友军，
+   * 序盘坚决禁止脱先占空角，必须强制进入局部作战应手！
+   */
+  private static isFriendlyStoneUnderContactPressure(
+    state: BoardState,
+    color: Color,
+    oppColor: Color
+  ): boolean {
+    const lastMove = state.lastMove;
+    if (!lastMove || lastMove.color !== oppColor) return false;
+
+    const size = state.size;
+    const checked = new Set<string>();
+    for (let dx = -2; dx <= 2; dx++) {
+      for (let dy = -2; dy <= 2; dy++) {
+        if (Math.abs(dx) + Math.abs(dy) > 2) continue;
+        const x = lastMove.x + dx;
+        const y = lastMove.y + dy;
+        if (x < 0 || x >= size || y < 0 || y >= size) continue;
+        if (state.grid[y][x] === color) {
+          const key = `${x},${y}`;
+          if (!checked.has(key)) {
+            const grp = GoCore.findGroup(state.grid, { x, y });
+            if (grp) {
+              for (const p of grp.points) checked.add(`${p.x},${p.y}`);
+              if (grp.liberties.length <= 3) {
+                return true;
+              }
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+
   private static getNovice18kFullGameMove(
     state: BoardState,
     color: Color,
@@ -1397,8 +1472,10 @@ export class GoAI {
       .sort((a, b) => b.score - a.score);
 
     // 7. 序盘大局观（前 20 至 32 手）：优先抢占大师大场（星位、小目、空角、拆边）
+    // 🛡️ 贴身接触战防御铁律：若我方弱子正遭受贴身紧逼，绝不脱先，坚决进入局部缠斗！
+    const isContactPressure = this.isFriendlyStoneUnderContactPressure(state, color, oppColor);
     const openingLimit = size === 9 ? 8 : size === 13 ? 20 : 32;
-    if (moveNumber < openingLimit && scored.length > 0) {
+    if (!isContactPressure && moveNumber < openingLimit && scored.length > 0) {
       const topScore = scored[0].score;
       if (topScore >= 180) {
         const topPool = scored.filter((c) => c.score >= topScore - 50);
@@ -1585,8 +1662,10 @@ export class GoAI {
     }
 
     // 2. Opening variety: In the opening phase, pick from top high-macro moves
+    // 🛡️ 贴身肉搏防御铁律：若我方弱子正遭受对手贴身紧逼，绝不脱先，交由 MCTS 深入搜索局部最优战斗手！
+    const isContactPressure = this.isFriendlyStoneUnderContactPressure(state, color, oppColor);
     const openingLimit = size === 9 ? 8 : size === 13 ? 24 : 40;
-    if (state.moveHistory.length < openingLimit && scoredCandidates.length > 0) {
+    if (!isContactPressure && state.moveHistory.length < openingLimit && scoredCandidates.length > 0) {
       const topScore = scoredCandidates[0].score;
       if (topScore >= 180) {
         const topPool = scoredCandidates.filter((c) => c.score >= topScore - 40);

@@ -28,3 +28,13 @@ CLOUDFLARE_KEEP_ALIVE.md
 scratch/
 .wrangler/
 .workbuddy/
+.handoff/*.py
+.handoff/*.json
+
+# KataGo 本地满血二进制与模型权重（体积过大不入 git）
+katago_server/*.exe
+katago_server/*.dll
+katago_server/*.bin.gz
+katago_server/gtp_logs/
+katago_server/*.zip
+*.apk
