@@ -78,6 +78,8 @@ class KataGoProcess:
         self.proc = None
         self.current_profile = None
         self.current_visits = None
+        self.current_board_size = None
+        self.current_moves = []
         self.start_process()
 
     def start_process(self):
@@ -155,16 +157,16 @@ class KataGoProcess:
             lvl = (level or "").lower()
             if lvl in ["18k", "novice", "beginner"]:
                 profile = "rank_18k"
-                visits = 8
+                visits = 1
             elif lvl in ["17k", "intermediate"]:
                 profile = "rank_17k"
-                visits = 12
+                visits = 1
             elif lvl in ["16k", "master", "advanced"]:
                 profile = "rank_16k"
-                visits = 16
+                visits = 1
             else:  # 15k, grandmaster, default
                 profile = "rank_15k"
-                visits = 24
+                visits = 1
 
             # Update parameters on the fly if changed
             if self.current_profile != profile:
@@ -174,16 +176,35 @@ class KataGoProcess:
                 self.send_command(f"kata-set-param maxVisits {visits}")
                 self.current_visits = visits
 
-            # Set board size and rules
-            self.send_command(f"boardsize {board_size}")
-            self.send_command("clear_board")
-            self.send_command(f"komi {komi}")
+            # Check if current board in KataGo matches move_history prefix (incremental sync)
+            is_incremental = (
+                self.current_board_size == board_size and
+                len(move_history) >= len(self.current_moves) and
+                all(
+                    m1.get("x") == m2.get("x") and
+                    m1.get("y") == m2.get("y") and
+                    m1.get("color") == m2.get("color")
+                    for m1, m2 in zip(self.current_moves, move_history[:len(self.current_moves)])
+                )
+            )
 
-            # Replay move history
-            for m in move_history:
+            if not is_incremental:
+                # Reset board and replay full history
+                self.send_command(f"boardsize {board_size}")
+                self.send_command("clear_board")
+                self.send_command(f"komi {komi}")
+                self.current_board_size = board_size
+                self.current_moves = []
+                new_moves = move_history
+            else:
+                # Only play delta moves since last turn
+                new_moves = move_history[len(self.current_moves):]
+
+            for m in new_moves:
                 m_color = "B" if m.get("color") == "black" else "W"
                 gtp_pos = point_to_gtp(m.get("x", -1), m.get("y", -1), board_size)
                 self.send_command(f"play {m_color} {gtp_pos}")
+                self.current_moves.append(m)
 
             # Request move
             ai_color = "B" if turn == "black" else "W"
@@ -191,7 +212,10 @@ class KataGoProcess:
             duration_ms = int((time.time() - t0) * 1000)
 
             pt = gtp_to_point(res, board_size)
-            logger.info(f"[{profile}|{visits}v] Move generated: {res} -> {pt} in {duration_ms}ms")
+            if pt:
+                self.current_moves.append({"x": pt["x"], "y": pt["y"], "color": turn})
+
+            logger.info(f"[{profile}|{visits}v|{len(self.current_moves)}m] Move generated: {res} -> {pt} in {duration_ms}ms (incremental={is_incremental})")
 
             return {
                 "move": pt,

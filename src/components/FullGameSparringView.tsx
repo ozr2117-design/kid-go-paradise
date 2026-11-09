@@ -479,7 +479,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
         } finally {
           setIsAiThinking(false);
         }
-      }, 450);
+      }, 120);
 
       return () => clearTimeout(timer);
     }
