@@ -78,6 +78,7 @@ class KataGoProcess:
         self.proc = None
         self.current_profile = None
         self.current_visits = None
+        self.current_temp = None
         self.current_board_size = None
         self.current_moves = []
         self.start_process()
@@ -153,20 +154,24 @@ class KataGoProcess:
     def generate_move(self, board_size: int, move_history: list, turn: str, level: str, komi: float = 7.5):
         with self.lock:
             t0 = time.time()
-            # Map level to Human-SL profile & visits
+            # Map level to Human-SL profile, visits & temperature
             lvl = (level or "").lower()
             if lvl in ["18k", "novice", "beginner"]:
+                profile = "rank_20k"
+                visits = 1
+                temp = 1.30
+            elif lvl in ["17k", "intermediate", "club"]:
+                profile = "rank_20k"
+                visits = 1
+                temp = 1.10
+            elif lvl in ["16k", "master", "advanced"]:
                 profile = "rank_18k"
                 visits = 1
-            elif lvl in ["17k", "intermediate"]:
-                profile = "rank_17k"
-                visits = 1
-            elif lvl in ["16k", "master", "advanced"]:
-                profile = "rank_16k"
-                visits = 1
+                temp = 0.95
             else:  # 15k, grandmaster, default
                 profile = "rank_15k"
                 visits = 1
+                temp = 0.75
 
             # Update parameters on the fly if changed
             if self.current_profile != profile:
@@ -175,6 +180,11 @@ class KataGoProcess:
             if self.current_visits != visits:
                 self.send_command(f"kata-set-param maxVisits {visits}")
                 self.current_visits = visits
+            if self.current_temp != temp:
+                self.send_command(f"kata-set-param chosenMoveTemperature {temp}")
+                self.send_command(f"kata-set-param chosenMoveTemperatureEarly {temp}")
+                self.send_command("kata-set-param chosenMoveTemperatureOnlyBelowProb 1.0")
+                self.current_temp = temp
 
             # Check if current board in KataGo matches move_history prefix (incremental sync)
             is_incremental = (
@@ -215,13 +225,14 @@ class KataGoProcess:
             if pt:
                 self.current_moves.append({"x": pt["x"], "y": pt["y"], "color": turn})
 
-            logger.info(f"[{profile}|{visits}v|{len(self.current_moves)}m] Move generated: {res} -> {pt} in {duration_ms}ms (incremental={is_incremental})")
+            logger.info(f"[{profile}|t={temp}|{visits}v|{len(self.current_moves)}m] Move generated: {res} -> {pt} in {duration_ms}ms (incremental={is_incremental})")
 
             return {
                 "move": pt,
                 "gtpMove": res,
                 "profile": profile,
                 "visits": visits,
+                "temperature": temp,
                 "durationMs": duration_ms
             }
 

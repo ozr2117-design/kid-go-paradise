@@ -1,3 +1,3 @@
-export const APP_VERSION = 'v9.44';
+export const APP_VERSION = 'v9.45';
 export const APP_VERSION_DATE = '2026-11-09';
-export const APP_VERSION_TITLE = 'KataGo 满血 Human-SL 局域网直连 · 0.6s 极速推演与局部反击系统';
+export const APP_VERSION_TITLE = 'KataGo Human-SL 真实少儿拟真分级 · rank_20k 破绽注入与手筋实战系统';
