@@ -37,4 +37,5 @@ katago_server/*.dll
 katago_server/*.bin.gz
 katago_server/gtp_logs/
 katago_server/*.zip
+katago_server/game_records.json
 *.apk

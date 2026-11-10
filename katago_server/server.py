@@ -272,6 +272,19 @@ class AppRequestHandler(SimpleHTTPRequestHandler):
             self.wfile.write(json.dumps(data).encode("utf-8"))
             return
 
+        if parsed.path == "/api/last_game":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+            data = {
+                "ok": True,
+                "boardSize": KATAGO_ENGINE.current_board_size,
+                "moves": KATAGO_ENGINE.current_moves,
+                "totalMoves": len(KATAGO_ENGINE.current_moves)
+            }
+            self.wfile.write(json.dumps(data).encode("utf-8"))
+            return
+
         # SPA Fallback: if requesting a route that doesn't exist on disk, serve index.html
         local_path = self.translate_path(self.path)
         if not os.path.exists(local_path) and os.path.exists(os.path.join(DIST_DIR, "index.html")):
@@ -281,7 +294,41 @@ class AppRequestHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urlparse(self.path)
-        if parsed.path == "/api/move":
+        if parsed.path == "/api/record":
+            try:
+                content_length = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(content_length).decode("utf-8")
+                payload = json.loads(body)
+
+                records_file = os.path.join(DIR_PATH, "game_records.json")
+                existing = []
+                if os.path.exists(records_file):
+                    try:
+                        with open(records_file, "r", encoding="utf-8") as rf:
+                            existing = json.load(rf)
+                    except Exception:
+                        existing = []
+
+                incoming = payload.get("records") if isinstance(payload, dict) and "records" in payload else [payload]
+                for r in incoming:
+                    if r and isinstance(r, dict):
+                        existing.append(r)
+
+                with open(records_file, "w", encoding="utf-8") as wf:
+                    json.dump(existing, wf, ensure_ascii=False, indent=2)
+                logger.info(f"Successfully recorded {len(incoming)} game record(s) to local file")
+
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(json.dumps({"ok": True, "saved": len(incoming)}).encode("utf-8"))
+            except Exception as e:
+                logger.error(f"Error handling /api/record: {e}", exc_info=True)
+                self.send_response(500)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(json.dumps({"ok": False, "error": str(e)}).encode("utf-8"))
+            return
             try:
                 content_length = int(self.headers.get("Content-Length", 0))
                 body = self.rfile.read(content_length).decode("utf-8")
