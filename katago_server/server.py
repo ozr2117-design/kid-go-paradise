@@ -159,19 +159,19 @@ class KataGoProcess:
             if lvl in ["18k", "novice", "beginner"]:
                 profile = "rank_20k"
                 visits = 1
-                temp = 1.15
+                temp = 1.60
             elif lvl in ["17k", "intermediate", "club"]:
+                profile = "rank_20k"
+                visits = 1
+                temp = 1.30
+            elif lvl in ["16k", "master", "advanced"]:
                 profile = "rank_18k"
                 visits = 1
-                temp = 0.95
-            elif lvl in ["16k", "master", "advanced"]:
+                temp = 1.05
+            else:  # 15k, grandmaster, default
                 profile = "rank_15k"
                 visits = 1
-                temp = 0.80
-            else:  # 15k, grandmaster, default
-                profile = "rank_12k"
-                visits = 1
-                temp = 0.65
+                temp = 0.85
 
             # Update parameters on the fly if changed
             if self.current_profile != profile:
@@ -184,6 +184,7 @@ class KataGoProcess:
                 self.send_command(f"kata-set-param chosenMoveTemperature {temp}")
                 self.send_command(f"kata-set-param chosenMoveTemperatureEarly {temp}")
                 self.send_command("kata-set-param chosenMoveTemperatureOnlyBelowProb 1.0")
+                self.send_command("kata-set-param chosenMoveTemperatureHalflife 9999")
                 self.current_temp = temp
 
             # Check if current board in KataGo matches move_history prefix (incremental sync)
