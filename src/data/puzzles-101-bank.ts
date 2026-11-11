@@ -1194,4 +1194,345 @@ export const AUTHENTIC_101_PUZZLES_BANK: PuzzleData[] = [
     },
   },
 
+// ========================================================
+  // 十一、名师倒扑实战强化（送子弃子诱敌与逆向反杀）
+  // ========================================================
+  {
+    id: '101-teacher-snapback-01',
+    title: '名师专项·角部一路送子倒扑',
+    category: 'capture',
+    difficulty: 'medium',
+    boardSize: 9,
+    initialTurn: 'black',
+    description: '白棋在角隅仅剩两气！黑棋勇敢把一颗棋子送入角部虎口，诱使白棋提吃，随后反手将白棋整串提光！',
+    voicePrompt: '舍小取大！勇敢把这颗棋子送入角部，等白棋上钩就反手全吃！',
+    hint: '下在角部一路 (1, 0) 扑入！',
+    explanation: '【名师精解·倒扑手筋】：黑 1 落在 (1, 0) 是绝妙的倒扑扑入！虽然让白棋在 (0, 0) 提吃一子，但白棋提吃后自身气数彻底收紧为 1 气，黑棋随即反提白棋整串 5 颗子！这是突破 18K 不敢弃子心理的第一课。',
+    initialBoard: {
+      black: [
+        { x: 0, y: 2 },
+        { x: 1, y: 2 },
+        { x: 2, y: 2 },
+        { x: 3, y: 1 },
+        { x: 3, y: 0 },
+      ],
+      white: [
+        { x: 0, y: 1 },
+        { x: 1, y: 1 },
+        { x: 2, y: 1 },
+        { x: 2, y: 0 },
+      ],
+    },
+    solutionTree: {
+      move: { x: 1, y: 0 },
+      isCorrect: true,
+      comment: '漂亮至极！角部送子倒扑，成功将白棋诱入绝境！',
+    },
+  },
+
+  {
+    id: '101-teacher-snapback-02',
+    title: '名师专项·二路虎口诱饵倒扑',
+    category: 'capture',
+    difficulty: 'medium',
+    boardSize: 9,
+    initialTurn: 'black',
+    description: '白棋在边线二路形成虎口，看似坚固但外气已被收紧。黑棋果断送子扑入，引蛇出洞！',
+    voicePrompt: '送子入虎口！别害怕送吃，吃掉诱饵的白棋马上就要全军覆没！',
+    hint: '在边线二路 (4, 0) 坚决扑入！',
+    explanation: '【名师精解·倒扑手筋】：黑 1 扑在 (4, 0) 制造倒扑陷阱！白棋贪吃落在 (3, 0) 提走黑子后，整块白棋仅剩 (4, 0) 最后 1 气，黑棋下回合反提整整 5 颗白子！',
+    initialBoard: {
+      black: [
+        { x: 2, y: 0 },
+        { x: 2, y: 1 },
+        { x: 3, y: 2 },
+        { x: 4, y: 2 },
+        { x: 5, y: 2 },
+        { x: 6, y: 1 },
+        { x: 6, y: 0 },
+      ],
+      white: [
+        { x: 3, y: 1 },
+        { x: 4, y: 1 },
+        { x: 5, y: 1 },
+        { x: 5, y: 0 },
+      ],
+    },
+    solutionTree: {
+      move: { x: 4, y: 0 },
+      isCorrect: true,
+      comment: '神来之扑！诱饵送入虎口，倒扑大获全胜！',
+    },
+  },
+
+  {
+    id: '101-teacher-snapback-03',
+    title: '名师专项·边线天罗地网倒扑',
+    category: 'capture',
+    difficulty: 'medium',
+    boardSize: 9,
+    initialTurn: 'black',
+    description: '白棋在边路一线挣扎。黑棋布下天罗地网，一子送入边路要害，彻底封死白棋退路！',
+    voicePrompt: '看准边线空档！把棋子往里一送，白棋怎么吃都是死！',
+    hint: '在边线一线 (0, 4) 扑入！',
+    explanation: '【名师精解·倒扑手筋】：黑棋扑在 (0, 4) 是绝对要害！白棋在 (0, 3) 提吃后不仅没有长气，反倒把自己撞进了只剩 1 气的自窒状态，黑棋反手全歼！',
+    initialBoard: {
+      black: [
+        { x: 0, y: 2 },
+        { x: 1, y: 2 },
+        { x: 2, y: 3 },
+        { x: 2, y: 4 },
+        { x: 2, y: 5 },
+        { x: 1, y: 6 },
+        { x: 0, y: 6 },
+      ],
+      white: [
+        { x: 1, y: 3 },
+        { x: 1, y: 4 },
+        { x: 1, y: 5 },
+        { x: 0, y: 5 },
+      ],
+    },
+    solutionTree: {
+      move: { x: 0, y: 4 },
+      isCorrect: true,
+      comment: '边线天罗地网！白棋无力回天，倒扑成功！',
+    },
+  },
+
+  {
+    id: '101-teacher-snapback-04',
+    title: '名师专项·倒扑结合接不归',
+    category: 'capture',
+    difficulty: 'medium',
+    boardSize: 9,
+    initialTurn: 'black',
+    description: '白棋边线气紧企图逃窜。黑棋通过扑入紧缩白棋气数，让白棋陷入连上也只有 1 气的接不归绝境！',
+    voicePrompt: '先扑紧气！让白棋连也不是、不连也不是！',
+    hint: '在 (3, 0) 关键交点扑入！',
+    explanation: '【名师精解·复合手筋】：黑棋下在 (3, 0) 是先手扑！白棋气数瞬间被压缩至极致。白棋即使想连接逃跑，连上之后依然只有 1 气，形成必死的接不归！',
+    initialBoard: {
+      black: [
+        { x: 1, y: 0 },
+        { x: 1, y: 1 },
+        { x: 2, y: 2 },
+        { x: 3, y: 2 },
+        { x: 4, y: 2 },
+        { x: 5, y: 1 },
+        { x: 5, y: 0 },
+      ],
+      white: [
+        { x: 2, y: 1 },
+        { x: 3, y: 1 },
+        { x: 4, y: 1 },
+        { x: 4, y: 0 },
+      ],
+    },
+    solutionTree: {
+      move: { x: 3, y: 0 },
+      isCorrect: true,
+      comment: '一石二鸟！倒扑与接不归双重封锁，白棋在劫难逃！',
+    },
+  },
+
+  {
+    id: '101-teacher-snapback-05',
+    title: '名师专项·倒扑破眼杀大龙',
+    category: 'life-and-death',
+    difficulty: 'hard',
+    boardSize: 9,
+    initialTurn: 'black',
+    description: '白棋企图在边角做出一只真眼苟延残喘。黑棋施展倒扑破眼术，一枪刺入破坏眼位！',
+    voicePrompt: '刺破假眼！把棋子送进白棋眼位，让它做不出两只眼！',
+    hint: '下在角部眼位要冲 (1, 0)！',
+    explanation: '【名师精解·死活手筋】：此题是将倒扑用于死活杀棋的高级实战技巧！下在 (1, 0) 既破坏了白棋成眼空间，又形成了倒扑杀棋，白棋大龙瞬间化为乌有。',
+    initialBoard: {
+      black: [
+        { x: 0, y: 3 },
+        { x: 1, y: 3 },
+        { x: 2, y: 3 },
+        { x: 3, y: 2 },
+        { x: 3, y: 1 },
+        { x: 3, y: 0 },
+      ],
+      white: [
+        { x: 0, y: 2 },
+        { x: 1, y: 2 },
+        { x: 2, y: 2 },
+        { x: 2, y: 1 },
+        { x: 2, y: 0 },
+        { x: 0, y: 1 },
+      ],
+    },
+    solutionTree: {
+      move: { x: 1, y: 0 },
+      isCorrect: true,
+      comment: '眼位破除！利用倒扑撕碎白棋眼形，全歼大龙！',
+    },
+  },
+
+  {
+    id: '101-teacher-snapback-06',
+    title: '名师专项·火眼金睛识破倒扑陷阱',
+    category: 'tactics',
+    difficulty: 'hard',
+    boardSize: 9,
+    initialTurn: 'black',
+    description: '警惕陷阱！白棋故意送了一颗子在 (3, 1) 诱惑黑棋提吃。黑棋若贪吃就会被白棋反扑整串！请找出冷静化解危机的防守妙手！',
+    voicePrompt: '千万别贪吃！那是白棋的诱饵陷阱！冷静把自己的大部队向外长气！',
+    hint: '拒绝诱饵，在 (2, 1) 沉着长气逃向开阔地带！',
+    explanation: '【名师精解·防守反制】：真正的实战高手不仅会用倒扑，更能看穿对手的倒扑！若黑棋贪吃 (3, 1)，白棋立刻在 (2, 1) 倒扑反杀黑棋整块。正解是果断不理诱饵，走 (2, 1) 连接长气，识破诡计！',
+    initialBoard: {
+      black: [
+        { x: 2, y: 2 },
+        { x: 3, y: 2 },
+        { x: 4, y: 2 },
+        { x: 4, y: 1 },
+      ],
+      white: [
+        { x: 3, y: 1 },
+        { x: 5, y: 1 },
+        { x: 5, y: 2 },
+        { x: 4, y: 3 },
+        { x: 3, y: 3 },
+        { x: 2, y: 3 },
+        { x: 1, y: 2 },
+      ],
+    },
+    solutionTree: {
+      move: { x: 2, y: 1 },
+      isCorrect: true,
+      comment: '火眼金睛！不贪吃诱饵，沉着长气化险为夷！',
+    },
+  },
+
+  // ========================================================
+  // 十二、名师真假断点进阶（算气对杀与识破假断点）
+  // ========================================================
+  {
+    id: '101-teacher-cut-09',
+    title: '名师专项·识破假断点自补走后手',
+    category: 'tactics',
+    difficulty: 'easy',
+    boardSize: 9,
+    initialTurn: 'black',
+    description: '黑棋阵地中看似留有断点，但白棋根本冲不进来（冲入即自杀）。黑棋切莫浪费先手自补，果断脱先分断白棋要害！',
+    voicePrompt: '不用补！敌人敢来就是送死！果断杀向白棋真正的弱点！',
+    hint: '无需补己方假断点，直接下在 (5, 2) 切断白棋！',
+    explanation: '【名师精解·真假断点辨析】：己方 (2, 2) 是虎口假断点，白棋若敢冲入只有 1 气会被黑棋直接提吃。因此黑棋绝不可在此浪费一手棋自补走后手，而是坚决在 (5, 2) 冲断白棋联络夺取主动权！',
+    initialBoard: {
+      black: [
+        { x: 1, y: 2 },
+        { x: 3, y: 2 },
+        { x: 2, y: 3 },
+        { x: 4, y: 1 },
+        { x: 6, y: 1 },
+      ],
+      white: [
+        { x: 4, y: 2 },
+        { x: 6, y: 2 },
+        { x: 5, y: 3 },
+      ],
+    },
+    solutionTree: {
+      move: { x: 5, y: 2 },
+      isCorrect: true,
+      comment: '大师级大局观！识破假断点不补后手，主动出击切断白棋！',
+    },
+  },
+
+  {
+    id: '101-teacher-cut-10',
+    title: '名师专项·对杀算气真断点',
+    category: 'capture',
+    difficulty: 'medium',
+    boardSize: 9,
+    initialTurn: 'black',
+    description: '双方贴身肉搏，能否切断的关键在于对杀算气！黑棋切断后自身有 3 气，白棋两边各自只剩 2 气，分断必定成立！',
+    voicePrompt: '先数气再动手！切断后我们气多，白棋气少，一刀斩下去！',
+    hint: '果断下在对杀分断点 (3, 3)！',
+    explanation: '【名师精解·真断点算气】：切断成立的前提是自身气数占优。黑 1 落在 (3, 3) 强行分断后自身有 3 气，白棋被割裂成两块孤子且都只有 2 气，黑棋快一气制胜！',
+    initialBoard: {
+      black: [
+        { x: 2, y: 3 },
+        { x: 2, y: 4 },
+        { x: 3, y: 4 },
+      ],
+      white: [
+        { x: 3, y: 2 },
+        { x: 4, y: 3 },
+        { x: 4, y: 4 },
+      ],
+    },
+    solutionTree: {
+      move: { x: 3, y: 3 },
+      isCorrect: true,
+      comment: '算气精准！快一气分断，牢牢掌控接触战胜局！',
+    },
+  },
+
+  {
+    id: '101-teacher-cut-11',
+    title: '名师专项·竹节如铁板不可盲目冲断',
+    category: 'tactics',
+    difficulty: 'medium',
+    boardSize: 9,
+    initialTurn: 'black',
+    description: '认识经典坚固棋形“竹节”！竹节的连接如钢筋铁板，黑棋若去冲断是无理送死。黑棋避实击虚，转去攻击白棋落单的弱子！',
+    voicePrompt: '竹节像铁板一样硬，千万别去碰！转头去抓那颗落单的白棋！',
+    hint: '不要冲断竹节，在 (6, 3) 痛击白棋孤子！',
+    explanation: '【名师精解·形状识别】：白棋 (3, 3)、(4, 3) 与 (3, 5)、(4, 5) 组成的形状叫“竹节”，是围棋中最牢固的联络之一，根本没有真断点！黑棋不可盲目在 (3, 4) 或 (4, 4) 撞铁板，而应冷静出击 (6, 3) 猎杀薄弱孤子。',
+    initialBoard: {
+      black: [
+        { x: 2, y: 4 },
+        { x: 5, y: 4 },
+        { x: 7, y: 4 },
+      ],
+      white: [
+        { x: 3, y: 3 },
+        { x: 4, y: 3 },
+        { x: 3, y: 5 },
+        { x: 4, y: 5 },
+        { x: 6, y: 4 },
+      ],
+    },
+    solutionTree: {
+      move: { x: 6, y: 3 },
+      isCorrect: true,
+      comment: '明智的选择！避开竹节铁板，精准擒拿孤子！',
+    },
+  },
+
+  {
+    id: '101-teacher-cut-12',
+    title: '名师专项·角隅两头蛇真断点',
+    category: 'capture',
+    difficulty: 'medium',
+    boardSize: 9,
+    initialTurn: 'black',
+    description: '角部两路白棋交汇，黑棋抓住防守缝隙一刀切入，同时叫吃两头，让白棋首尾不能相顾！',
+    voicePrompt: '一刀切开两头蛇！下在交叉要害，让白棋两边都要喊救命！',
+    hint: '下在角部二路关键断点 (2, 1)！',
+    explanation: '【名师精解·分断手筋】：下在 (2, 1) 是致命真断点！白棋角部两颗与边线两颗被生生截断，两边白棋气数骤减无法两全，黑棋大获全胜！',
+    initialBoard: {
+      black: [
+        { x: 0, y: 1 },
+        { x: 1, y: 2 },
+        { x: 2, y: 3 },
+        { x: 4, y: 2 },
+      ],
+      white: [
+        { x: 1, y: 1 },
+        { x: 1, y: 0 },
+        { x: 2, y: 2 },
+        { x: 3, y: 2 },
+      ],
+    },
+    solutionTree: {
+      move: { x: 2, y: 1 },
+      isCorrect: true,
+      comment: '手起刀落！斩断两头蛇，白棋全线瓦解！',
+    },
+  },
+
 ];
