@@ -157,21 +157,21 @@ class KataGoProcess:
             # Map level to Human-SL profile, visits & temperature
             lvl = (level or "").lower()
             if lvl in ["18k", "novice", "beginner"]:
-                profile = "rank_20k"
+                profile = "rank_19k"
                 visits = 1
-                temp = 1.60
+                temp = 1.20
             elif lvl in ["17k", "intermediate", "club"]:
-                profile = "rank_20k"
-                visits = 1
-                temp = 1.30
-            elif lvl in ["16k", "master", "advanced"]:
                 profile = "rank_18k"
                 visits = 1
                 temp = 1.05
+            elif lvl in ["16k", "master", "advanced"]:
+                profile = "rank_16k"
+                visits = 1
+                temp = 0.95
             else:  # 15k, grandmaster, default
                 profile = "rank_15k"
-                visits = 1
-                temp = 0.85
+                visits = 2
+                temp = 0.80
 
             # Update parameters on the fly if changed
             if self.current_profile != profile:
@@ -340,7 +340,7 @@ class AppRequestHandler(SimpleHTTPRequestHandler):
                 board_size = int(payload.get("boardSize", 19))
                 move_history = payload.get("moveHistory", [])
                 turn = payload.get("turn", "white")
-                level = payload.get("sparringLevel", "15k")
+                level = payload.get("sparringLevel") or payload.get("level") or "18k"
                 komi = float(payload.get("komi", 7.5))
 
                 result = KATAGO_ENGINE.generate_move(board_size, move_history, turn, level, komi)
