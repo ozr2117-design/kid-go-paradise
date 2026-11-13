@@ -37,7 +37,11 @@ class PcKataGoClientImpl {
       if (window.location.port === String(DEFAULT_PORT)) {
         return `${window.location.protocol}//${window.location.host}`;
       }
-      // If served from Vite dev server or Pages on LAN
+      // If on public domain (e.g. Cloudflare Pages), fallback to default LAN IP
+      if (window.location.hostname.includes('pages.dev') || window.location.hostname.includes('github.io')) {
+        return `http://${DEFAULT_LAN_IP}:${DEFAULT_PORT}`;
+      }
+      // If served from Vite dev server on LAN IP
       if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
         return `http://${window.location.hostname}:${DEFAULT_PORT}`;
       }
@@ -80,7 +84,7 @@ class PcKataGoClientImpl {
       for (const url of uniqueCandidates) {
         try {
           const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 1200);
+          const timer = setTimeout(() => controller.abort(), 2500);
           const res = await fetch(`${url}/api/status`, {
             method: 'GET',
             signal: controller.signal,
