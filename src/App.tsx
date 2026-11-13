@@ -7,6 +7,7 @@ import { syncPendingLocalRecords } from './engine/cloud-recorder';
 import { KidNavbar } from './components/KidNavbar';
 import { AdventureMap } from './components/AdventureMap';
 import { FullGameSparringView } from './components/FullGameSparringView';
+import { CaptureBattleView } from './components/CaptureBattleView';
 import { PuzzleView } from './components/PuzzleView';
 import { FreePlayView } from './components/FreePlayView';
 import { DailyChallengeView } from './components/DailyChallengeView';
@@ -127,6 +128,13 @@ export const App: React.FC = () => {
             showCoordinates={progress.showCoordinates}
             onGoToSparring={() => setCurrentMode('sparring')}
             onBackToAdventure={() => setCurrentMode('adventure')}
+          />
+        )}
+
+        {currentMode === 'battle' && (
+          <CaptureBattleView
+            onWinRecord={handleBattleWin}
+            showCoordinates={progress.showCoordinates}
           />
         )}
 

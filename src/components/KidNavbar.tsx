@@ -127,6 +127,19 @@ export const KidNavbar: React.FC<KidNavbarProps> = ({
         </button>
 
         <button
+          onClick={() => onSelectMode('battle')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-sm transition-all ${
+            currentMode === 'battle'
+              ? 'bg-yellow-400 text-amber-950 shadow-md scale-105'
+              : 'hover:bg-amber-500/50 text-amber-100'
+          }`}
+          title="棋院比赛同款 19路吃子锦标赛（先吃5子/10子获胜）"
+        >
+          <Swords className="w-4 h-4" />
+          <span>19路吃子比赛</span>
+        </button>
+
+        <button
           onClick={() => onSelectMode('sparring')}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-sm transition-all ${
             currentMode === 'sparring'

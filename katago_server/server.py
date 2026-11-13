@@ -156,7 +156,11 @@ class KataGoProcess:
             t0 = time.time()
             # Map level to Human-SL profile, visits & temperature
             lvl = (level or "").lower()
-            if lvl in ["18k", "novice", "beginner"]:
+            if lvl in ["23k", "starter", "rookie"]:
+                profile = "rank_20k"
+                visits = 1
+                temp = 1.70
+            elif lvl in ["18k", "novice", "beginner"]:
                 profile = "rank_19k"
                 visits = 1
                 temp = 1.20

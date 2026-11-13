@@ -2,13 +2,33 @@ import { AnimalOpponent } from '../types/go';
 
 export const ROBOT_OPPONENTS: AnimalOpponent[] = [
   {
+    id: 'robot-23k',
+    name: '23K 萌萌机',
+    avatar: '🐣',
+    rank: '23K 启蒙伴读机',
+    difficulty: 'beginner',
+    boardSize: 19,
+    captureTarget: 5, // 19路吃子赛先吃5子获胜
+    intro: '滴答！我是 23K 萌萌机，陪你备战棋院 19 路吃子大赛！先吃满 5 颗棋子就拿冠军啦！',
+    taunts: [
+      '哇，我的棋子只有 1 气了，你可别吃我呀～',
+      '看我的小兵跳到这里！',
+      '咦？你的棋子好像连在一起了！',
+    ],
+    praises: [
+      '太棒啦！你先吃到了 5 颗子，获得吃子比赛大冠军！',
+      '你的抓断点太厉害啦！雷达都被你突破了！',
+      '恭喜你赢得 19 路吃子大赛金牌！',
+    ],
+  },
+  {
     id: 'robot-18k',
     name: '18K 呆萌机',
     avatar: '🤖',
     rank: '18K 启蒙小助手',
     difficulty: 'beginner',
-    boardSize: 13,
-    captureTarget: 5, // 13路先吃5子获胜
+    boardSize: 19,
+    captureTarget: 5, // 19路先吃5子获胜
     intro: '哔哔！我是 18K 呆萌机，陪你扎实练棋！先吃到 5 颗棋子就赢啦！',
     taunts: [
       '哇，我的能量模块掉了，你可别吃我的棋子哦！',
@@ -27,8 +47,8 @@ export const ROBOT_OPPONENTS: AnimalOpponent[] = [
     avatar: '🚁',
     rank: '17K 巡逻侦察兵',
     difficulty: 'intermediate',
-    boardSize: 13,
-    captureTarget: 8, // 13路先吃8子获胜
+    boardSize: 19,
+    captureTarget: 8, // 19路先吃8子获胜
     intro: '滴滴！我是 17K 巡逻机！侦察全盘断点，先吃 8 颗子算赢，看你能突破我的巡逻防线吗？',
     taunts: [
       '雷达锁定！我的棋子很结实，你吃不到我的～',
@@ -47,9 +67,9 @@ export const ROBOT_OPPONENTS: AnimalOpponent[] = [
     avatar: '🛡️',
     rank: '16K 防线铁哨兵',
     difficulty: 'advanced',
-    boardSize: 13,
-    captureTarget: 12, // 13路先吃12子获胜
-    intro: '咔嚓！我是 16K 哨兵机，防守扎实、绝不轻弃大龙！先吃满 12 颗棋子获胜，敢来挑战铁壁吗？',
+    boardSize: 19,
+    captureTarget: 10, // 19路先吃10子获胜
+    intro: '咔嚓！我是 16K 哨兵机，防守扎实、绝不轻弃大龙！先吃满 10 颗棋子获胜，敢来挑战铁壁吗？',
     taunts: [
       '铁壁装甲展开！小心掉进我的哨卡陷阱里～',
       '注意你的棋子气数，别被我打吃了！',
@@ -57,7 +77,7 @@ export const ROBOT_OPPONENTS: AnimalOpponent[] = [
     ],
     praises: [
       '居然打破了我的铁壁！你太神机妙算啦！',
-      '真是一场精彩的对局，我的十二颗棋子全被你拿下了！',
+      '真是一场精彩的对局，我的十颗棋子全被你拿下了！',
       '你的水平已经具备冲锋战将的实力啦！',
     ],
   },
@@ -67,9 +87,9 @@ export const ROBOT_OPPONENTS: AnimalOpponent[] = [
     avatar: '⚔️',
     rank: '15K 锐利冲锋官',
     difficulty: 'grandmaster',
-    boardSize: 13,
-    captureTarget: 15, // 13路先吃15子获胜
-    intro: '轰鸣！我是 15K 冲锋机！KataGo 神经网络直觉加持，短兵相接杀气凶悍！先吃满 15 颗子获胜！',
+    boardSize: 19,
+    captureTarget: 15, // 19路先吃15子获胜
+    intro: '轰鸣！我是 15K 冲锋机！短兵相接杀气凶悍！先吃满 15 颗子获胜！',
     taunts: [
       '冲锋动力全开！你的断点逃不过我的双刃剑！',
       '小心！这一招反叫吃突围你接得住吗？',

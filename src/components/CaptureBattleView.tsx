@@ -6,7 +6,7 @@ import { GoAI } from '../engine/go-ai';
 import { SoundEngine } from '../engine/sound-engine';
 import { GoBoard } from './GoBoard';
 import { WinModal } from './WinModal';
-import { RotateCcw, Undo2, Eye, Award } from 'lucide-react';
+import { RotateCcw, Undo2, Eye, Award, Swords } from 'lucide-react';
 
 interface CaptureBattleViewProps {
   onWinRecord: (animalId: string) => void;
@@ -18,11 +18,12 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
   showCoordinates,
 }) => {
   const [selectedAnimal, setSelectedAnimal] = useState<AnimalOpponent>(ANIMAL_OPPONENTS[0]);
+  const [boardSize, setBoardSize] = useState<19 | 13>(19);
   const [customCaptureTarget, setCustomCaptureTarget] = useState<number>(ANIMAL_OPPONENTS[0].captureTarget);
   const effectiveTarget = customCaptureTarget || selectedAnimal.captureTarget;
 
   const [boardState, setBoardState] = useState<BoardState>(() =>
-    GoCore.createEmptyBoard(ANIMAL_OPPONENTS[0].boardSize)
+    GoCore.createEmptyBoard(19)
   );
   const [animalDialogue, setAnimalDialogue] = useState<string>(ANIMAL_OPPONENTS[0].intro);
   const [showLiberties, setShowLiberties] = useState<boolean>(true);
@@ -40,13 +41,14 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
     SoundEngine.speakText(text);
   }, []);
 
-  // Initialize board when changing opponent or target
+  // Initialize board when changing opponent, target or size
   const initGame = useCallback(
-    (animal: AnimalOpponent = selectedAnimal, targetCount?: number) => {
+    (animal: AnimalOpponent = selectedAnimal, targetCount?: number, size: 19 | 13 = boardSize) => {
       const nextTarget = targetCount ?? animal.captureTarget;
       setSelectedAnimal(animal);
       setCustomCaptureTarget(nextTarget);
-      setBoardState(GoCore.createEmptyBoard(animal.boardSize));
+      setBoardSize(size);
+      setBoardState(GoCore.createEmptyBoard(size));
       updateDialogue(animal.intro);
       setIsWinModalOpen(false);
       setIsDefeatModalOpen(false);
@@ -54,13 +56,18 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
       setUndosRemaining(MAX_UNDOS_PER_GAME);
       setCanUndoTurn(false);
     },
-    [selectedAnimal, updateDialogue]
+    [selectedAnimal, boardSize, updateDialogue]
   );
+
+  const handleSelectBoardSize = (size: 19 | 13) => {
+    SoundEngine.speakText(`切换为 ${size} 路棋盘！重新开局！`);
+    initGame(selectedAnimal, effectiveTarget, size);
+  };
 
   const handleSelectTarget = (targetCount: number) => {
     setCustomCaptureTarget(targetCount);
     SoundEngine.speakText(`吃子目标调整为先吃 ${targetCount} 颗子获胜！重新开局！`);
-    initGame(selectedAnimal, targetCount);
+    initGame(selectedAnimal, targetCount, boardSize);
   };
 
   // Handle Player (Black) Move
@@ -113,9 +120,10 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
             return;
           }
 
+          const rawLevel = selectedAnimal.id.replace('robot-', '');
           const aiMove = await GoAI.getBestMoveAsync(current, 'white', {
             difficulty: selectedAnimal.difficulty,
-            sparringLevel: (selectedAnimal.id.replace('robot-', '') as any),
+            sparringLevel: (rawLevel as any),
             captureTarget: effectiveTarget,
           });
 
@@ -160,7 +168,7 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
         } finally {
           setIsAiThinking(false);
         }
-      }, 500);
+      }, 400);
 
       return () => clearTimeout(timer);
     }
@@ -177,7 +185,7 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
       return;
     }
 
-    let reverted = GoCore.createEmptyBoard(selectedAnimal.boardSize);
+    let reverted = GoCore.createEmptyBoard(boardSize);
     const movesToReplay = boardState.moveHistory.slice(0, -2);
     for (const m of movesToReplay) {
       reverted = GoCore.playMove(reverted, { x: m.x, y: m.y }, m.color, effectiveTarget).nextState;
@@ -219,12 +227,15 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
 
       {/* 2. RIGHT SIDEBAR: ANIMAL SELECTOR, DIALOGUE, STATS & ACTIONS */}
       <div className="w-full md:w-80 lg:w-84 xl:w-88 h-full flex flex-col justify-start gap-2 sm:gap-2.5 overflow-y-auto pr-1 shrink-0">
-        {/* Top: Animal Opponents Selector */}
+        {/* Top: 19路吃子比赛 Header & Opponents Selector */}
         <div className="bg-white/95 rounded-2xl p-2 sm:p-2.5 border-2 border-amber-300 shadow-sm flex flex-col gap-1.5 shrink-0">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-black text-amber-950 font-cartoon">选择吃子对战伙伴：</span>
+            <span className="text-xs font-black text-amber-950 font-cartoon flex items-center gap-1">
+              <Swords className="w-3.5 h-3.5 text-amber-700" />
+              <span>19路棋院吃子大赛</span>
+            </span>
             <span className="text-[10px] text-amber-800 font-bold bg-amber-100 px-2 py-0.5 rounded-full">
-              共 5 阶段位
+              先吃满 {effectiveTarget} 子胜
             </span>
           </div>
 
@@ -236,15 +247,11 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
                   key={animal.id}
                   onClick={() => {
                     SoundEngine.playStoneSound();
-                    initGame(animal, animal.captureTarget);
+                    initGame(animal, animal.captureTarget, boardSize);
                   }}
                   className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-xl font-bold transition-all cursor-pointer active:scale-95 ${
                     isSelected
-                      ? animal.id === 'dragon'
-                        ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-amber-500 text-white shadow-md scale-[1.03] ring-2 ring-yellow-400'
-                        : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md scale-[1.03] ring-2 ring-amber-300'
-                      : animal.id === 'dragon'
-                      ? 'bg-gradient-to-r from-purple-100 to-indigo-100 hover:from-purple-200 hover:to-indigo-200 text-purple-950 border border-purple-300'
+                      ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md scale-[1.03] ring-2 ring-amber-300'
                       : 'bg-amber-100/70 hover:bg-amber-200 text-amber-900 border border-amber-300'
                   }`}
                   title={`${animal.name} (${animal.rank})`}
@@ -259,6 +266,35 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
                 </button>
               );
             })}
+          </div>
+
+          {/* Quick Board Size Switcher */}
+          <div className="bg-amber-50/90 px-2 py-1.5 rounded-xl border border-amber-200 flex items-center justify-between gap-1 mt-0.5">
+            <span className="text-[11px] font-black text-amber-950 font-cartoon shrink-0">🏟️ 比赛棋盘：</span>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => handleSelectBoardSize(19)}
+                className={`px-2.5 py-0.5 rounded-lg text-xs font-black transition active:scale-95 ${
+                  boardSize === 19
+                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-xs'
+                    : 'bg-white hover:bg-amber-100 text-amber-900 border border-amber-300'
+                }`}
+                title="棋院正式比赛同款 19路大棋盘"
+              >
+                19路 (棋院比赛)
+              </button>
+              <button
+                onClick={() => handleSelectBoardSize(13)}
+                className={`px-2.5 py-0.5 rounded-lg text-xs font-black transition active:scale-95 ${
+                  boardSize === 13
+                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-xs'
+                    : 'bg-white hover:bg-amber-100 text-amber-900 border border-amber-300'
+                }`}
+                title="13路练习小棋盘"
+              >
+                13路
+              </button>
+            </div>
           </div>
 
           {/* Quick Target Count Switcher */}
@@ -299,7 +335,7 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
                 </span>
               </div>
               <p className="text-[11px] text-amber-800 mt-0.5">
-                目标：先吃 <strong className="text-red-600 font-cartoon text-xs">{effectiveTarget}</strong> 颗子获胜
+                赛制：{boardSize}路棋盘 · 先吃 <strong className="text-red-600 font-cartoon text-xs">{effectiveTarget}</strong> 颗子获胜
               </p>
             </div>
           </div>
@@ -409,7 +445,7 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
           </button>
 
           <button
-            onClick={() => initGame(selectedAnimal, effectiveTarget)}
+            onClick={() => initGame(selectedAnimal, effectiveTarget, boardSize)}
             className="flex items-center justify-center gap-1 py-2 px-2 bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-500 hover:to-yellow-500 text-amber-950 font-black rounded-xl border border-amber-400 text-xs shadow-sm transition active:scale-95"
           >
             <RotateCcw className="w-3.5 h-3.5" />
@@ -422,9 +458,9 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
       <WinModal
         isOpen={isWinModalOpen}
         title={`🎉 战胜了 ${selectedAnimal.name}！`}
-        subtitle={`你率先吃满了 ${effectiveTarget} 颗棋子，展现了高超的吃子技巧！`}
+        subtitle={`恭喜你在 ${boardSize} 路吃子大赛中率先吃满 ${effectiveTarget} 颗棋子，展现了高超的吃子技巧！`}
         stars={3}
-        onRetry={() => initGame(selectedAnimal, effectiveTarget)}
+        onRetry={() => initGame(selectedAnimal, effectiveTarget, boardSize)}
         onBackToMap={() => setIsWinModalOpen(false)}
         hasNext={false}
       />
@@ -449,39 +485,18 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
             <div className="flex flex-col gap-2 mt-5">
               {undosRemaining > 0 && (
                 <button
-                  onClick={() => {
-                    setIsDefeatModalOpen(false);
-                    handleUndo();
-                  }}
-                  className="w-full py-3 px-4 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-black rounded-2xl flex items-center justify-center gap-2 shadow-md text-sm active:scale-95 transition"
+                  onClick={handleUndo}
+                  className="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-sm rounded-2xl shadow-md transition active:scale-95"
                 >
-                  <Undo2 className="w-4 h-4" />
-                  <span>悔一步棋，提掉大龙！({undosRemaining}/3)</span>
+                  ↩️ 悔棋一步，立刻反提大龙！(剩 {undosRemaining} 次)
                 </button>
               )}
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    setIsDefeatModalOpen(false);
-                    initGame(selectedAnimal, effectiveTarget);
-                  }}
-                  className="flex-1 py-2.5 px-3 bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-500 hover:to-yellow-500 text-amber-950 font-black rounded-2xl shadow-xs flex items-center justify-center gap-1.5 text-xs sm:text-sm active:scale-95 transition"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  <span>再来一局</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setIsDefeatModalOpen(false);
-                    handleSelectTarget(15);
-                  }}
-                  className="flex-1 py-2.5 px-3 bg-white hover:bg-orange-50 text-amber-900 font-bold rounded-2xl border-2 border-amber-300 flex items-center justify-center gap-1.5 text-xs sm:text-sm active:scale-95 transition"
-                >
-                  <span>战 15 子大对决 🔥</span>
-                </button>
-              </div>
+              <button
+                onClick={() => initGame(selectedAnimal, effectiveTarget, boardSize)}
+                className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-sm rounded-2xl shadow-md transition active:scale-95"
+              >
+                🔄 重新再战一局！
+              </button>
             </div>
           </div>
         </div>

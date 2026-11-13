@@ -4,7 +4,7 @@ import { KataGoONNXEngine, RobotTier } from './neural/katago-onnx-engine';
 import { PcKataGoClient } from './pc-katago-client';
 
 export type AIDifficulty = 'beginner' | 'intermediate' | 'advanced' | 'master' | 'grandmaster';
-export type AISparringLevel = '18k' | '17k' | '16k' | '15k' | 'novice' | 'club' | 'master' | 'grandmaster';
+export type AISparringLevel = '23k' | '18k' | '17k' | '16k' | '15k' | 'novice' | 'club' | 'master' | 'grandmaster';
 
 export interface AIMoveOptions {
   difficulty?: AIDifficulty;
@@ -154,6 +154,7 @@ export class GoAI {
     // through to the default dragon tier (the strongest), making them as strong
     // as 龙尊 and collapsing the whole difficulty ladder.
         const sparringToDifficulty: Record<AISparringLevel, AIDifficulty> = {
+      '23k': 'beginner',          // 23K 萌萌机 (启蒙吃子大赛伴读：温和留破绽，多送吃)
       '18k': 'beginner',          // 18K 呆萌机 (对标 101 小智 18K：温和稳健，留容错)
       '17k': 'intermediate',      // 17K 巡逻机 (争夺角地，适度接触战)
       '16k': 'advanced',          // 16K 哨兵机 (棋形紧凑，严防断点)
