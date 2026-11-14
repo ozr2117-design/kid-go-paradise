@@ -242,6 +242,8 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
           <div className="grid grid-cols-5 gap-1">
             {ANIMAL_OPPONENTS.map((animal) => {
               const isSelected = animal.id === selectedAnimal.id;
+              const rankCode = animal.rank.split(' ')[0] || animal.name.slice(0, 3);
+              const nickname = animal.name.replace(/^[0-9]+K\s*/i, '');
               return (
                 <button
                   key={animal.id}
@@ -249,19 +251,19 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
                     SoundEngine.playStoneSound();
                     initGame(animal, animal.captureTarget, boardSize);
                   }}
-                  className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-xl font-bold transition-all cursor-pointer active:scale-95 ${
+                  className={`flex flex-col items-center justify-center py-1 sm:py-1.5 px-0.5 rounded-xl font-bold transition-all cursor-pointer active:scale-95 ${
                     isSelected
                       ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md scale-[1.03] ring-2 ring-amber-300'
                       : 'bg-amber-100/70 hover:bg-amber-200 text-amber-900 border border-amber-300'
                   }`}
                   title={`${animal.name} (${animal.rank})`}
                 >
-                  <span className="text-lg sm:text-xl leading-none">{animal.avatar}</span>
-                  <span className="text-[11px] font-cartoon mt-0.5 truncate w-full text-center leading-tight">
-                    {animal.name}
+                  <span className="text-base sm:text-lg leading-none">{animal.avatar}</span>
+                  <span className="text-[11px] font-cartoon font-black mt-0.5 leading-none">
+                    {rankCode}
                   </span>
-                  <span className="text-[9px] opacity-90 truncate leading-tight font-normal">
-                    {animal.rank.split(' ')[0]}
+                  <span className="text-[9.5px] font-bold opacity-90 leading-tight mt-0.5 whitespace-nowrap">
+                    {nickname}
                   </span>
                 </button>
               );
