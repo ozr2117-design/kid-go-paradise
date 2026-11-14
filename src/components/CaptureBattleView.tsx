@@ -45,35 +45,6 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
     SoundEngine.speakText(text);
   }, []);
 
-  // Chrome on Android 原生全屏调用助手（双保险机制）
-  const requestChromeFullscreen = useCallback(() => {
-    try {
-      const docEl = document.documentElement as any;
-      if (docEl.requestFullscreen) {
-        docEl.requestFullscreen().catch(() => {});
-      } else if (docEl.webkitRequestFullscreen) {
-        docEl.webkitRequestFullscreen();
-      }
-    } catch {
-      // 降级使用 CSS fixed 满屏，不抛出异常
-    }
-  }, []);
-
-  const exitChromeFullscreen = useCallback(() => {
-    try {
-      const doc = document as any;
-      if (doc.fullscreenElement || doc.webkitFullscreenElement) {
-        if (doc.exitFullscreen) {
-          doc.exitFullscreen().catch(() => {});
-        } else if (doc.webkitExitFullscreen) {
-          doc.webkitExitFullscreen();
-        }
-      }
-    } catch {
-      // 容错处理
-    }
-  }, []);
-
   // Initialize board when changing opponent, target or size
   const initGame = useCallback(
     (animal: AnimalOpponent = selectedAnimal, targetCount?: number, size: 19 | 13 = boardSize) => {
@@ -92,24 +63,22 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
     [selectedAnimal, boardSize, updateDialogue]
   );
 
-  // 进入 19 路沉浸全屏对弈
+  // 进入 19 路沉浸全屏对弈（纯净 CSS 视口顶格，杜绝 Chrome 底部黑条安全提示）
   const startFullscreenMatch = useCallback(() => {
-    requestChromeFullscreen();
     setIsPlayingFullscreen(true);
     setShowExitConfirm(false);
     if (boardState.isGameOver || boardState.moveHistory.length === 0) {
       initGame(selectedAnimal, effectiveTarget, boardSize);
     }
     SoundEngine.speakText(`比赛开始！黑棋先走，先吃满 ${effectiveTarget} 颗子获胜！`);
-  }, [requestChromeFullscreen, boardState.isGameOver, boardState.moveHistory.length, initGame, selectedAnimal, effectiveTarget, boardSize]);
+  }, [boardState.isGameOver, boardState.moveHistory.length, initGame, selectedAnimal, effectiveTarget, boardSize]);
 
   // 退出全屏对弈，返回备战大厅
   const exitFullscreenMatch = useCallback(() => {
-    exitChromeFullscreen();
     setIsPlayingFullscreen(false);
     setShowExitConfirm(false);
     updateDialogue('已返回备战大厅，随时可以重新开启对决！');
-  }, [exitChromeFullscreen, updateDialogue]);
+  }, [updateDialogue]);
 
   const handleSelectBoardSize = (size: 19 | 13) => {
     SoundEngine.speakText(`切换为 ${size} 路棋盘！重新开局！`);
@@ -128,7 +97,6 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
 
     // 若在备战大厅直接落子，顺畅自动切换为全屏竞技对弈
     if (!isPlayingFullscreen) {
-      requestChromeFullscreen();
       setIsPlayingFullscreen(true);
     }
 
