@@ -178,3 +178,17 @@
      - 第三层：引入 `50ms/200ms/500ms` 延迟自适应校准三保险。
   3. **效果**：小米平板 6 Pro 上的 19 路棋盘瞬间撑满整块屏幕上下高度（达到 780 至 800px 巨幅物理显示），彻底告别缩略小棋盘。
   4. **全量构建与测试**：11 个测试套件、160 项 Vitest 测试 100% 通过；Vite 单文件编译成功，离线缓存更新至 `v9.52` (`weiqi-kids-offline-v9.52`)。
+
+### 2026-11-14 15:46:00 (UTC+8) - 激活吃子大赛战术恶狼引擎 · 杜绝全盘模型脱先送子 (v9.53)
+- **核心变更**：
+  1. **吃子战 AI 拦截断路确诊**：
+     - 用户实测反馈：孩子在吃子战各级别都能游刃有余、毫无旗鼓相当的感觉。
+     - 源码深度排查确诊：在 `src/engine/go-ai.ts` 的 `getBestMoveAsync` 异步入口中，第 96 行对 PC 算力正确排除了吃子战，但在第 109 行本地 `KataGoONNXEngine.isReady()` 分支中缺少 `(options.isFullGame || !options.captureTarget)` 判定！
+     - 导致只要浏览器加载了 KataGo ONNX 全盘大局观模型，吃子对战便被大局观神经网络完全截胡：KataGo 满脑子是全盘占角占边，短兵相接时频繁脱先抢大场，送吃落单子毫不在乎。
+     - 原本精细调校的 1000 多行吃子大赛恶狼战术引擎（`getRabbitCaptureMove`、`getBearCaptureMove`、`getFoxCaptureMove`、`getEagleCaptureMove`、`getDragonCaptureMove`、`findCounterAtariMoves` 反打反提、`findDoubleAtariMoves` 抓双打、`isDeadEscapeMove` 死征死逃剪枝、大龙 2 气死守等）被 100% 旁路架空！
+  2. **方案一精准修复**：
+     - 在 `src/engine/go-ai.ts` 的 ONNX 直觉推理分支添加 `(options.isFullGame || !options.captureTarget)` 前置守卫；
+     - 吃子大赛（`options.captureTarget` 存在时）100% 直通本地专属战术引擎，杜绝脱先送子，17K 巡逻机、16K 哨兵机、15K 冲锋机即刻恢复凶悍防守与双打反击战斗力。
+  3. **全量构建与测试**：
+     - 11 个测试套件、160 项 Vitest 测试 100% PASS；
+     - Vite 单文件编译通过（627.5 kB，gzip 177.5 kB），离线缓存递增至 `v9.53` (`weiqi-kids-offline-v9.53`)。

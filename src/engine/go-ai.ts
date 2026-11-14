@@ -106,8 +106,8 @@ export class GoAI {
       }
     }
 
-    // 1. 若本地 KataGo ONNX 神经网络已就绪，优先采用直觉预测
-    if (KataGoONNXEngine.isReady()) {
+    // 1. 若本地 KataGo ONNX 神经网络已就绪，优先采用直觉预测（仅用于全盘对弈；吃子大赛必须直通战术恶狼引擎）
+    if ((options.isFullGame || !options.captureTarget) && KataGoONNXEngine.isReady()) {
       try {
         const tier: RobotTier =
           options.sparringLevel === '15k' || options.sparringLevel === 'grandmaster'
@@ -127,7 +127,7 @@ export class GoAI {
         // eslint-disable-next-line no-console
         console.warn('[GoAI.getBestMoveAsync] ONNX inference fallback:', e);
       }
-    } else {
+    } else if (options.isFullGame || !options.captureTarget) {
       // 在后台静默预热初始化，不阻塞当前对局
       KataGoONNXEngine.getInstance().init().catch(() => {});
     }
