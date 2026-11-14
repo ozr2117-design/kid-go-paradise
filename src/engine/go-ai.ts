@@ -203,15 +203,23 @@ export class GoAI {
     legalMoves: Point[],
     options: AIMoveOptions
   ): Point | null {
-    // 遇到孩子落单被叫吃，40%几率吃，60%几率走别的，给孩子留下容错自救空间
+    const is23k = options.sparringLevel === '23k';
+
+    // 遇到孩子落单被叫吃：
+    // 23K 萌萌机：仅 25% 几率抓吃，75% 几率走闲步，给孩子留出极其充裕的自救逃跑空间！
+    // 18K 呆萌机：50% 几率抓吃，50% 几率走闲步，适度考查孩子的逃子反应。
+    const captureChance = is23k ? 0.25 : 0.50;
     const instantCaptures = this.findImmediateCaptures(state, color, legalMoves);
-    if (instantCaptures.length > 0 && Math.random() < 0.4) {
+    if (instantCaptures.length > 0 && Math.random() < captureChance) {
       return instantCaptures[0];
     }
 
-    // 自己被叫吃（1气）时，只有 35% 几率逃跑，65% 故意留破绽给孩子提吃，建立成就感！
+    // 自己被叫吃（1气）时：
+    // 23K 萌萌机：仅 20% 几率逃跑，80% 几率故意留破绽给孩子提吃，建立满满成就感！
+    // 18K 呆萌机：50% 几率逃跑，50% 几率留破绽。
+    const rescueChance = is23k ? 0.20 : 0.50;
     const rescues = this.findEscapeAtariMoves(state, color, legalMoves);
-    if (rescues.length > 0 && Math.random() < 0.35) {
+    if (rescues.length > 0 && Math.random() < rescueChance) {
       return rescues[0];
     }
 
