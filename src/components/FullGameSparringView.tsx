@@ -36,6 +36,10 @@ import {
   ChevronsRight,
   X,
   Map,
+  ArrowLeft,
+  Minimize2,
+  Maximize2,
+  Trophy,
 } from 'lucide-react';
 
 const SPARRING_PROFILES: SparringProfile[] = [
@@ -98,6 +102,10 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
   // Per-move Countdown Timer Switch (建议 5)
   const [timerMode, setTimerMode] = useState<'off' | '30s'>('off');
   const [timeLeft, setTimeLeft] = useState<number>(30);
+
+  // 19路全屏沉浸对弈状态 (针对小米平板 6 Pro 深度定制)
+  const [isPlayingFullscreen, setIsPlayingFullscreen] = useState<boolean>(false);
+  const [showExitConfirm, setShowExitConfirm] = useState<boolean>(false);
 
   // Restart Double-Insurance Modal (防误触双保险)
   const [isRestartConfirmOpen, setIsRestartConfirmOpen] = useState<boolean>(false);
@@ -207,6 +215,9 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
       }
 
       setBoardSize(sz);
+      if (sz !== 19) {
+        setIsPlayingFullscreen(false);
+      }
       setPlayerColor(pColor);
       setAiLevel(lvl);
       setHandicapCount(handicap);
@@ -374,6 +385,11 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
   // Player Move Handler
   const handlePlayerMove = (point: Point) => {
     if (boardState.isGameOver || boardState.turn !== playerColor || isAiThinking || isReviewMode) return;
+
+    // 19 路对弈首手落子时，自动平滑切入全屏大棋盘（纯净视口顶格，无系统黑条）
+    if (boardSize === 19 && !isPlayingFullscreen && boardState.moveHistory.length === 0) {
+      setIsPlayingFullscreen(true);
+    }
 
     const res = GoCore.playMove(boardState, point, playerColor);
     if (res.error) {
@@ -562,6 +578,388 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
   const blackPercent = Math.min(95, Math.max(5, Math.round((blackScore / totalScore) * 100)));
   const whitePercent = 100 - blackPercent;
 
+  // =========================================================================
+  // VIEW MODE A: 19路全屏沉浸对弈界面 (针对小米平板 6 Pro 深度定制，纯净视口顶格)
+  // =========================================================================
+  if (isPlayingFullscreen && boardSize === 19) {
+    return (
+      <div className="fixed inset-0 z-50 bg-[#F4EEE1] flex flex-col md:flex-row items-stretch justify-between p-1 sm:p-2 select-none overflow-hidden animate-pop-in">
+        {/* 1. LEFT WING: OPPONENT (WHITE/AI) & RETURN BUTTON & LIVE SPEECH */}
+        <div className="w-full md:w-44 lg:w-48 xl:w-56 h-auto md:h-full flex flex-row md:flex-col justify-between items-center md:items-stretch gap-1.5 p-2 bg-white/95 rounded-2xl border-2 border-amber-300 shadow-md shrink-0">
+          {/* Top Section */}
+          <div className="flex flex-col gap-2 w-full">
+            <button
+              onClick={() => {
+                if (boardState.moveHistory.length > 2 && !boardState.isGameOver) {
+                  setShowExitConfirm(true);
+                } else {
+                  setIsPlayingFullscreen(false);
+                }
+              }}
+              className="self-start flex items-center gap-1.5 px-3 py-1.5 text-xs font-black text-amber-900 bg-amber-100 hover:bg-amber-200 rounded-xl border border-amber-300 transition active:scale-95 shadow-xs cursor-pointer"
+              title="退出全屏实战，返回常规视窗"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>退出全屏</span>
+            </button>
+
+            {/* Opponent Profile */}
+            <div className="flex items-center md:flex-col md:items-center gap-2 pt-1">
+              <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-gradient-to-br from-amber-100 to-yellow-200 border-2 border-amber-400 flex items-center justify-center text-3xl md:text-4xl shadow-inner shrink-0">
+                {activeProfile.avatar}
+              </div>
+              <div className="text-left md:text-center min-w-0">
+                <h3 className="font-black text-amber-950 text-sm md:text-base font-cartoon truncate">
+                  {activeProfile.name}
+                </h3>
+                <span className="inline-block text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full mt-0.5">
+                  {activeProfile.rank}
+                </span>
+                {isPcConnected && (
+                  <span className="block text-[9px] font-bold text-emerald-700 bg-emerald-100/90 px-1.5 py-0.5 rounded-md mt-0.5">
+                    ⚡ PC满血算力
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* AI Territory & Capture Scoreboard */}
+            <div className="bg-amber-50/90 p-2 md:p-2.5 rounded-xl border border-amber-200 flex flex-col gap-1 mt-1">
+              <div className="flex items-center justify-between text-xs font-bold text-gray-800">
+                <span className="flex items-center gap-1">
+                  <span className={`w-3 h-3 rounded-full ${aiColor === 'black' ? 'bg-black border border-gray-700' : 'bg-white border border-gray-400'} inline-block shrink-0`} />
+                  <span>AI 占地</span>
+                </span>
+                <span className="text-sm md:text-base font-black text-orange-700 font-cartoon">
+                  {aiColor === 'black' ? blackScore : whiteScore.toFixed(1)} <span className="text-[10px] text-gray-500 font-normal">目</span>
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-[11px] font-bold text-amber-900 mt-0.5 pt-0.5 border-t border-amber-200/60">
+                <span>提吃对手:</span>
+                <span className="font-cartoon text-xs text-amber-950 font-black">{oppCaptures} 子</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Section: Speech bubble */}
+          <div className="hidden md:block w-full bg-amber-50/90 p-2.5 rounded-xl border border-amber-200 text-xs font-bold text-amber-950 relative">
+            <div className="absolute -top-1.5 left-6 w-3 h-3 bg-amber-50 border-t border-l border-amber-200 transform rotate-45"></div>
+            {isAiThinking ? (
+              <span className="text-amber-600 flex items-center gap-1.5 animate-pulse">
+                <span>💭 正在深度推演局势...</span>
+              </span>
+            ) : (
+              <span className="line-clamp-3 leading-relaxed">“{aiDialogue}”</span>
+            )}
+          </div>
+        </div>
+
+        {/* 2. CENTER: MAXIMIZED 19-BOARD (100% HEIGHT, IMMERSIVE) */}
+        <div className="flex-1 h-full min-h-0 min-w-0 flex items-center justify-center p-0.5 overflow-hidden relative">
+          {/* Floating Review Controller when in Replay Mode */}
+          {isReviewMode && (
+            <div className="absolute top-2 z-30 flex items-center gap-1 sm:gap-2 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-2xl shadow-xl border-2 border-amber-400 text-amber-950 animate-pop-in">
+              <span className="text-xs font-black bg-amber-100 px-2 py-0.5 rounded-lg text-amber-900 font-cartoon">
+                📖 棋盘复盘
+              </span>
+              <button
+                onClick={() => {
+                  setReviewStep(0);
+                  SoundEngine.playStoneSound();
+                }}
+                disabled={reviewStep === 0}
+                className="p-1 rounded-lg bg-amber-100 hover:bg-amber-200 disabled:opacity-40 text-amber-900 transition cursor-pointer"
+                title="首手"
+              >
+                <ChevronsLeft className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => {
+                  setReviewStep((s) => Math.max(0, s - 1));
+                  SoundEngine.playStoneSound();
+                }}
+                disabled={reviewStep === 0}
+                className="p-1 rounded-lg bg-amber-100 hover:bg-amber-200 disabled:opacity-40 text-amber-900 transition cursor-pointer"
+                title="上一手"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-xs font-black min-w-16 text-center">
+                第 {reviewStep} / {boardState.moveHistory.length} 手
+              </span>
+              <button
+                onClick={() => {
+                  setReviewStep((s) => Math.min(boardState.moveHistory.length, s + 1));
+                  SoundEngine.playStoneSound();
+                }}
+                disabled={reviewStep === boardState.moveHistory.length}
+                className="p-1 rounded-lg bg-amber-100 hover:bg-amber-200 disabled:opacity-40 text-amber-900 transition cursor-pointer"
+                title="下一手"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => {
+                  setReviewStep(boardState.moveHistory.length);
+                  SoundEngine.playStoneSound();
+                }}
+                disabled={reviewStep === boardState.moveHistory.length}
+                className="p-1 rounded-lg bg-amber-100 hover:bg-amber-200 disabled:opacity-40 text-amber-900 transition cursor-pointer"
+                title="末手"
+              >
+                <ChevronsRight className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setIsReviewMode(false)}
+                className="flex items-center gap-0.5 ml-1 sm:ml-2 px-2 py-0.5 bg-red-100 hover:bg-red-200 text-red-900 text-xs font-bold rounded-lg border border-red-300 transition cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>退出复盘</span>
+              </button>
+            </div>
+          )}
+
+          <GoBoard
+            state={isReviewMode ? reviewState : boardState}
+            onPlayMove={handlePlayerMove}
+            onIllegalMove={(reason) => {
+              setStatusMessage(`❌ ${reason}`);
+              if (reason.includes('打劫')) {
+                updateAiDialogue('此处正在打劫中 🔒，刚被吃不能立刻回提，请先在别处落子（找劫材）哦！');
+              } else if (reason.includes('自杀')) {
+                updateAiDialogue('这里落子没有气，属于自杀禁着点，不能下在这里哦！');
+              }
+            }}
+            disabled={isReviewMode || boardState.turn !== playerColor || isAiThinking || boardState.isGameOver}
+            showCoordinates={showCoordinates}
+            showLibertiesHelper={showLiberties && !isReviewMode}
+            showTerritoryHeatmap={showTerritoryHeatmap && !isReviewMode}
+            isImmersiveFullscreen={true}
+          />
+        </div>
+
+        {/* 3. RIGHT WING: PLAYER SCOREBOARD & ERGONOMIC TOUCH CONTROLS */}
+        <div className="w-full md:w-44 lg:w-48 xl:w-56 h-auto md:h-full flex flex-row md:flex-col justify-between items-center md:items-stretch gap-1.5 p-2 bg-white/95 rounded-2xl border-2 border-amber-300 shadow-md shrink-0">
+          {/* Top Section */}
+          <div className="flex flex-col gap-2 w-full">
+            <div className="bg-gradient-to-r from-yellow-100 to-amber-100 px-2.5 py-1.5 rounded-xl border border-amber-300 text-center">
+              <span className="text-[11px] font-black text-amber-950 font-cartoon flex items-center justify-center gap-1">
+                <Trophy className="w-3.5 h-3.5 text-amber-700" />
+                <span>19路公开赛点目标准</span>
+              </span>
+              <p className="text-[9.5px] font-bold text-amber-800 mt-0.5">
+                黑贴 3又3/4子 (7.5目)
+              </p>
+            </div>
+
+            {/* Player Territory & Capture Scoreboard */}
+            <div className="bg-emerald-50/90 p-2 md:p-2.5 rounded-xl border border-emerald-200 flex flex-col gap-1">
+              <div className="flex items-center justify-between text-xs font-bold text-gray-800">
+                <span className="flex items-center gap-1">
+                  <span className={`w-3 h-3 rounded-full ${playerColor === 'black' ? 'bg-black border border-gray-700' : 'bg-white border border-gray-400'} inline-block shrink-0`} />
+                  <span>你已占地</span>
+                </span>
+                <span className="text-sm md:text-base font-black text-emerald-700 font-cartoon">
+                  {playerColor === 'black' ? blackScore : whiteScore.toFixed(1)} <span className="text-[10px] text-gray-500 font-normal">目</span>
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-[11px] font-bold text-emerald-900 mt-0.5 pt-0.5 border-t border-emerald-200/60">
+                <span>提吃对手:</span>
+                <span className="font-cartoon text-xs text-emerald-950 font-black">{myCaptures} 子</span>
+              </div>
+            </div>
+
+            {/* Live Territory Ratio Bar */}
+            <div className="bg-amber-50/90 p-1.5 rounded-xl border border-amber-200 flex flex-col gap-1">
+              <div className="flex items-center justify-between text-[10px] font-black text-amber-950">
+                <span>黑: {blackScore}目</span>
+                <span className="text-amber-800 font-cartoon text-[9.5px]">实时地盘占比</span>
+                <span>白: {whiteScore.toFixed(1)}目</span>
+              </div>
+              <div className="w-full h-1.5 bg-gray-300 rounded-full overflow-hidden flex border border-amber-300">
+                <div style={{ width: `${blackPercent}%` }} className="h-full bg-gray-900 transition-all duration-500" />
+                <div style={{ width: `${whitePercent}%` }} className="h-full bg-gray-100 transition-all duration-500" />
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Section: Tactile Touch Controls */}
+          <div className="flex flex-col gap-1.5 w-full pt-1">
+            <button
+              onClick={handleUndo}
+              disabled={
+                boardState.moveHistory.length < 2 ||
+                isAiThinking ||
+                isReviewMode ||
+                undosRemaining <= 0 ||
+                !canUndoTurn
+              }
+              className="w-full py-2.5 px-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:opacity-40 text-white font-black rounded-xl text-xs md:text-sm shadow-md transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+              title={
+                undosRemaining <= 0
+                  ? '本局 3 次悔棋机会已用完'
+                  : !canUndoTurn && boardState.moveHistory.length >= 2
+                  ? '每次只能悔棋一次，请重新落子'
+                  : `悔棋一步（本局剩 ${undosRemaining} 次）`
+              }
+            >
+              <Undo2 className="w-4 h-4" />
+              <span>悔一步棋 ({undosRemaining}/3)</span>
+            </button>
+
+            <button
+              onClick={handlePass}
+              disabled={boardState.turn !== playerColor || isAiThinking || isReviewMode}
+              className="w-full py-2 px-2 bg-white hover:bg-amber-50 disabled:opacity-40 text-amber-900 font-bold rounded-xl border border-amber-300 text-xs shadow-xs transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+              title="放弃本手（停一手）"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5 text-amber-700" />
+              <span>停一手 (Pass)</span>
+            </button>
+
+            <div className="grid grid-cols-2 gap-1">
+              <button
+                onClick={() => {
+                  const next = !showTerritoryHeatmap;
+                  setShowTerritoryHeatmap(next);
+                  if (next) {
+                    SoundEngine.playSuccessSound();
+                    updateAiDialogue('地盘视界已开启！绿区是你的大本营，橙区是我的地盘哦！');
+                  }
+                }}
+                disabled={isReviewMode}
+                className={`py-1.5 px-1 font-bold rounded-xl border text-[11px] shadow-xs transition active:scale-95 flex items-center justify-center gap-1 cursor-pointer ${
+                  showTerritoryHeatmap
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-emerald-600'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                <Map className="w-3.5 h-3.5" />
+                <span>看地盘</span>
+              </button>
+
+              <button
+                onClick={() => setShowLiberties(!showLiberties)}
+                disabled={isReviewMode}
+                className={`py-1.5 px-1 font-bold rounded-xl border text-[11px] shadow-xs transition active:scale-95 flex items-center justify-center gap-1 cursor-pointer ${
+                  showLiberties
+                    ? 'bg-emerald-500 text-white border-emerald-600'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                <Eye className="w-3.5 h-3.5" />
+                <span>数气点</span>
+              </button>
+            </div>
+
+            <button
+              onClick={handleManualEnd}
+              disabled={boardState.isGameOver || isReviewMode || boardState.moveHistory.length < 3}
+              className="w-full py-2 px-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 disabled:opacity-40 text-white font-black rounded-xl text-xs shadow-xs transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>结束本局 · 记录棋谱</span>
+            </button>
+
+            <button
+              onClick={() => setIsPlayingFullscreen(false)}
+              className="text-[11px] text-gray-500 hover:text-gray-800 font-bold flex items-center justify-center gap-1 py-0.5 transition cursor-pointer"
+              title="退出全屏，返回普通视窗"
+            >
+              <Minimize2 className="w-3 h-3" />
+              <span>缩小窗口</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Exit Confirmation Modal */}
+        {showExitConfirm && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-pop-in">
+            <div className="bg-gradient-to-b from-amber-50 to-orange-100 rounded-3xl p-5 max-w-xs w-full text-center shadow-2xl border-4 border-amber-400">
+              <div className="text-3xl mb-1">🏁</div>
+              <h3 className="text-lg font-black text-amber-950 font-cartoon">
+                退出全屏实战？
+              </h3>
+              <p className="text-xs text-amber-900 mt-2 font-bold leading-relaxed">
+                当前对局进度将完好保留，切回普通视窗模式继续下棋～
+              </p>
+              <div className="grid grid-cols-2 gap-2 mt-4">
+                <button
+                  onClick={() => setShowExitConfirm(false)}
+                  className="py-2.5 px-3 bg-white hover:bg-amber-100 text-amber-900 font-black rounded-xl border border-amber-300 text-xs shadow-sm transition active:scale-95 cursor-pointer"
+                >
+                  继续全屏
+                </button>
+                <button
+                  onClick={() => {
+                    setShowExitConfirm(false);
+                    setIsPlayingFullscreen(false);
+                  }}
+                  className="py-2.5 px-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black rounded-xl text-xs shadow-md transition active:scale-95 cursor-pointer"
+                >
+                  切回普通视窗
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Settlement Modal */}
+        <SparringSettlementModal
+          isOpen={isSettlementOpen}
+          data={settlementData}
+          onPlayAgain={() => startNewGame(boardSize, playerColor, aiLevel, handicapCount)}
+          onCloseReview={() => {
+            setIsSettlementOpen(false);
+            setIsReviewMode(true);
+            setReviewStep(boardState.moveHistory.length);
+          }}
+          onBackToMap={() => {
+            setIsSettlementOpen(false);
+            setIsPlayingFullscreen(false);
+          }}
+        />
+
+        {/* Restart Confirmation Modal */}
+        {isRestartConfirmOpen && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-pop-in select-none">
+            <div className="bg-gradient-to-b from-amber-50 to-orange-100 rounded-3xl p-5 sm:p-6 max-w-sm w-full text-center shadow-2xl border-4 border-yellow-400 relative flex flex-col gap-3">
+              <div className="w-12 h-12 rounded-full bg-amber-200 text-amber-800 flex items-center justify-center text-2xl mx-auto shadow-inner border border-amber-300">
+                ⚠️
+              </div>
+              <div>
+                <h3 className="text-lg sm:text-xl font-black text-amber-950 font-cartoon">
+                  正在激战中，确定重开吗？
+                </h3>
+                <p className="text-xs font-bold text-amber-900 mt-2 leading-relaxed bg-amber-100/80 p-3 rounded-2xl border border-amber-300">
+                  当前对局已经下了 <span className="text-red-600 font-black">{boardState.moveHistory.length}</span> 手，双方地盘正在激烈争夺中！<br />
+                  重新开局将清空当前棋盘。
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 mt-1">
+                <button
+                  onClick={() => setIsRestartConfirmOpen(false)}
+                  className="w-full py-3 px-4 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-black rounded-2xl shadow-md text-sm active:scale-95 transition flex items-center justify-center gap-1.5 font-cartoon cursor-pointer"
+                >
+                  <span>🟢 继续这盘棋（不要重开）</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setIsRestartConfirmOpen(false);
+                    startNewGame();
+                  }}
+                  className="w-full py-2 px-3 bg-white hover:bg-gray-100 text-gray-600 font-bold rounded-xl border border-gray-300 text-xs active:scale-95 transition cursor-pointer"
+                >
+                  <span>确定清空并重新开始</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="w-full h-full flex flex-col md:flex-row items-stretch justify-between gap-1.5 sm:gap-2 p-1 sm:p-1.5 select-none overflow-hidden">
       {/* 1. LEFT/CENTER: FULL-HEIGHT GO BOARD (ZERO top/bottom distractions, maximum scaling) */}
@@ -629,6 +1027,21 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
           </div>
         )}
 
+        {/* Floating 19-Board Fullscreen Button in windowed mode */}
+        {boardSize === 19 && !isReviewMode && (
+          <button
+            onClick={() => {
+              setIsPlayingFullscreen(true);
+              SoundEngine.speakText('已开启19路全屏沉浸对弈！');
+            }}
+            className="absolute top-2 right-2 z-20 flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1 rounded-xl text-xs font-black shadow-md border border-amber-300 transition active:scale-95 cursor-pointer"
+            title="切换为平板全屏沉浸大棋盘"
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+            <span>全屏大棋盘</span>
+          </button>
+        )}
+
         <GoBoard
           state={isReviewMode ? reviewState : boardState}
           onPlayMove={handlePlayerMove}
@@ -649,6 +1062,20 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
 
       {/* 2. RIGHT SIDEBAR: ALL STATS, CAPTURE FEEDBACK & OPTIONS */}
       <div className="w-full md:w-80 lg:w-84 xl:w-88 h-full flex flex-col justify-start gap-1.5 sm:gap-2 overflow-y-auto pr-0.5 shrink-0">
+        {/* 19-Board Fullscreen CTA Button in right sidebar */}
+        {boardSize === 19 && (
+          <button
+            onClick={() => {
+              setIsPlayingFullscreen(true);
+              SoundEngine.speakText('已开启19路全屏沉浸对弈！');
+            }}
+            className="w-full py-2.5 px-3 bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-xs sm:text-sm rounded-xl shadow-md border border-emerald-300 transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer animate-bounce-short shrink-0"
+          >
+            <Swords className="w-4 h-4 text-yellow-200" />
+            <span>⚔️ 开启19路全屏实战 · 顶天立地 🏆</span>
+          </button>
+        )}
+
         {/* Top: 4 AI Opponents Quick Switcher (与吃子战完全统一，置顶直观可点) */}
         <div className="bg-white/95 rounded-2xl p-1.5 sm:p-2 border-2 border-amber-300 shadow-xs flex flex-col gap-1 shrink-0">
           <div className="flex items-center justify-between px-0.5">
