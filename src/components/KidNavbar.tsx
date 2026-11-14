@@ -107,7 +107,7 @@ export const KidNavbar: React.FC<KidNavbarProps> = ({
                 ? 'bg-yellow-400 text-amber-950 shadow-md scale-105'
                 : 'hover:bg-amber-500/50 text-amber-100'
             }`}
-            title="每日15题 101考级真题特训打卡"
+            title="每日15题 趣味特训打卡"
           >
             <Sparkles className="w-3.5 h-3.5 text-yellow-300 fill-yellow-300" />
             <span>每日打卡</span>
@@ -120,10 +120,10 @@ export const KidNavbar: React.FC<KidNavbarProps> = ({
                 ? 'bg-yellow-400 text-amber-950 shadow-md scale-105'
                 : 'hover:bg-amber-500/50 text-amber-100'
             }`}
-            title="101 吃子考级手筋宝典（八大专题闯关）"
+            title="围棋大冒险·趣味吃子题库（八大关卡通关摘星星）"
           >
             <Map className="w-3.5 h-3.5" />
-            <span>101考级宝典</span>
+            <span>围棋题库</span>
           </button>
 
           <button

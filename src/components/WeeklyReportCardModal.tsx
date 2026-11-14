@@ -21,10 +21,10 @@ export const WeeklyReportCardModal: React.FC<WeeklyReportCardModalProps> = ({
   studentName = '森森',
   grade = '幼儿园大三班',
   weekNumber = 7,
-  totalPuzzles = 6,
-  completedPuzzles = 6,
-  starsCount = 18,
-  maxStars = 18,
+  totalPuzzles = 15,
+  completedPuzzles = 15,
+  starsCount = 45,
+  maxStars = 45,
 }) => {
   const [copied, setCopied] = useState(false);
 

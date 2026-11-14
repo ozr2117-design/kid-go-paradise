@@ -3,11 +3,11 @@ import { AUTHENTIC_101_PUZZLES_BANK } from './puzzles-101-bank';
 
 export const ADVENTURE_STAGES: StageInfo[] = [
   // ==========================================
-  // 第一章：101考级必考·双打吃绝杀（两头叫吃，必得其一）
+  // 第一章：双打吃绝杀·两头捉小鸡（两头叫吃，必得其一）
   // ==========================================
   {
     id: 1,
-    title: '第一章：101考级必考·双打吃绝杀',
+    title: '第一章：双打吃绝杀·两头捉小鸡',
     subtitle: '掌握两头叫吃绝招！一子落下，两处白棋同时只剩一口气，顾此失彼必得其一！',
     icon: '⚡',
     themeColor: 'from-amber-400 to-orange-500',
@@ -211,13 +211,13 @@ export const ADVENTURE_STAGES: StageInfo[] = [
       },
       {
         id: '1-8',
-        title: '第8关：101考级压轴真题·连环双叫吃',
+        title: '第8关：连环双叫吃大绝杀',
         category: 'tactics',
         difficulty: 'hard',
         boardSize: 9,
         initialTurn: 'black',
-        description: '【101围棋网考级压轴真题】白棋大龙看似庞大，但断点暴露无遗！黑棋精准点入要害，制造连环双打吃！',
-        voicePrompt: '考级压轴大题！看清白棋最致命的断点，下在要害，连环双叫吃！',
+        description: '白棋大龙看似庞大，但断点暴露无遗！黑棋精准点入要害，制造连环双打吃！',
+        voicePrompt: '最后的大关卡！看清白棋最致命的断点，下在要害，连环双叫吃！',
         hint: '点在中心断点 (4, 4)！',
         initialBoard: {
           black: [
@@ -234,7 +234,7 @@ export const ADVENTURE_STAGES: StageInfo[] = [
         solutionTree: {
           move: { x: 4, y: 4 },
           isCorrect: true,
-          comment: '🎉 完美通关！这就是 101 吃子考级最具杀伤力的双打吃绝技！',
+          comment: '🎉 完美通关！这就是最具杀伤力的双打吃绝技！',
         },
       },
     ],

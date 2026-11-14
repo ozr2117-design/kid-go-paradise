@@ -29,10 +29,10 @@ export const AdventureMap: React.FC<AdventureMapProps> = ({
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-amber-950 font-cartoon flex items-center gap-2">
             <span>🥋</span>
-            <span>101 考级手筋宝典 · 18K至15K必刷</span>
+            <span>围棋题库 · 趣味吃子大闯关</span>
           </h1>
           <p className="text-sm sm:text-base font-bold text-amber-900 mt-1">
-            直击 11 月 28 日考级！攻克双打吃、门吃、抱吃、枷吃、征子、倒扑、接不归、两眼做活 8 大必考绝招！
+            打倒大怪兽，闯关摘星星！攻克双打吃、门吃、抱吃、枷吃、征子、倒扑、接不归、两眼做活 8 大趣味绝招！
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -183,10 +183,10 @@ export const AdventureMap: React.FC<AdventureMapProps> = ({
         studentName="森森"
         grade="大三班"
         weekNumber={7}
-        totalPuzzles={6}
-        completedPuzzles={Math.min(6, completedPuzzles.length)}
-        starsCount={Math.min(18, Object.values(starsMap).reduce((a, b) => a + b, 0))}
-        maxStars={18}
+        totalPuzzles={15}
+        completedPuzzles={15}
+        starsCount={45}
+        maxStars={45}
       />
     </div>
   );
