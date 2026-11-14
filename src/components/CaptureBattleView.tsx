@@ -6,7 +6,7 @@ import { GoAI } from '../engine/go-ai';
 import { SoundEngine } from '../engine/sound-engine';
 import { GoBoard } from './GoBoard';
 import { WinModal } from './WinModal';
-import { RotateCcw, Undo2, Eye, Award, Swords } from 'lucide-react';
+import { RotateCcw, Undo2, Eye, Award, Swords, ArrowLeft, Minimize2, Trophy } from 'lucide-react';
 
 interface CaptureBattleViewProps {
   onWinRecord: (animalId: string) => void;
@@ -31,6 +31,10 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
   const [isWinModalOpen, setIsWinModalOpen] = useState<boolean>(false);
   const [isDefeatModalOpen, setIsDefeatModalOpen] = useState<boolean>(false);
 
+  // Fullscreen and Exit Confirmation States (针对小米平板 6 Pro 深度定制)
+  const [isPlayingFullscreen, setIsPlayingFullscreen] = useState<boolean>(false);
+  const [showExitConfirm, setShowExitConfirm] = useState<boolean>(false);
+
   // Undo limit rules (每局最多 3 次，每次只能悔 1 次)
   const MAX_UNDOS_PER_GAME = 3;
   const [undosRemaining, setUndosRemaining] = useState<number>(MAX_UNDOS_PER_GAME);
@@ -39,6 +43,35 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
   const updateDialogue = useCallback((text: string) => {
     setAnimalDialogue(text);
     SoundEngine.speakText(text);
+  }, []);
+
+  // Chrome on Android 原生全屏调用助手（双保险机制）
+  const requestChromeFullscreen = useCallback(() => {
+    try {
+      const docEl = document.documentElement as any;
+      if (docEl.requestFullscreen) {
+        docEl.requestFullscreen().catch(() => {});
+      } else if (docEl.webkitRequestFullscreen) {
+        docEl.webkitRequestFullscreen();
+      }
+    } catch {
+      // 降级使用 CSS fixed 满屏，不抛出异常
+    }
+  }, []);
+
+  const exitChromeFullscreen = useCallback(() => {
+    try {
+      const doc = document as any;
+      if (doc.fullscreenElement || doc.webkitFullscreenElement) {
+        if (doc.exitFullscreen) {
+          doc.exitFullscreen().catch(() => {});
+        } else if (doc.webkitExitFullscreen) {
+          doc.webkitExitFullscreen();
+        }
+      }
+    } catch {
+      // 容错处理
+    }
   }, []);
 
   // Initialize board when changing opponent, target or size
@@ -59,6 +92,25 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
     [selectedAnimal, boardSize, updateDialogue]
   );
 
+  // 进入 19 路沉浸全屏对弈
+  const startFullscreenMatch = useCallback(() => {
+    requestChromeFullscreen();
+    setIsPlayingFullscreen(true);
+    setShowExitConfirm(false);
+    if (boardState.isGameOver || boardState.moveHistory.length === 0) {
+      initGame(selectedAnimal, effectiveTarget, boardSize);
+    }
+    SoundEngine.speakText(`比赛开始！黑棋先走，先吃满 ${effectiveTarget} 颗子获胜！`);
+  }, [requestChromeFullscreen, boardState.isGameOver, boardState.moveHistory.length, initGame, selectedAnimal, effectiveTarget, boardSize]);
+
+  // 退出全屏对弈，返回备战大厅
+  const exitFullscreenMatch = useCallback(() => {
+    exitChromeFullscreen();
+    setIsPlayingFullscreen(false);
+    setShowExitConfirm(false);
+    updateDialogue('已返回备战大厅，随时可以重新开启对决！');
+  }, [exitChromeFullscreen, updateDialogue]);
+
   const handleSelectBoardSize = (size: 19 | 13) => {
     SoundEngine.speakText(`切换为 ${size} 路棋盘！重新开局！`);
     initGame(selectedAnimal, effectiveTarget, size);
@@ -73,6 +125,12 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
   // Handle Player (Black) Move
   const handlePlayerMove = (point: Point) => {
     if (boardState.isGameOver || boardState.turn !== 'black' || isAiThinking) return;
+
+    // 若在备战大厅直接落子，顺畅自动切换为全屏竞技对弈
+    if (!isPlayingFullscreen) {
+      requestChromeFullscreen();
+      setIsPlayingFullscreen(true);
+    }
 
     const result = GoCore.playMove(boardState, point, 'black', effectiveTarget);
     if (result.error) {
@@ -204,9 +262,286 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
     updateDialogue(msg);
   };
 
+  // =========================================================================
+  // VIEW MODE A: 沉浸式全屏对弈界面 (针对小米平板 6 Pro 16:10 宽屏顶天立地定制)
+  // =========================================================================
+  if (isPlayingFullscreen) {
+    return (
+      <div className="fixed inset-0 z-50 bg-[#F4EEE1] flex flex-col md:flex-row items-stretch justify-between p-1 sm:p-2 select-none overflow-hidden animate-pop-in">
+        {/* 1. LEFT WING: OPPONENT (WHITE) & RETURN BUTTON & LIVE SPEECH */}
+        <div className="w-full md:w-44 lg:w-48 xl:w-56 h-auto md:h-full flex flex-row md:flex-col justify-between items-center md:items-stretch gap-1.5 p-2 bg-white/95 rounded-2xl border-2 border-amber-300 shadow-md shrink-0">
+          {/* Top Section: Back button & Opponent Card */}
+          <div className="flex flex-col gap-2 w-full">
+            <button
+              onClick={() => setShowExitConfirm(true)}
+              className="self-start flex items-center gap-1.5 px-3 py-1.5 text-xs font-black text-amber-900 bg-amber-100 hover:bg-amber-200 rounded-xl border border-amber-300 transition active:scale-95 shadow-xs"
+              title="退出全屏比赛回到备战大厅"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>退出比赛</span>
+            </button>
+
+            {/* Opponent Profile */}
+            <div className="flex items-center md:flex-col md:items-center gap-2 pt-1">
+              <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-gradient-to-br from-amber-100 to-yellow-200 border-2 border-amber-400 flex items-center justify-center text-3xl md:text-4xl shadow-inner shrink-0">
+                {selectedAnimal.avatar}
+              </div>
+              <div className="text-left md:text-center min-w-0">
+                <h3 className="font-black text-amber-950 text-sm md:text-base font-cartoon truncate">
+                  {selectedAnimal.name}
+                </h3>
+                <span className="inline-block text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full mt-0.5">
+                  {selectedAnimal.rank}
+                </span>
+              </div>
+            </div>
+
+            {/* White Capture Counter Card */}
+            <div className="bg-amber-50/90 p-2 md:p-2.5 rounded-xl border border-amber-200 flex flex-col gap-1 mt-1">
+              <div className="flex items-center justify-between text-xs font-bold text-gray-800">
+                <span className="flex items-center gap-1">
+                  <span className="w-3 h-3 rounded-full bg-white border border-gray-400 inline-block shrink-0" />
+                  <span>AI吃白棋</span>
+                </span>
+                <span className="text-sm md:text-base font-black text-orange-700 font-cartoon">
+                  {boardState.captures.white} <span className="text-[10px] text-gray-500 font-normal">/ {effectiveTarget}</span>
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
+                <div
+                  className="bg-orange-500 h-full rounded-full transition-all duration-300"
+                  style={{ width: `${Math.min(100, (boardState.captures.white / effectiveTarget) * 100)}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Section: Speech bubble */}
+          <div className="hidden md:block w-full bg-amber-50/90 p-2.5 rounded-xl border border-amber-200 text-xs font-bold text-amber-950 relative">
+            <div className="absolute -top-1.5 left-6 w-3 h-3 bg-amber-50 border-t border-l border-amber-200 transform rotate-45"></div>
+            {isAiThinking ? (
+              <span className="text-amber-600 flex items-center gap-1.5 animate-pulse">
+                <span>💭 认真算气中...</span>
+              </span>
+            ) : (
+              <span className="line-clamp-3 leading-relaxed">“{animalDialogue}”</span>
+            )}
+          </div>
+        </div>
+
+        {/* 2. CENTER: MAXIMIZED GO BOARD (100% HEIGHT ON TABLETS, ZERO NAVBAR WASTE) */}
+        <div className="flex-1 h-full min-h-0 min-w-0 flex items-center justify-center p-0.5 overflow-hidden">
+          <GoBoard
+            state={boardState}
+            onPlayMove={handlePlayerMove}
+            onIllegalMove={(reason) => {
+              if (reason.includes('打劫')) {
+                updateDialogue('此处正在打劫中 🔒，请先在别处落子（找劫材）再来提回～');
+              } else if (reason.includes('自杀')) {
+                updateDialogue('这里没有气，属于禁着点，不能下在这里哦！');
+              }
+            }}
+            disabled={boardState.turn !== 'black' || isAiThinking || boardState.isGameOver}
+            showCoordinates={showCoordinates}
+            showLibertiesHelper={showLiberties}
+            captureTarget={effectiveTarget}
+            isImmersiveFullscreen={true}
+          />
+        </div>
+
+        {/* 3. RIGHT WING: PLAYER SCOREBOARD & ERGONOMIC TOUCH CONTROLS */}
+        <div className="w-full md:w-44 lg:w-48 xl:w-56 h-auto md:h-full flex flex-row md:flex-col justify-between items-center md:items-stretch gap-1.5 p-2 bg-white/95 rounded-2xl border-2 border-amber-300 shadow-md shrink-0">
+          {/* Top Section: Target & Player Score Card */}
+          <div className="flex flex-col gap-2 w-full">
+            <div className="bg-gradient-to-r from-yellow-100 to-amber-100 px-2.5 py-1.5 rounded-xl border border-amber-300 text-center">
+              <span className="text-[11px] font-black text-amber-950 font-cartoon flex items-center justify-center gap-1">
+                <Trophy className="w-3.5 h-3.5 text-amber-700" />
+                <span>先吃满 {effectiveTarget} 子获胜</span>
+              </span>
+              <p className="text-[9.5px] font-bold text-amber-800 mt-0.5">
+                {boardSize}路棋院公开比赛标准
+              </p>
+            </div>
+
+            {/* Black Capture Counter Card */}
+            <div className="bg-emerald-50/90 p-2 md:p-2.5 rounded-xl border border-emerald-200 flex flex-col gap-1">
+              <div className="flex items-center justify-between text-xs font-bold text-gray-800">
+                <span className="flex items-center gap-1">
+                  <span className="w-3 h-3 rounded-full bg-black border border-gray-600 inline-block shrink-0" />
+                  <span>你已吃黑棋</span>
+                </span>
+                <span className="text-sm md:text-base font-black text-emerald-700 font-cartoon">
+                  {boardState.captures.black} <span className="text-[10px] text-gray-500 font-normal">/ {effectiveTarget}</span>
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
+                <div
+                  className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+                  style={{ width: `${Math.min(100, (boardState.captures.black / effectiveTarget) * 100)}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Section: Tactile Touch Buttons */}
+          <div className="flex flex-col gap-2 w-full pt-1">
+            <button
+              onClick={handleUndo}
+              disabled={
+                boardState.moveHistory.length < 2 ||
+                isAiThinking ||
+                boardState.isGameOver ||
+                undosRemaining <= 0 ||
+                !canUndoTurn
+              }
+              className="w-full py-2.5 md:py-3 px-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:opacity-40 text-white font-black rounded-xl text-xs md:text-sm shadow-md transition active:scale-95 flex items-center justify-center gap-1.5"
+              title={
+                undosRemaining <= 0
+                  ? '本局 3 次悔棋机会已用完'
+                  : !canUndoTurn && boardState.moveHistory.length >= 2
+                  ? '每次只能悔棋一次，请重新落子'
+                  : `悔棋（本局剩 ${undosRemaining} 次）`
+              }
+            >
+              <Undo2 className="w-4 h-4" />
+              <span>悔一步棋 ({undosRemaining}/3)</span>
+            </button>
+
+            <button
+              onClick={() => setShowLiberties(!showLiberties)}
+              className={`w-full py-2 px-2 font-bold rounded-xl border text-xs shadow-sm transition active:scale-95 flex items-center justify-center gap-1.5 ${
+                showLiberties
+                  ? 'bg-emerald-500 text-white border-emerald-600 shadow'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span>数气光点</span>
+            </button>
+
+            <button
+              onClick={() => initGame(selectedAnimal, effectiveTarget, boardSize)}
+              className="w-full py-2 px-2 bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-500 hover:to-yellow-500 text-amber-950 font-black rounded-xl border border-amber-400 text-xs shadow-sm transition active:scale-95 flex items-center justify-center gap-1.5"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>重新开局</span>
+            </button>
+
+            <button
+              onClick={exitFullscreenMatch}
+              className="text-[11px] text-gray-500 hover:text-gray-800 font-bold flex items-center justify-center gap-1 py-1 transition"
+              title="退出全屏，返回普通备战模式"
+            >
+              <Minimize2 className="w-3 h-3" />
+              <span>缩小窗口</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Exit Confirmation Modal */}
+        {showExitConfirm && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-pop-in">
+            <div className="bg-gradient-to-b from-amber-50 to-orange-100 rounded-3xl p-5 max-w-xs w-full text-center shadow-2xl border-4 border-amber-400">
+              <div className="text-3xl mb-1">🏁</div>
+              <h3 className="text-lg font-black text-amber-950 font-cartoon">
+                退出当前比赛？
+              </h3>
+              <p className="text-xs text-amber-900 mt-2 font-bold leading-relaxed">
+                退出后将返回备战大厅，可以重新挑选对手或调整吃子目标哦～
+              </p>
+              <div className="grid grid-cols-2 gap-2 mt-4">
+                <button
+                  onClick={() => setShowExitConfirm(false)}
+                  className="py-2.5 px-3 bg-white hover:bg-amber-100 text-amber-900 font-black rounded-xl border border-amber-300 text-xs shadow-sm transition active:scale-95"
+                >
+                  继续比赛
+                </button>
+                <button
+                  onClick={exitFullscreenMatch}
+                  className="py-2.5 px-3 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white font-black rounded-xl text-xs shadow-md transition active:scale-95"
+                >
+                  确认退出
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Win Modal */}
+        <WinModal
+          isOpen={isWinModalOpen}
+          title={`🎉 战胜了 ${selectedAnimal.name}！`}
+          subtitle={`恭喜你在 ${boardSize} 路吃子大赛中率先吃满 ${effectiveTarget} 颗棋子，展现了高超的吃子技巧！`}
+          stars={3}
+          onRetry={() => {
+            initGame(selectedAnimal, effectiveTarget, boardSize);
+            setIsWinModalOpen(false);
+          }}
+          onBackToMap={() => {
+            setIsWinModalOpen(false);
+            exitFullscreenMatch();
+          }}
+          hasNext={false}
+        />
+
+        {/* Defeat / Game Over Modal */}
+        {isDefeatModalOpen && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-pop-in">
+            <div className="bg-gradient-to-b from-amber-50 to-orange-100 rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl border-4 border-amber-400 relative overflow-hidden">
+              <div className="text-4xl mb-2">🐾</div>
+              <h2 className="text-2xl font-black text-amber-950 font-cartoon">
+                哎呀，差一点点就翻盘啦！
+              </h2>
+              <div className="text-xs sm:text-sm font-bold text-amber-900 mt-2.5 px-3 py-2 bg-yellow-200/60 rounded-xl leading-relaxed text-left border border-yellow-300">
+                <p>
+                  {selectedAnimal.name} 率先吃满了 <strong className="text-red-600 font-cartoon text-sm">{effectiveTarget}</strong> 颗子，本局比赛结束啦！
+                </p>
+                <p className="mt-1.5 text-emerald-900 text-xs">
+                  💡 <strong>小教练提示</strong>：你包围大龙的战术非常惊艳！只要点击【悔一步棋】，就能立刻下在空位把整条大龙一口气全部提光！
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2 mt-5">
+                {undosRemaining > 0 && (
+                  <button
+                    onClick={handleUndo}
+                    className="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-sm rounded-2xl shadow-md transition active:scale-95"
+                  >
+                    ↩️ 悔棋一步，立刻反提大龙！(剩 {undosRemaining} 次)
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    initGame(selectedAnimal, effectiveTarget, boardSize);
+                    setIsDefeatModalOpen(false);
+                  }}
+                  className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-sm rounded-2xl shadow-md transition active:scale-95"
+                >
+                  🔄 重新再战一局！
+                </button>
+                <button
+                  onClick={() => {
+                    setIsDefeatModalOpen(false);
+                    exitFullscreenMatch();
+                  }}
+                  className="w-full py-2 bg-white hover:bg-amber-100 text-amber-900 font-bold text-xs rounded-xl border border-amber-300 shadow-sm transition active:scale-95"
+                >
+                  ⬅ 返回备战大厅
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // VIEW MODE B: 备战大厅常规界面 (Lobby Mode)
+  // =========================================================================
   return (
     <div className="w-full h-full flex flex-col md:flex-row items-stretch justify-between gap-2 p-1 sm:p-2 select-none overflow-hidden">
-      {/* 1. LEFT/CENTER: FULL-HEIGHT GO BOARD (ZERO top/bottom distractions, maximum scaling) */}
+      {/* 1. LEFT/CENTER: FULL-HEIGHT GO BOARD PREVIEW */}
       <div className="flex-1 h-full min-h-0 min-w-0 flex items-center justify-center overflow-hidden">
         <GoBoard
           state={boardState}
@@ -222,17 +557,27 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
           showCoordinates={showCoordinates}
           showLibertiesHelper={showLiberties}
           captureTarget={effectiveTarget}
+          isImmersiveFullscreen={false}
         />
       </div>
 
       {/* 2. RIGHT SIDEBAR: ANIMAL SELECTOR, DIALOGUE, STATS & ACTIONS */}
       <div className="w-full md:w-80 lg:w-84 xl:w-88 h-full flex flex-col justify-start gap-2 sm:gap-2.5 overflow-y-auto pr-1 shrink-0">
+        {/* Core CTA: 开始 19 路全屏比赛按钮 */}
+        <button
+          onClick={startFullscreenMatch}
+          className="w-full py-3 px-3 bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-sm sm:text-base rounded-2xl shadow-lg border-2 border-emerald-300 transition-all active:scale-95 flex items-center justify-center gap-2 animate-bounce-short cursor-pointer"
+        >
+          <Swords className="w-5 h-5 text-yellow-200" />
+          <span>⚔️ 开始19路全屏吃子比赛 🏆</span>
+        </button>
+
         {/* Top: 19路吃子比赛 Header & Opponents Selector */}
         <div className="bg-white/95 rounded-2xl p-2 sm:p-2.5 border-2 border-amber-300 shadow-sm flex flex-col gap-1.5 shrink-0">
           <div className="flex items-center justify-between">
             <span className="text-xs font-black text-amber-950 font-cartoon flex items-center gap-1">
               <Swords className="w-3.5 h-3.5 text-amber-700" />
-              <span>19路棋院吃子大赛</span>
+              <span>19路棋院吃子大赛备战厅</span>
             </span>
             <span className="text-[10px] text-amber-800 font-bold bg-amber-100 px-2 py-0.5 rounded-full">
               先吃满 {effectiveTarget} 子胜

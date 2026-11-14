@@ -26,6 +26,7 @@ interface GoBoardProps {
   dangerPoints?: Point[];
   singleTapToPlay?: boolean;
   onIllegalMove?: (reason: string) => void;
+  isImmersiveFullscreen?: boolean;
 }
 
 export const GoBoard: React.FC<GoBoardProps> = ({
@@ -39,6 +40,7 @@ export const GoBoard: React.FC<GoBoardProps> = ({
   dangerPoints = [],
   singleTapToPlay = false,
   onIllegalMove,
+  isImmersiveFullscreen = false,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -60,20 +62,30 @@ export const GoBoard: React.FC<GoBoardProps> = ({
         let w = rect.width > 20 ? rect.width : maxVw * 0.65;
         let h = rect.height > 20 ? rect.height : maxVh - 60;
 
-        // CRITICAL SAFEGUARD FOR TABLETS:
-        // The board canvas height MUST NOT exceed (viewport height - 64px) to prevent vertical overflow/scrolling
-        const hardMaxH = Math.max(200, maxVh - 64);
-        h = Math.min(h, hardMaxH);
+        if (isImmersiveFullscreen) {
+          // In immersive fullscreen mode (optimized for Xiaomi Pad 6 Pro & tablets):
+          // Board height utilizes 100% of viewport without navbar or artificial 720px cap
+          const hardMaxH = Math.max(200, maxVh - 8);
+          h = Math.min(rect.height > 20 ? rect.height : maxVh, hardMaxH);
+          w = rect.width > 20 ? rect.width : maxVw;
+          const maxSquare = Math.min(w, h) - 6;
+          const clamped = Math.max(240, Math.min(Math.floor(maxSquare), 1400));
+          setDisplaySize(clamped);
+        } else {
+          // Standard view mode with navbar and sidebar
+          const hardMaxH = Math.max(200, maxVh - 64);
+          h = Math.min(h, hardMaxH);
 
-        // Also ensure width leaves room for sidebar in landscape mode
-        if (maxVw >= 768) {
-          const hardMaxW = Math.max(200, maxVw - 320);
-          w = Math.min(w, hardMaxW);
+          // Also ensure width leaves room for sidebar in landscape mode
+          if (maxVw >= 768) {
+            const hardMaxW = Math.max(200, maxVw - 320);
+            w = Math.min(w, hardMaxW);
+          }
+
+          const maxSquare = Math.min(w, h) - 10;
+          const clamped = Math.max(240, Math.min(Math.floor(maxSquare), 720));
+          setDisplaySize(clamped);
         }
-
-        const maxSquare = Math.min(w, h) - 10;
-        const clamped = Math.max(240, Math.min(Math.floor(maxSquare), 720));
-        setDisplaySize(clamped);
       }
     };
 
@@ -92,7 +104,7 @@ export const GoBoard: React.FC<GoBoardProps> = ({
       if (ro) ro.disconnect();
       window.removeEventListener('resize', updateSize);
     };
-  }, []);
+  }, [isImmersiveFullscreen]);
 
   // Compute geometry dynamically so stones NEVER overflow board edge and coordinates NEVER overlap stones
   const size = state.size;
