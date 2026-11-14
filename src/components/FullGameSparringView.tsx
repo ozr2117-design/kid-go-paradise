@@ -583,7 +583,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
   // =========================================================================
   if (isPlayingFullscreen && boardSize === 19) {
     return (
-      <div className="fixed inset-0 z-50 bg-[#F4EEE1] flex flex-col md:flex-row items-stretch justify-between p-1 sm:p-2 select-none overflow-hidden animate-pop-in">
+      <div className="fixed inset-0 z-50 bg-[#F4EEE1] flex flex-col md:flex-row items-stretch justify-between p-1 sm:p-2 select-none overflow-hidden">
         {/* 1. LEFT WING: OPPONENT (WHITE/AI) & RETURN BUTTON & LIVE SPEECH */}
         <div className="w-full md:w-44 lg:w-48 xl:w-56 h-auto md:h-full flex flex-row md:flex-col justify-between items-center md:items-stretch gap-1.5 p-2 bg-white/95 rounded-2xl border-2 border-amber-300 shadow-md shrink-0">
           {/* Top Section */}

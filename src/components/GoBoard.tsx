@@ -54,25 +54,25 @@ export const GoBoard: React.FC<GoBoardProps> = ({
   useEffect(() => {
     const updateSize = () => {
       if (containerRef.current) {
+        const clientW = containerRef.current.clientWidth;
+        const clientH = containerRef.current.clientHeight;
         const rect = containerRef.current.getBoundingClientRect();
         const maxVw = window.innerWidth;
         const maxVh = window.innerHeight;
 
-        // Container available width & height
-        let w = rect.width > 20 ? rect.width : maxVw * 0.65;
-        let h = rect.height > 20 ? rect.height : maxVh - 60;
-
         if (isImmersiveFullscreen) {
           // In immersive fullscreen mode (optimized for Xiaomi Pad 6 Pro & tablets):
           // Board height utilizes 100% of viewport without navbar or artificial 720px cap
-          const hardMaxH = Math.max(200, maxVh - 8);
-          h = Math.min(rect.height > 20 ? rect.height : maxVh, hardMaxH);
-          w = rect.width > 20 ? rect.width : maxVw;
-          const maxSquare = Math.min(w, h) - 6;
+          const availH = Math.max(200, Math.max(clientH, maxVh) - 12);
+          const availW = Math.max(200, clientW > 100 ? clientW : (maxVw >= 768 ? maxVw - 380 : maxVw));
+          const maxSquare = Math.min(availW, availH) - 4;
           const clamped = Math.max(240, Math.min(Math.floor(maxSquare), 1400));
           setDisplaySize(clamped);
         } else {
           // Standard view mode with navbar and sidebar
+          let w = clientW > 20 ? clientW : (rect.width > 20 ? rect.width : maxVw * 0.65);
+          let h = clientH > 20 ? clientH : (rect.height > 20 ? rect.height : maxVh - 60);
+
           const hardMaxH = Math.max(200, maxVh - 64);
           h = Math.min(h, hardMaxH);
 
@@ -91,6 +91,11 @@ export const GoBoard: React.FC<GoBoardProps> = ({
 
     updateSize();
 
+    // Deferred checks to guarantee expansion after any transitions or DOM settling
+    const t1 = setTimeout(updateSize, 50);
+    const t2 = setTimeout(updateSize, 200);
+    const t3 = setTimeout(updateSize, 500);
+
     let ro: ResizeObserver | null = null;
     if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
       ro = new ResizeObserver(() => {
@@ -101,6 +106,9 @@ export const GoBoard: React.FC<GoBoardProps> = ({
 
     window.addEventListener('resize', updateSize);
     return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
       if (ro) ro.disconnect();
       window.removeEventListener('resize', updateSize);
     };
