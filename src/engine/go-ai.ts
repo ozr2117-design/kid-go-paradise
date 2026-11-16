@@ -347,6 +347,12 @@ export class GoAI {
       }
     }
 
+    // 5.5 恶狼主动猎杀：绝不被动挨打，主动扑杀 2 气弱棋（叫吃）、强行切断与紧气肉搏
+    const huntMove = this.findFerociousHuntingMove(state, color, oppColor, legalMoves, options);
+    if (huntMove) {
+      return huntMove;
+    }
+
     // 6. 主力搜索：局部 2-ply 杀气与紧气前瞻（宽度 6）
     return this.runMinimaxTacticalSearch(state, color, oppColor, legalMoves, options, 6);
   }
@@ -421,6 +427,12 @@ export class GoAI {
       }
     }
 
+    // 5.5 恶狼主动猎杀：绝不被动挨打，主动扑杀 2 气弱棋（叫吃）、强行切断、紧气压迫与开局贴身肉搏
+    const huntMove = this.findFerociousHuntingMove(state, color, oppColor, legalMoves, options);
+    if (huntMove) {
+      return huntMove;
+    }
+
     // 6. 局部 4 至 6 步杀气深搜 (Deep Tactical Combat Search)
     // 麒麟（master 业4）：深度 4 步，候选 8 个；龙尊（grandmaster 业5）：深度 6 步，候选 12 个
     const isKylin = options.sparringLevel === 'master';
@@ -431,6 +443,131 @@ export class GoAI {
     if (deepMove) return deepMove;
 
     return this.runMinimaxTacticalSearch(state, color, oppColor, legalMoves, options, width);
+  }
+
+  /**
+   * 赛场恶狼主动猎杀算子 (Ferocious Hunting Strike)
+   * 针对 15K 冲锋机与 16K 哨兵机：
+   * 拒绝被动挨打，在无防守险情时主动发起：
+   * 1. 致命叫吃猎杀 (Atari Strike): 对手凡是有 2 气的弱棋，直接扑杀紧气至 1 气（叫吃）！
+   * 2. 强行切断分断 (Cross-cut & Sever): 寻找对手两块不同棋子间的关键断点，强行分断制造双弱！
+   * 3. 紧气包围猎杀 (3-Liberty Squeeze): 将对手 3 气棋紧为 2 气，同时确保己方安全；
+   * 4. 早期贴身缠斗磁吸 (Contact Engagement): 开局直接紧贴对手单子展开肉搏，绝不和平脱先！
+   */
+  public static findFerociousHuntingMove(
+    state: BoardState,
+    color: Color,
+    oppColor: Color,
+    legalMoves: Point[],
+    options: AIMoveOptions
+  ): Point | null {
+    const size = state.size;
+    // 19路辽阔大盘要求自身至少留存 3 气才发起猎杀，坚决防范贴入厚势后沦为 2 气反送死；
+    // 9路/13路小盘接触战空间紧凑，允许 2 气近身缠斗搏杀。
+    const minSelfLibs = size === 19 ? 3 : 2;
+    const candidates: { point: Point; score: number }[] = [];
+
+    // 收集全盘对手的所有棋块信息
+    const oppGroups: { points: Point[]; liberties: Point[] }[] = [];
+    const checked = new Set<string>();
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        if (state.grid[y][x] === oppColor) {
+          const key = `${x},${y}`;
+          if (checked.has(key)) continue;
+          const grp = GoCore.findGroup(state.grid, { x, y });
+          if (grp) {
+            for (const p of grp.points) checked.add(`${p.x},${p.y}`);
+            oppGroups.push(grp);
+          }
+        }
+      }
+    }
+
+    if (oppGroups.length === 0) return null;
+
+    // 1. 致命叫吃猎杀：对手凡是有 2 气的弱棋，直接下在其中一口气上叫吃！
+    const twoLibGroups = oppGroups.filter((g) => g.liberties.length === 2);
+    for (const grp of twoLibGroups) {
+      for (const lib of grp.liberties) {
+        if (!legalMoves.some((m) => GoCore.pointsEqual(m, lib))) continue;
+        const sim = GoCore.playMove(state, lib, color, options.captureTarget);
+        if (sim.error) continue;
+        const myGrp = GoCore.findGroup(sim.nextState.grid, lib);
+        if (!myGrp || myGrp.liberties.length < minSelfLibs) continue; // 自身必须有足够气数，杜绝送死
+
+        // 验证对手此块是否确实被叫吃（剩 1 气）
+        const oppAfter = GoCore.findGroup(sim.nextState.grid, grp.points[0]);
+        if (oppAfter && oppAfter.liberties.length === 1) {
+          // 基础分 5000 + 棋子数加分 + 自身气数安全度
+          let strikeScore = 5000 + grp.points.length * 1500 + myGrp.liberties.length * 200;
+          const dEdge = Math.min(lib.x, size - 1 - lib.x, lib.y, size - 1 - lib.y);
+          if (dEdge <= 1) strikeScore += 800;
+          candidates.push({ point: lib, score: strikeScore });
+        }
+      }
+    }
+
+    // 2. 切断猎杀：寻找对手两块不同棋子之间的分割断点
+    if (oppGroups.length >= 2) {
+      for (const move of legalMoves) {
+        const neighborsOpp = GoCore.getNeighbors(move, size).filter(
+          (n) => state.grid[n.y][n.x] === oppColor
+        );
+        if (neighborsOpp.length >= 2) {
+          const cutGroupRoots = new Set<string>();
+          for (const on of neighborsOpp) {
+            const g = GoCore.findGroup(state.grid, on);
+            if (g) cutGroupRoots.add(`${g.points[0].x},${g.points[0].y}`);
+          }
+          if (cutGroupRoots.size >= 2) {
+            const sim = GoCore.playMove(state, move, color, options.captureTarget);
+            if (!sim.error) {
+              const myG = GoCore.findGroup(sim.nextState.grid, move);
+              if (myG && myG.liberties.length >= minSelfLibs) {
+                candidates.push({ point: move, score: 3800 + myG.liberties.length * 150 });
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 3. 紧气包围猎杀：对手 3 气的棋，紧气至 2 气
+    const threeLibGroups = oppGroups.filter((g) => g.liberties.length === 3);
+    for (const grp of threeLibGroups) {
+      for (const lib of grp.liberties) {
+        if (!legalMoves.some((m) => GoCore.pointsEqual(m, lib))) continue;
+        const sim = GoCore.playMove(state, lib, color, options.captureTarget);
+        if (sim.error) continue;
+        const myGrp = GoCore.findGroup(sim.nextState.grid, lib);
+        if (!myGrp || myGrp.liberties.length < minSelfLibs) continue; // 进攻必须自身留足安全气数
+
+        const oppAfter = GoCore.findGroup(sim.nextState.grid, grp.points[0]);
+        if (oppAfter && oppAfter.liberties.length === 2) {
+          candidates.push({ point: lib, score: 2200 + grp.points.length * 600 });
+        }
+      }
+    }
+
+    // 4. 开局贴身缠斗磁吸（前 16 手，对手单子无接触时直接贴身靠断）
+    if (state.moveHistory.length < 16 && candidates.length === 0) {
+      for (const grp of oppGroups) {
+        for (const lib of grp.liberties) {
+          if (!legalMoves.some((m) => GoCore.pointsEqual(m, lib))) continue;
+          const sim = GoCore.playMove(state, lib, color, options.captureTarget);
+          if (sim.error) continue;
+          const myG = GoCore.findGroup(sim.nextState.grid, lib);
+          if (myG && myG.liberties.length >= minSelfLibs) {
+            candidates.push({ point: lib, score: 1800 + myG.liberties.length * 100 });
+          }
+        }
+      }
+    }
+
+    if (candidates.length === 0) return null;
+    candidates.sort((a, b) => b.score - a.score);
+    return candidates[0].point;
   }
 
   /**

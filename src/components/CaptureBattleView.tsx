@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { AnimalOpponent, BoardState, Point } from '../types/go';
+import { AnimalOpponent, BoardState, Point, Color } from '../types/go';
 import { ANIMAL_OPPONENTS } from '../data/animals';
 import { GoCore } from '../engine/go-core';
 import { GoAI } from '../engine/go-ai';
@@ -21,6 +21,10 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
   const [boardSize, setBoardSize] = useState<19 | 13>(19);
   const [customCaptureTarget, setCustomCaptureTarget] = useState<number>(ANIMAL_OPPONENTS[0].captureTarget);
   const effectiveTarget = customCaptureTarget || selectedAnimal.captureTarget;
+
+  // 执子角色切换：默认执黑先行；支持执白后手抗压对决与随机猜先
+  const [playerColor, setPlayerColor] = useState<Color>('black');
+  const aiColor: Color = playerColor === 'black' ? 'white' : 'black';
 
   const [boardState, setBoardState] = useState<BoardState>(() =>
     GoCore.createEmptyBoard(19)
@@ -45,13 +49,19 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
     SoundEngine.speakText(text);
   }, []);
 
-  // Initialize board when changing opponent, target or size
+  // Initialize board when changing opponent, target, size or color
   const initGame = useCallback(
-    (animal: AnimalOpponent = selectedAnimal, targetCount?: number, size: 19 | 13 = boardSize) => {
+    (
+      animal: AnimalOpponent = selectedAnimal,
+      targetCount?: number,
+      size: 19 | 13 = boardSize,
+      color: Color = playerColor
+    ) => {
       const nextTarget = targetCount ?? animal.captureTarget;
       setSelectedAnimal(animal);
       setCustomCaptureTarget(nextTarget);
       setBoardSize(size);
+      setPlayerColor(color);
       setBoardState(GoCore.createEmptyBoard(size));
       updateDialogue(animal.intro);
       setIsWinModalOpen(false);
@@ -60,18 +70,38 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
       setUndosRemaining(MAX_UNDOS_PER_GAME);
       setCanUndoTurn(false);
     },
-    [selectedAnimal, boardSize, updateDialogue]
+    [selectedAnimal, boardSize, playerColor, updateDialogue]
   );
+
+  // 执子模式切换（执黑先行 / 执白后手 / 现场随机猜先）
+  const handleSelectPlayerColor = (colorMode: 'black' | 'white' | 'random') => {
+    let chosen: Color = 'black';
+    if (colorMode === 'random') {
+      chosen = Math.random() < 0.5 ? 'black' : 'white';
+      SoundEngine.speakText(
+        `现场猜先！你抽到了${chosen === 'black' ? '黑棋，先行进攻' : '白棋，后手抗压'}！重新开局！`
+      );
+    } else {
+      chosen = colorMode;
+      SoundEngine.speakText(
+        chosen === 'black'
+          ? '切换为执黑先行，开始进攻！'
+          : '切换为执白后手，考验防守反击与抗压能力！重新开局！'
+      );
+    }
+    initGame(selectedAnimal, effectiveTarget, boardSize, chosen);
+  };
 
   // 进入 19 路沉浸全屏对弈（纯净 CSS 视口顶格，杜绝 Chrome 底部黑条安全提示）
   const startFullscreenMatch = useCallback(() => {
     setIsPlayingFullscreen(true);
     setShowExitConfirm(false);
     if (boardState.isGameOver || boardState.moveHistory.length === 0) {
-      initGame(selectedAnimal, effectiveTarget, boardSize);
+      initGame(selectedAnimal, effectiveTarget, boardSize, playerColor);
     }
-    SoundEngine.speakText(`比赛开始！黑棋先走，先吃满 ${effectiveTarget} 颗子获胜！`);
-  }, [boardState.isGameOver, boardState.moveHistory.length, initGame, selectedAnimal, effectiveTarget, boardSize]);
+    const roleText = playerColor === 'black' ? '执黑先行' : '执白后手';
+    SoundEngine.speakText(`比赛开始！你${roleText}，先吃满 ${effectiveTarget} 颗子获胜！`);
+  }, [boardState.isGameOver, boardState.moveHistory.length, initGame, selectedAnimal, effectiveTarget, boardSize, playerColor]);
 
   // 退出全屏对弈，返回备战大厅
   const exitFullscreenMatch = useCallback(() => {
@@ -82,25 +112,25 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
 
   const handleSelectBoardSize = (size: 19 | 13) => {
     SoundEngine.speakText(`切换为 ${size} 路棋盘！重新开局！`);
-    initGame(selectedAnimal, effectiveTarget, size);
+    initGame(selectedAnimal, effectiveTarget, size, playerColor);
   };
 
   const handleSelectTarget = (targetCount: number) => {
     setCustomCaptureTarget(targetCount);
     SoundEngine.speakText(`吃子目标调整为先吃 ${targetCount} 颗子获胜！重新开局！`);
-    initGame(selectedAnimal, targetCount, boardSize);
+    initGame(selectedAnimal, targetCount, boardSize, playerColor);
   };
 
-  // Handle Player (Black) Move
+  // Handle Player Move (Black or White based on playerColor)
   const handlePlayerMove = (point: Point) => {
-    if (boardState.isGameOver || boardState.turn !== 'black' || isAiThinking) return;
+    if (boardState.isGameOver || boardState.turn !== playerColor || isAiThinking) return;
 
     // 若在备战大厅直接落子，顺畅自动切换为全屏竞技对弈
     if (!isPlayingFullscreen) {
       setIsPlayingFullscreen(true);
     }
 
-    const result = GoCore.playMove(boardState, point, 'black', effectiveTarget);
+    const result = GoCore.playMove(boardState, point, playerColor, effectiveTarget);
     if (result.error) {
       SoundEngine.playErrorSound();
       return;
@@ -121,10 +151,13 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
 
     // Check game over
     if (result.nextState.isGameOver) {
-      if (result.nextState.winner === 'black') {
+      if (result.nextState.winner === playerColor) {
         SoundEngine.playVictoryFanfare();
         onWinRecord(selectedAnimal.id);
         setIsWinModalOpen(true);
+      } else if (result.nextState.winner === aiColor) {
+        SoundEngine.playErrorSound();
+        setIsDefeatModalOpen(true);
       }
       return;
     }
@@ -138,16 +171,16 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
   stateRef.current = boardState;
 
   useEffect(() => {
-    if (boardState.turn === 'white' && !boardState.isGameOver) {
+    if (boardState.turn === aiColor && !boardState.isGameOver) {
       const timer = setTimeout(async () => {
         try {
           const current = stateRef.current;
-          if (current.turn !== 'white' || current.isGameOver) {
+          if (current.turn !== aiColor || current.isGameOver) {
             return;
           }
 
           const rawLevel = selectedAnimal.id.replace('robot-', '');
-          const aiMove = await GoAI.getBestMoveAsync(current, 'white', {
+          const aiMove = await GoAI.getBestMoveAsync(current, aiColor, {
             difficulty: selectedAnimal.difficulty,
             sparringLevel: (rawLevel as any),
             captureTarget: effectiveTarget,
@@ -157,7 +190,7 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
             const aiResult = GoCore.playMove(
               current,
               aiMove,
-              'white',
+              aiColor,
               effectiveTarget
             );
             setBoardState(aiResult.nextState);
@@ -175,11 +208,11 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
             }
 
             if (aiResult.nextState.isGameOver) {
-              if (aiResult.nextState.winner === 'black') {
+              if (aiResult.nextState.winner === playerColor) {
                 SoundEngine.playVictoryFanfare();
                 onWinRecord(selectedAnimal.id);
                 setIsWinModalOpen(true);
-              } else if (aiResult.nextState.winner === 'white') {
+              } else if (aiResult.nextState.winner === aiColor) {
                 SoundEngine.playErrorSound();
                 setIsDefeatModalOpen(true);
                 updateDialogue(`哎呀，我先吃满 ${effectiveTarget} 颗子啦！不过你包围的大龙太惊险了！`);
@@ -198,7 +231,7 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
 
       return () => clearTimeout(timer);
     }
-  }, [boardState.turn, boardState.isGameOver, selectedAnimal, effectiveTarget, onWinRecord, updateDialogue]);
+  }, [boardState.turn, boardState.isGameOver, selectedAnimal, effectiveTarget, onWinRecord, updateDialogue, aiColor, playerColor]);
 
   // Undo Move (Take back 2 moves: player + AI) - 每局最多 3 次，每次只能悔 1 次
   const handleUndo = () => {
@@ -264,21 +297,27 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
               </div>
             </div>
 
-            {/* White Capture Counter Card */}
+            {/* AI Capture Counter Card */}
             <div className="bg-amber-50/90 p-2 md:p-2.5 rounded-xl border border-amber-200 flex flex-col gap-1 mt-1">
               <div className="flex items-center justify-between text-xs font-bold text-gray-800">
                 <span className="flex items-center gap-1">
-                  <span className="w-3 h-3 rounded-full bg-white border border-gray-400 inline-block shrink-0" />
-                  <span>AI吃白棋</span>
+                  <span
+                    className={`w-3 h-3 rounded-full inline-block shrink-0 ${
+                      aiColor === 'black'
+                        ? 'bg-black border border-gray-600'
+                        : 'bg-white border border-gray-400'
+                    }`}
+                  />
+                  <span>AI吃子({aiColor === 'black' ? '执黑' : '执白'})</span>
                 </span>
                 <span className="text-sm md:text-base font-black text-orange-700 font-cartoon">
-                  {boardState.captures.white} <span className="text-[10px] text-gray-500 font-normal">/ {effectiveTarget}</span>
+                  {boardState.captures[aiColor]} <span className="text-[10px] text-gray-500 font-normal">/ {effectiveTarget}</span>
                 </span>
               </div>
               <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
                 <div
                   className="bg-orange-500 h-full rounded-full transition-all duration-300"
-                  style={{ width: `${Math.min(100, (boardState.captures.white / effectiveTarget) * 100)}%` }}
+                  style={{ width: `${Math.min(100, (boardState.captures[aiColor] / effectiveTarget) * 100)}%` }}
                 />
               </div>
             </div>
@@ -309,7 +348,7 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
                 updateDialogue('这里没有气，属于禁着点，不能下在这里哦！');
               }
             }}
-            disabled={boardState.turn !== 'black' || isAiThinking || boardState.isGameOver}
+            disabled={boardState.turn !== playerColor || isAiThinking || boardState.isGameOver}
             showCoordinates={showCoordinates}
             showLibertiesHelper={showLiberties}
             captureTarget={effectiveTarget}
@@ -331,28 +370,62 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
               </p>
             </div>
 
-            {/* Black Capture Counter Card */}
+            {/* Player Capture Counter Card */}
             <div className="bg-emerald-50/90 p-2 md:p-2.5 rounded-xl border border-emerald-200 flex flex-col gap-1">
               <div className="flex items-center justify-between text-xs font-bold text-gray-800">
                 <span className="flex items-center gap-1">
-                  <span className="w-3 h-3 rounded-full bg-black border border-gray-600 inline-block shrink-0" />
-                  <span>你已吃黑棋</span>
+                  <span
+                    className={`w-3 h-3 rounded-full inline-block shrink-0 ${
+                      playerColor === 'black'
+                        ? 'bg-black border border-gray-600'
+                        : 'bg-white border border-gray-400'
+                    }`}
+                  />
+                  <span>你已吃子({playerColor === 'black' ? '执黑' : '执白'})</span>
                 </span>
                 <span className="text-sm md:text-base font-black text-emerald-700 font-cartoon">
-                  {boardState.captures.black} <span className="text-[10px] text-gray-500 font-normal">/ {effectiveTarget}</span>
+                  {boardState.captures[playerColor]} <span className="text-[10px] text-gray-500 font-normal">/ {effectiveTarget}</span>
                 </span>
               </div>
               <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
                 <div
                   className="bg-emerald-500 h-full rounded-full transition-all duration-300"
-                  style={{ width: `${Math.min(100, (boardState.captures.black / effectiveTarget) * 100)}%` }}
+                  style={{ width: `${Math.min(100, (boardState.captures[playerColor] / effectiveTarget) * 100)}%` }}
                 />
               </div>
             </div>
           </div>
 
           {/* Bottom Section: Tactile Touch Buttons */}
-          <div className="flex flex-col gap-2 w-full pt-1">
+          <div className="flex flex-col gap-1.5 w-full pt-1">
+            {/* Quick Role Toggle in Fullscreen */}
+            <div className="flex items-center justify-between gap-1 w-full bg-amber-50/90 p-1 rounded-xl border border-amber-200">
+              <button
+                onClick={() => handleSelectPlayerColor('black')}
+                className={`flex-1 py-1 px-1 rounded-lg text-[10.5px] font-black transition flex items-center justify-center gap-1 ${
+                  playerColor === 'black'
+                    ? 'bg-black text-white shadow-xs'
+                    : 'bg-white hover:bg-amber-100 text-gray-700 border border-gray-300'
+                }`}
+                title="执黑先行，先手主动进攻"
+              >
+                <span className="w-2 h-2 rounded-full bg-black border border-gray-400" />
+                <span>执黑先行</span>
+              </button>
+              <button
+                onClick={() => handleSelectPlayerColor('white')}
+                className={`flex-1 py-1 px-1 rounded-lg text-[10.5px] font-black transition flex items-center justify-center gap-1 ${
+                  playerColor === 'white'
+                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-xs'
+                    : 'bg-white hover:bg-amber-100 text-gray-700 border border-gray-300'
+                }`}
+                title="执白后手，考验防守反击与抗压能力"
+              >
+                <span className="w-2 h-2 rounded-full bg-white border border-gray-400" />
+                <span>执白后手</span>
+              </button>
+            </div>
+
             <button
               onClick={handleUndo}
               disabled={
@@ -362,7 +435,7 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
                 undosRemaining <= 0 ||
                 !canUndoTurn
               }
-              className="w-full py-2.5 md:py-3 px-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:opacity-40 text-white font-black rounded-xl text-xs md:text-sm shadow-md transition active:scale-95 flex items-center justify-center gap-1.5"
+              className="w-full py-2 px-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:opacity-40 text-white font-black rounded-xl text-xs md:text-sm shadow-md transition active:scale-95 flex items-center justify-center gap-1.5"
               title={
                 undosRemaining <= 0
                   ? '本局 3 次悔棋机会已用完'
@@ -371,13 +444,13 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
                   : `悔棋（本局剩 ${undosRemaining} 次）`
               }
             >
-              <Undo2 className="w-4 h-4" />
+              <Undo2 className="w-3.5 h-3.5" />
               <span>悔一步棋 ({undosRemaining}/3)</span>
             </button>
 
             <button
               onClick={() => setShowLiberties(!showLiberties)}
-              className={`w-full py-2 px-2 font-bold rounded-xl border text-xs shadow-sm transition active:scale-95 flex items-center justify-center gap-1.5 ${
+              className={`w-full py-1.5 px-2 font-bold rounded-xl border text-xs shadow-sm transition active:scale-95 flex items-center justify-center gap-1.5 ${
                 showLiberties
                   ? 'bg-emerald-500 text-white border-emerald-600 shadow'
                   : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
@@ -388,8 +461,8 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
             </button>
 
             <button
-              onClick={() => initGame(selectedAnimal, effectiveTarget, boardSize)}
-              className="w-full py-2 px-2 bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-500 hover:to-yellow-500 text-amber-950 font-black rounded-xl border border-amber-400 text-xs shadow-sm transition active:scale-95 flex items-center justify-center gap-1.5"
+              onClick={() => initGame(selectedAnimal, effectiveTarget, boardSize, playerColor)}
+              className="w-full py-1.5 px-2 bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-500 hover:to-yellow-500 text-amber-950 font-black rounded-xl border border-amber-400 text-xs shadow-sm transition active:scale-95 flex items-center justify-center gap-1.5"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span>重新开局</span>
@@ -521,7 +594,7 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
               updateDialogue('这里没有气，属于禁着点，不能下在这里哦！');
             }
           }}
-          disabled={boardState.turn !== 'black' || isAiThinking || boardState.isGameOver}
+          disabled={boardState.turn !== playerColor || isAiThinking || boardState.isGameOver}
           showCoordinates={showCoordinates}
           showLibertiesHelper={showLiberties}
           captureTarget={effectiveTarget}
@@ -562,7 +635,7 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
                   key={animal.id}
                   onClick={() => {
                     SoundEngine.playStoneSound();
-                    initGame(animal, animal.captureTarget, boardSize);
+                    initGame(animal, animal.captureTarget, boardSize, playerColor);
                   }}
                   className={`flex flex-col items-center justify-center py-1 sm:py-1.5 px-0.5 rounded-xl font-bold transition-all cursor-pointer active:scale-95 ${
                     isSelected
@@ -632,6 +705,44 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
               ))}
             </div>
           </div>
+
+          {/* Quick Role & Color Switcher */}
+          <div className="bg-amber-50/90 px-2 py-1.5 rounded-xl border border-amber-200 flex items-center justify-between gap-1 mt-0.5">
+            <span className="text-[11px] font-black text-amber-950 font-cartoon shrink-0">🎲 执子猜先：</span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => handleSelectPlayerColor('black')}
+                className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-black transition active:scale-95 ${
+                  playerColor === 'black'
+                    ? 'bg-black text-white shadow-xs'
+                    : 'bg-white hover:bg-amber-100 text-gray-700 border border-gray-300'
+                }`}
+                title="执黑先行，先手主动进攻"
+              >
+                <span className="w-2.5 h-2.5 rounded-full bg-black inline-block border border-gray-500" />
+                <span>执黑先行</span>
+              </button>
+              <button
+                onClick={() => handleSelectPlayerColor('white')}
+                className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-black transition active:scale-95 ${
+                  playerColor === 'white'
+                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-xs'
+                    : 'bg-white hover:bg-amber-100 text-gray-700 border border-gray-300'
+                }`}
+                title="执白后手，考验防守反击与抗压能力"
+              >
+                <span className="w-2.5 h-2.5 rounded-full bg-white inline-block border border-gray-400" />
+                <span>执白后手</span>
+              </button>
+              <button
+                onClick={() => handleSelectPlayerColor('random')}
+                className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-lg text-xs font-black bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 transition active:scale-95"
+                title="现场模拟真实赛场随机猜先！"
+              >
+                <span>🎲 猜先</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Middle 1: Opponent Avatar & Live Speech Bubble */}
@@ -650,7 +761,7 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
                 </span>
               </div>
               <p className="text-[11px] text-amber-800 mt-0.5">
-                赛制：{boardSize}路棋盘 · 先吃 <strong className="text-red-600 font-cartoon text-xs">{effectiveTarget}</strong> 颗子获胜
+                赛制：{boardSize}路棋盘 · 先吃 <strong className="text-red-600 font-cartoon text-xs">{effectiveTarget}</strong> 颗子获胜 · 你{playerColor === 'black' ? '执黑先行' : '执白后手'}
               </p>
             </div>
           </div>
@@ -681,42 +792,54 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
           </div>
 
           <div className="grid grid-cols-2 gap-2 mt-0.5">
-            {/* Player (Black) */}
+            {/* Player */}
             <div className="bg-white/90 p-2 rounded-xl border border-amber-200 flex flex-col gap-1">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <span className="w-3.5 h-3.5 rounded-full bg-black inline-block border border-gray-700 shrink-0" />
-                  <span className="text-xs font-bold text-gray-800">你已吃</span>
+                  <span
+                    className={`w-3.5 h-3.5 rounded-full inline-block shrink-0 ${
+                      playerColor === 'black'
+                        ? 'bg-black border border-gray-700'
+                        : 'bg-white border border-gray-300'
+                    }`}
+                  />
+                  <span className="text-xs font-bold text-gray-800">你已吃({playerColor === 'black' ? '执黑' : '执白'})</span>
                 </div>
                 <div className="text-sm sm:text-base font-black text-emerald-700 font-cartoon">
-                  {boardState.captures.black} <span className="text-[10px] text-gray-500 font-normal">/ {effectiveTarget}</span>
+                  {boardState.captures[playerColor]} <span className="text-[10px] text-gray-500 font-normal">/ {effectiveTarget}</span>
                 </div>
               </div>
               {/* Progress bar */}
               <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
                 <div
                   className="bg-emerald-500 h-full rounded-full transition-all duration-300"
-                  style={{ width: `${Math.min(100, (boardState.captures.black / effectiveTarget) * 100)}%` }}
+                  style={{ width: `${Math.min(100, (boardState.captures[playerColor] / effectiveTarget) * 100)}%` }}
                 />
               </div>
             </div>
 
-            {/* Opponent (White) */}
+            {/* Opponent (AI) */}
             <div className="bg-white/90 p-2 rounded-xl border border-amber-200 flex flex-col gap-1">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <span className="w-3.5 h-3.5 rounded-full bg-white inline-block border border-gray-300 shrink-0" />
-                  <span className="text-xs font-bold text-gray-800">AI已吃</span>
+                  <span
+                    className={`w-3.5 h-3.5 rounded-full inline-block shrink-0 ${
+                      aiColor === 'black'
+                        ? 'bg-black border border-gray-700'
+                        : 'bg-white border border-gray-300'
+                    }`}
+                  />
+                  <span className="text-xs font-bold text-gray-800">AI已吃({aiColor === 'black' ? '执黑' : '执白'})</span>
                 </div>
                 <div className="text-sm sm:text-base font-black text-orange-700 font-cartoon">
-                  {boardState.captures.white} <span className="text-[10px] text-gray-500 font-normal">/ {effectiveTarget}</span>
+                  {boardState.captures[aiColor]} <span className="text-[10px] text-gray-500 font-normal">/ {effectiveTarget}</span>
                 </div>
               </div>
               {/* Progress bar */}
               <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
                 <div
                   className="bg-orange-500 h-full rounded-full transition-all duration-300"
-                  style={{ width: `${Math.min(100, (boardState.captures.white / effectiveTarget) * 100)}%` }}
+                  style={{ width: `${Math.min(100, (boardState.captures[aiColor] / effectiveTarget) * 100)}%` }}
                 />
               </div>
             </div>

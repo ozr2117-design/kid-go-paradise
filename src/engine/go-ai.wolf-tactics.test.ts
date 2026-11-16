@@ -115,4 +115,29 @@ describe('GoAI Wolf Tactics Engine (赛场恶狼 4 大手筋算子)', () => {
     // 战灵狐敏锐下在断点 (10,9) 发动双叫吃！
     expect(move).toEqual({ x: 10, y: 9 });
   });
+
+  it('6. 15K 冲锋机与 16K 哨兵机主动发起 2 气弱棋叫吃猎杀 (findFerociousHuntingMove)', () => {
+    // 构造局面：黑棋单子落入中央 (9,9)，被白棋 (9,8) 贴住，黑棋只剩 3 气；
+    // 白棋再走 (8,9)，黑棋只剩 2 气 (9,10) 和 (10,9)。
+    let board = GoCore.createEmptyBoard(19);
+    board = GoCore.playMove(board, { x: 9, y: 9 }, 'black').nextState;
+    board = GoCore.playMove(board, { x: 9, y: 8 }, 'white').nextState;
+    board = GoCore.playMove(board, { x: 8, y: 9 }, 'white').nextState;
+    board.turn = 'white';
+
+    const legal = GoAI.getFastLegalMoves(board, 'white');
+    const huntMove = GoAI.findFerociousHuntingMove(board, 'white', 'black', legal, {
+      captureTarget: 10,
+    });
+
+    // 白棋主动猎杀叫吃：必须下在 (9,10) 或 (10,9) 将黑棋紧至 1 气！
+    expect(huntMove).not.toBeNull();
+    const isAtariStrike = (huntMove!.x === 9 && huntMove!.y === 10) || (huntMove!.x === 10 && huntMove!.y === 9);
+    expect(isAtariStrike).toBe(true);
+
+    // 验证落子后黑棋确实剩 1 气叫吃
+    const sim = GoCore.playMove(board, huntMove!, 'white');
+    const bGrp = GoCore.findGroup(sim.nextState.grid, { x: 9, y: 9 });
+    expect(bGrp!.liberties.length).toBe(1);
+  });
 });
