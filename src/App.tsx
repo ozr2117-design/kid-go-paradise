@@ -13,7 +13,8 @@ import { FreePlayView } from './components/FreePlayView';
 import { DailyChallengeView } from './components/DailyChallengeView';
 
 export const App: React.FC = () => {
-  const [currentMode, setCurrentMode] = useState<GameMode>('adventure');
+  // 周六 19 路吃子大赛冲刺期：打开应用默认直达「吃子大战」主战大厅
+  const [currentMode, setCurrentMode] = useState<GameMode>('battle');
   const [progress, setProgress] = useState<UserProgress>(() => ProgressStore.load());
   const [activeStage, setActiveStage] = useState<StageInfo>(ADVENTURE_STAGES[0]);
   const [activePuzzle, setActivePuzzle] = useState<PuzzleData>(ADVENTURE_STAGES[0].puzzles[0]);

@@ -91,7 +91,56 @@ export class GoAI {
   ): Promise<Point | null> {
     if (state.isGameOver) return null;
 
-    // 0. 优先检测局域网 PC 满血 KataGo Human-SL 算力服务 (192.168.10.135:8765)
+    // 0. 吃子大赛双核融合引擎（16K 哨兵机 / 15K 冲锋机）：
+    // 第一层：本地生死战术护盾（提吃、被叫吃逃跑/反打、2气大龙延气、双打吃攻防）100% 接管，杜绝 KataGo 脱先送子；
+    // 第二层：常规缠斗行棋交由 PC 端 KataGo Human-SL (20K/18K) 走真实人类棋形；若 PC 引擎离线则自动无缝降级纯本地恶狼引擎。
+    if (options.captureTarget && !options.isFullGame) {
+      const is16k =
+        options.sparringLevel === '16k' ||
+        options.sparringLevel === 'master' ||
+        options.difficulty === 'advanced' ||
+        options.difficulty === 'master';
+      const is15k =
+        options.sparringLevel === '15k' ||
+        options.sparringLevel === 'grandmaster' ||
+        options.difficulty === 'grandmaster';
+
+      if (is16k || is15k) {
+        const oppColor: Color = color === 'black' ? 'white' : 'black';
+        const legalMoves = this.getFastLegalMoves(state, color);
+        if (legalMoves.length === 0) return null;
+
+        // Layer 1: 生死战术护盾（0 延时）
+        const emergencyMove = this.findCaptureEmergencyShieldMove(state, color, oppColor, legalMoves);
+        if (emergencyMove) {
+          return emergencyMove;
+        }
+
+        // Layer 2: PC 满血 KataGo Human-SL 拟人棋形大脑
+        // 16K 哨兵机 -> PC rank_20k ('23k')；15K 冲锋机 -> PC rank_18k ('17k')
+        try {
+          const pcTier: AISparringLevel = is15k ? '17k' : '23k';
+          const pcMove = await PcKataGoClient.requestMove(state, color, pcTier);
+          if (pcMove) {
+            const sim = GoCore.playMove(state, pcMove, color, options.captureTarget);
+            if (!sim.error && !this.isTrueEye(state, pcMove, color)) {
+              const myGrp = GoCore.findGroup(sim.nextState.grid, pcMove);
+              if (sim.captured.length > 0 || (myGrp && myGrp.liberties.length >= 2)) {
+                return pcMove;
+              }
+            }
+          }
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.warn('[GoAI.getBestMoveAsync] Hybrid capture PC KataGo fallback:', e);
+        }
+      }
+
+      // 降级或低级别（23K / 18K / 17K）直通本地精准阶梯战术引擎
+      return this.getBestMove(state, color, options);
+    }
+
+    // 1. 全盘对弈：优先检测局域网 PC 满血 KataGo Human-SL 算力服务 (192.168.10.135:8765)
     // 毫秒级即时响应，原汁原味真实人类棋风，支持 18K 至 15K 等各级段位
     if (options.isFullGame || !options.captureTarget) {
       try {
@@ -134,6 +183,79 @@ export class GoAI {
 
     // 2. 核心保障：本地瞬时战术引擎（0延时，100%可靠，大龙2气死守）
     return this.getBestMove(state, color, options);
+  }
+
+  /**
+   * 吃子大赛双核融合 · 第一层生死战术护盾 (0 延时)
+   * 只要盘面存在：立刻提吃、反提解围、被叫吃有效逃跑、大龙 2 气绝境、反叫吃、双打吃攻防，
+   * 立即拦截并由本地恶狼引擎接管，彻底杜绝 KataGo 神经网络在吃子赛中脱先弃子。
+   */
+  public static findCaptureEmergencyShieldMove(
+    state: BoardState,
+    color: Color,
+    oppColor: Color,
+    legalMoves: Point[]
+  ): Point | null {
+    // 1. 见吃必提，提子数最多者优先
+    const instantCaptures = this.findImmediateCaptures(state, color, legalMoves);
+    if (instantCaptures.length > 0) {
+      return this.pickBestCapture(state, instantCaptures, color);
+    }
+
+    // 2. 若反打能直接提吃对方进攻子解围，100% 优先反提
+    const counterAtaris = this.findCounterAtariMoves(state, color, legalMoves);
+    if (counterAtaris.length > 0) {
+      const safeCounter = this.pickSafePoint(state, color, counterAtaris);
+      if (safeCounter) {
+        const simC = GoCore.playMove(state, safeCounter, color);
+        if (simC.captured.length > 0) {
+          return safeCounter;
+        }
+      }
+    }
+
+    // 3. 被叫吃（1 气）且非必死征子，优先向开阔处逃跑自救
+    const rescues = this.findEscapeAtariMoves(state, color, legalMoves);
+    const viableRescues = rescues.filter((r) => !this.isDeadEscapeMove(state, r, color));
+    if (viableRescues.length > 0) {
+      viableRescues.sort(
+        (a, b) => this.getEscapeDirectionScore(state, b, color) - this.getEscapeDirectionScore(state, a, color)
+      );
+      return viableRescues[0];
+    }
+
+    // 4. 大龙（>= 2 子）仅剩 2 气生死存亡绝境，必须立即延气
+    const urgentTwoLibRescues = this.findUrgentTwoLibertyRescueMoves(state, color, legalMoves);
+    if (urgentTwoLibRescues.length > 0) {
+      return urgentTwoLibRescues[0];
+    }
+
+    // 5. 若无法逃跑（死征子）但可反叫吃以攻代守
+    if (counterAtaris.length > 0) {
+      const safeCounter = this.pickSafePoint(state, color, counterAtaris);
+      if (safeCounter) {
+        return safeCounter;
+      }
+    }
+
+    // 6. 敏锐发起双打吃手筋
+    const doubleAtaris = this.findDoubleAtariMoves(state, color, legalMoves);
+    const safeDouble = this.pickSafePoint(state, color, doubleAtaris);
+    if (safeDouble) {
+      return safeDouble;
+    }
+
+    // 7. 提前化解对手的双打吃威胁
+    const oppLegal = this.getFastLegalMoves(state, oppColor);
+    const oppDoubleAtaris = this.findDoubleAtariMoves(state, oppColor, oppLegal);
+    for (const threatPoint of oppDoubleAtaris) {
+      if (legalMoves.some((m) => GoCore.pointsEqual(m, threatPoint))) {
+        if (!this.pickSafePoint(state, color, [threatPoint])) continue;
+        return threatPoint;
+      }
+    }
+
+    return null;
   }
 
   /**

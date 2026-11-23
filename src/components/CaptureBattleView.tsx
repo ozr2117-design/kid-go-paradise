@@ -3,24 +3,44 @@ import { AnimalOpponent, BoardState, Point, Color } from '../types/go';
 import { ANIMAL_OPPONENTS } from '../data/animals';
 import { GoCore } from '../engine/go-core';
 import { GoAI } from '../engine/go-ai';
+import { PcKataGoClient } from '../engine/pc-katago-client';
 import { SoundEngine } from '../engine/sound-engine';
 import { GoBoard } from './GoBoard';
 import { WinModal } from './WinModal';
-import { RotateCcw, Undo2, Eye, Award, Swords, ArrowLeft, Minimize2, Trophy } from 'lucide-react';
+import { RotateCcw, Undo2, Eye, Award, Swords, ArrowLeft, Minimize2, Trophy, Zap, CalendarCheck } from 'lucide-react';
 
 interface CaptureBattleViewProps {
   onWinRecord: (animalId: string) => void;
   showCoordinates: boolean;
 }
 
+const DEFAULT_SPRINT_OPPONENT = ANIMAL_OPPONENTS[3] || ANIMAL_OPPONENTS[0]; // 默认 16K 哨兵机（热身第一局）
+
 export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
   onWinRecord,
   showCoordinates,
 }) => {
-  const [selectedAnimal, setSelectedAnimal] = useState<AnimalOpponent>(ANIMAL_OPPONENTS[0]);
+  const [selectedAnimal, setSelectedAnimal] = useState<AnimalOpponent>(DEFAULT_SPRINT_OPPONENT);
   const [boardSize, setBoardSize] = useState<19 | 13>(19);
-  const [customCaptureTarget, setCustomCaptureTarget] = useState<number>(ANIMAL_OPPONENTS[0].captureTarget);
+  const [customCaptureTarget, setCustomCaptureTarget] = useState<number>(DEFAULT_SPRINT_OPPONENT.captureTarget);
   const effectiveTarget = customCaptureTarget || selectedAnimal.captureTarget;
+
+  // PC 端满血 KataGo 双核状态探测
+  const [pcEngineOnline, setPcEngineOnline] = useState<boolean>(false);
+
+  useEffect(() => {
+    let mounted = true;
+    const checkPc = async () => {
+      const ok = await PcKataGoClient.probeStatus();
+      if (mounted) setPcEngineOnline(ok);
+    };
+    checkPc();
+    const timer = setInterval(checkPc, 15000);
+    return () => {
+      mounted = false;
+      clearInterval(timer);
+    };
+  }, []);
 
   // 执子角色切换：默认执黑先行；支持执白后手抗压对决与随机猜先
   const [playerColor, setPlayerColor] = useState<Color>('black');
@@ -29,7 +49,7 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
   const [boardState, setBoardState] = useState<BoardState>(() =>
     GoCore.createEmptyBoard(19)
   );
-  const [animalDialogue, setAnimalDialogue] = useState<string>(ANIMAL_OPPONENTS[0].intro);
+  const [animalDialogue, setAnimalDialogue] = useState<string>(DEFAULT_SPRINT_OPPONENT.intro);
   const [showLiberties, setShowLiberties] = useState<boolean>(true);
   const [isAiThinking, setIsAiThinking] = useState<boolean>(false);
   const [isWinModalOpen, setIsWinModalOpen] = useState<boolean>(false);
@@ -294,6 +314,26 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
                 <span className="inline-block text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full mt-0.5">
                   {selectedAnimal.rank}
                 </span>
+                {(selectedAnimal.id === 'robot-16k' || selectedAnimal.id === 'robot-15k') && (
+                  <div className="mt-1">
+                    <span
+                      className={`inline-flex items-center gap-0.5 text-[9.5px] font-black px-2 py-0.5 rounded-full border ${
+                        pcEngineOnline
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                          : 'bg-gray-100 text-gray-600 border-gray-300'
+                      }`}
+                    >
+                      <Zap className="w-2.5 h-2.5" />
+                      <span>
+                        {pcEngineOnline
+                          ? selectedAnimal.id === 'robot-15k'
+                            ? 'PC双核(18K棋形+护盾)'
+                            : 'PC双核(20K棋形+护盾)'
+                          : '本地恶狼引擎'}
+                      </span>
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -742,6 +782,72 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
                 <span>🎲 猜先</span>
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* 周六比赛 5 天冲刺练习计划（一键开练 + 双核引擎状态） */}
+        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-2 sm:p-2.5 border-2 border-emerald-300 shadow-sm flex flex-col gap-1.5 shrink-0">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-xs font-black text-emerald-950 font-cartoon flex items-center gap-1">
+              <CalendarCheck className="w-3.5 h-3.5 text-emerald-700" />
+              <span>周六大赛每日冲刺计划 (3至4局)</span>
+            </span>
+            <span
+              className={`inline-flex items-center gap-0.5 text-[9.5px] font-black px-1.5 py-0.5 rounded-full border shrink-0 ${
+                pcEngineOnline
+                  ? 'bg-emerald-600 text-white border-emerald-700'
+                  : 'bg-gray-200 text-gray-700 border-gray-300'
+              }`}
+              title={pcEngineOnline ? 'PC 满血 KataGo 已连线，16K/15K 自动启用双核融合' : '未连线 PC 引擎，当前使用本地恶狼引擎'}
+            >
+              <Zap className="w-2.5 h-2.5" />
+              <span>{pcEngineOnline ? 'PC双核已连线' : '本地模式'}</span>
+            </span>
+          </div>
+
+          <div className="flex flex-col gap-1 text-[11px] font-bold text-emerald-950">
+            <button
+              onClick={() => {
+                const robot16k = ANIMAL_OPPONENTS.find((a) => a.id === 'robot-16k') || ANIMAL_OPPONENTS[3];
+                SoundEngine.playStoneSound();
+                initGame(robot16k, 10, 19, 'black');
+                setIsPlayingFullscreen(true);
+                SoundEngine.speakText('第1局热身开始！执黑先行挑战16K哨兵机，先吃10颗子获胜！');
+              }}
+              className="w-full text-left px-2 py-1 rounded-xl bg-white/90 hover:bg-emerald-100 border border-emerald-200 flex items-center justify-between transition active:scale-[0.98]"
+            >
+              <span>第1局(热身)：执黑打 16K 哨兵机 · 10子</span>
+              <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded-md shrink-0">开练</span>
+            </button>
+            <button
+              onClick={() => {
+                const robot15k = ANIMAL_OPPONENTS.find((a) => a.id === 'robot-15k') || ANIMAL_OPPONENTS[4];
+                const randColor: Color = Math.random() < 0.5 ? 'black' : 'white';
+                SoundEngine.playStoneSound();
+                initGame(robot15k, 12, 19, randColor);
+                setIsPlayingFullscreen(true);
+                SoundEngine.speakText(
+                  `模拟赛开始！现场猜先你抽到${randColor === 'black' ? '黑棋先走' : '白棋后手'}，挑战15K冲锋机，先吃12颗子获胜，全程不悔棋哦！`
+                );
+              }}
+              className="w-full text-left px-2 py-1 rounded-xl bg-white/90 hover:bg-emerald-100 border border-emerald-200 flex items-center justify-between transition active:scale-[0.98]"
+            >
+              <span>第2至3局(模拟赛)：猜先打 15K · 12子不悔棋</span>
+              <span className="text-[10px] font-black text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded-md shrink-0">猜先</span>
+            </button>
+            <button
+              onClick={() => {
+                const robot15k = ANIMAL_OPPONENTS.find((a) => a.id === 'robot-15k') || ANIMAL_OPPONENTS[4];
+                SoundEngine.playStoneSound();
+                initGame(robot15k, 10, 19, 'white');
+                setIsPlayingFullscreen(true);
+                SoundEngine.speakText('第4局抗压特训！执白后手挑战15K冲锋机，守住断点找反击！');
+              }}
+              className="w-full text-left px-2 py-1 rounded-xl bg-white/90 hover:bg-emerald-100 border border-emerald-200 flex items-center justify-between transition active:scale-[0.98]"
+            >
+              <span>第4局(抗压)：执白后手打 15K 冲锋机 · 10子</span>
+              <span className="text-[10px] font-black text-orange-800 bg-orange-100 px-1.5 py-0.5 rounded-md shrink-0">抗压</span>
+            </button>
           </div>
         </div>
 
