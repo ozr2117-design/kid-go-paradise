@@ -12,7 +12,13 @@ import {
 function getApiEndpoint(): string {
   if (typeof window !== 'undefined' && window.location && window.location.origin) {
     const origin = window.location.origin;
-    if (origin.startsWith('http') && !origin.includes('localhost') && !origin.includes('127.0.0.1')) {
+    const isLocalOrLan =
+      origin.includes('localhost') ||
+      origin.includes('127.0.0.1') ||
+      origin.includes('192.168.') ||
+      origin.includes('10.') ||
+      origin.includes(':8765');
+    if (origin.startsWith('http') && !isLocalOrLan) {
       return '/api/record';
     }
   }

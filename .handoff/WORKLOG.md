@@ -223,3 +223,9 @@
      - `src/components/CaptureBattleView.tsx` 默认选中 16K 哨兵机，新增 PC 双核实时状态指示牌，并内置「周六大赛每日冲刺计划（3至4局）」一键开练卡片（第 1 局热身 16K 执黑 10 子、第 2 至 3 局模拟赛猜先 15K 12 子不悔棋、第 4 局抗压执白 15K 10 子）。
   3. **PC KataGo 守护服务重启就绪**：
      - 在后台重启 `katago_server/server.py`（端口 `8765`，局域网 `192.168.10.135:8765`），验证 `/api/status` 返回 `ok: True`。
+
+### 2026-11-23 21:29:00 (UTC+8) - 吃子大战自动存谱与云端 D1 服务器上传 (v9.56)
+- **核心变更**：
+  1. `src/components/CaptureBattleView.tsx` 补齐 `recordAndUploadBattle`，对局胜负结算时自动保存本地并上传云端 D1（`winRule: 'capture'`），中途退出或切换对手若满 3 手亦自动补传防丢谱；
+  2. 修复 `src/engine/cloud-recorder.ts` 在局域网访问（`192.168.*:8765`）时误走相对路径 `/api/record` 的隐患，局域网场景强制直连线上 `https://weiqi-kids.pages.dev/api/record`；
+  3. 生产构建 `dist/index.html` 通过（640.54 kB），缓存递增至 `v9.56`。

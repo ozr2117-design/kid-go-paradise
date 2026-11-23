@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { AnimalOpponent, BoardState, Point, Color } from '../types/go';
+import { AISparringLevel, AnimalOpponent, BoardState, Point, Color } from '../types/go';
 import { ANIMAL_OPPONENTS } from '../data/animals';
 import { GoCore } from '../engine/go-core';
 import { GoAI } from '../engine/go-ai';
 import { PcKataGoClient } from '../engine/pc-katago-client';
 import { SoundEngine } from '../engine/sound-engine';
+import { saveGameRecord, GameRecord } from '../engine/game-recorder';
+import { uploadGameRecord } from '../engine/cloud-recorder';
 import { GoBoard } from './GoBoard';
 import { WinModal } from './WinModal';
 import { RotateCcw, Undo2, Eye, Award, Swords, ArrowLeft, Minimize2, Trophy, Zap, CalendarCheck } from 'lucide-react';
@@ -64,10 +66,56 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
   const [undosRemaining, setUndosRemaining] = useState<number>(MAX_UNDOS_PER_GAME);
   const [canUndoTurn, setCanUndoTurn] = useState<boolean>(false);
 
+  // 棋谱防重复上传标记
+  const hasRecordedGameRef = useRef<boolean>(false);
+  const stateRef = useRef(boardState);
+  stateRef.current = boardState;
+
   const updateDialogue = useCallback((text: string) => {
     setAnimalDialogue(text);
     SoundEngine.speakText(text);
   }, []);
+
+  // 将吃子大战完整棋谱保存至本地并自动上传云端 D1 服务器（每局至多上传一次）
+  const recordAndUploadBattle = useCallback(
+    (finalState: BoardState) => {
+      if (hasRecordedGameRef.current || finalState.moveHistory.length < 3) {
+        return;
+      }
+      hasRecordedGameRef.current = true;
+      const myCaps = finalState.captures[playerColor];
+      const oppCaps = finalState.captures[aiColor];
+      let winner: 'player' | 'ai' | 'draw' = 'draw';
+      if (finalState.winner === playerColor) {
+        winner = 'player';
+      } else if (finalState.winner === aiColor) {
+        winner = 'ai';
+      } else if (myCaps > oppCaps) {
+        winner = 'player';
+      } else if (oppCaps > myCaps) {
+        winner = 'ai';
+      }
+
+      const rawLevel = selectedAnimal.id.replace('robot-', '') as AISparringLevel;
+      const record: GameRecord = {
+        id: `cap-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        timestamp: Date.now(),
+        boardSize,
+        winRule: 'capture',
+        opponent: `${selectedAnimal.name}(吃${effectiveTarget}子)`,
+        aiLevel: rawLevel,
+        playerColor,
+        winner,
+        playerCaptures: myCaps,
+        aiCaptures: oppCaps,
+        totalMoves: finalState.moveHistory.length,
+        moves: finalState.moveHistory.map((m) => ({ ...m })),
+      };
+      saveGameRecord(record);
+      uploadGameRecord(record);
+    },
+    [playerColor, aiColor, selectedAnimal, boardSize, effectiveTarget]
+  );
 
   // Initialize board when changing opponent, target, size or color
   const initGame = useCallback(
@@ -77,6 +125,12 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
       size: 19 | 13 = boardSize,
       color: Color = playerColor
     ) => {
+      // 中途重开/切换对手前，若已下满 3 手且尚未上传，自动补传云端防丢谱
+      if (stateRef.current.moveHistory.length >= 3 && !hasRecordedGameRef.current) {
+        recordAndUploadBattle(stateRef.current);
+      }
+      hasRecordedGameRef.current = false;
+
       const nextTarget = targetCount ?? animal.captureTarget;
       setSelectedAnimal(animal);
       setCustomCaptureTarget(nextTarget);
@@ -90,7 +144,7 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
       setUndosRemaining(MAX_UNDOS_PER_GAME);
       setCanUndoTurn(false);
     },
-    [selectedAnimal, boardSize, playerColor, updateDialogue]
+    [selectedAnimal, boardSize, playerColor, updateDialogue, recordAndUploadBattle]
   );
 
   // 执子模式切换（执黑先行 / 执白后手 / 现场随机猜先）
@@ -123,12 +177,15 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
     SoundEngine.speakText(`比赛开始！你${roleText}，先吃满 ${effectiveTarget} 颗子获胜！`);
   }, [boardState.isGameOver, boardState.moveHistory.length, initGame, selectedAnimal, effectiveTarget, boardSize, playerColor]);
 
-  // 退出全屏对弈，返回备战大厅
+  // 退出全屏对弈，返回备战大厅（若已下满 3 手且未结算，自动补传云端防丢谱）
   const exitFullscreenMatch = useCallback(() => {
+    if (stateRef.current.moveHistory.length >= 3 && !hasRecordedGameRef.current) {
+      recordAndUploadBattle(stateRef.current);
+    }
     setIsPlayingFullscreen(false);
     setShowExitConfirm(false);
     updateDialogue('已返回备战大厅，随时可以重新开启对决！');
-  }, [updateDialogue]);
+  }, [updateDialogue, recordAndUploadBattle]);
 
   const handleSelectBoardSize = (size: 19 | 13) => {
     SoundEngine.speakText(`切换为 ${size} 路棋盘！重新开局！`);
@@ -171,6 +228,7 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
 
     // Check game over
     if (result.nextState.isGameOver) {
+      recordAndUploadBattle(result.nextState);
       if (result.nextState.winner === playerColor) {
         SoundEngine.playVictoryFanfare();
         onWinRecord(selectedAnimal.id);
@@ -187,9 +245,6 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
   };
 
   // AI Turn Effect
-  const stateRef = useRef(boardState);
-  stateRef.current = boardState;
-
   useEffect(() => {
     if (boardState.turn === aiColor && !boardState.isGameOver) {
       const timer = setTimeout(async () => {
@@ -228,6 +283,7 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
             }
 
             if (aiResult.nextState.isGameOver) {
+              recordAndUploadBattle(aiResult.nextState);
               if (aiResult.nextState.winner === playerColor) {
                 SoundEngine.playVictoryFanfare();
                 onWinRecord(selectedAnimal.id);
@@ -251,7 +307,7 @@ export const CaptureBattleView: React.FC<CaptureBattleViewProps> = ({
 
       return () => clearTimeout(timer);
     }
-  }, [boardState.turn, boardState.isGameOver, selectedAnimal, effectiveTarget, onWinRecord, updateDialogue, aiColor, playerColor]);
+  }, [boardState.turn, boardState.isGameOver, selectedAnimal, effectiveTarget, onWinRecord, updateDialogue, aiColor, playerColor, recordAndUploadBattle]);
 
   // Undo Move (Take back 2 moves: player + AI) - 每局最多 3 次，每次只能悔 1 次
   const handleUndo = () => {
