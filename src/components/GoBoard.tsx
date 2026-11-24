@@ -62,10 +62,16 @@ export const GoBoard: React.FC<GoBoardProps> = ({
 
         if (isImmersiveFullscreen) {
           // In immersive fullscreen mode (optimized for Xiaomi Pad 6 Pro & tablets):
-          // Board height utilizes 100% of viewport without navbar or artificial 720px cap
-          const availH = Math.max(200, Math.max(clientH, maxVh) - 12);
-          const availW = Math.max(200, clientW > 100 ? clientW : (maxVw >= 768 ? maxVw - 380 : maxVw));
-          const maxSquare = Math.min(availW, availH) - 4;
+          // Respect actual container clientH (already excludes Chrome URL bar & parent padding),
+          // and deduct 18px for inner wrapper p-1 (8px) + board border-4 (8px) + 2px breathing room
+          // so the bottom wooden frame & Row 1 stones are 100% visible and NEVER clipped.
+          const measuredH = clientH > 200 ? Math.min(clientH, maxVh) : maxVh;
+          const availH = Math.max(200, measuredH - 18);
+          const availW = Math.max(
+            200,
+            clientW > 100 ? clientW - 18 : maxVw >= 768 ? maxVw - 380 : maxVw - 18
+          );
+          const maxSquare = Math.min(availW, availH);
           const clamped = Math.max(240, Math.min(Math.floor(maxSquare), 1400));
           setDisplaySize(clamped);
         } else {
