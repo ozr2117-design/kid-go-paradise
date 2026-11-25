@@ -1,3 +1,3 @@
-export const APP_VERSION = 'v9.57';
-export const APP_VERSION_DATE = '2026-11-24';
-export const APP_VERSION_TITLE = '修复平板全屏底部1路棋子被裁切半颗问题并确保四边圆角完整可见';
+export const APP_VERSION = 'v9.58';
+export const APP_VERSION_DATE = '2026-11-25';
+export const APP_VERSION_TITLE = '新增周六赛前特训题库：悬崖边线防送子4关（1路别硬爬与2气大龙延气）';

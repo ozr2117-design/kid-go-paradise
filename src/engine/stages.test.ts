@@ -2,15 +2,15 @@ import { describe, it, expect } from 'vitest';
 import { ADVENTURE_STAGES } from '../data/stages';
 import { GoCore } from './go-core';
 
-describe('Adventure Stages Validation (All 7 Chapters & Authentic Puzzles)', () => {
-  it('should have exactly 7 chapters', () => {
-    expect(ADVENTURE_STAGES.length).toBe(7);
+describe('Adventure Stages Validation (All 8 Chapters & Authentic Puzzles)', () => {
+  it('should have 8 chapters including pre-tournament cliff defense training', () => {
+    expect(ADVENTURE_STAGES.length).toBe(8);
   });
 
   it('Chapter 1 should contain the 8 digitized ladder homework & mastery problems', () => {
-    const ch1 = ADVENTURE_STAGES[0];
-    expect(ch1.id).toBe(1);
-    expect(ch1.puzzles.length).toBe(8);
+    const ch1 = ADVENTURE_STAGES.find((s) => s.id === 1);
+    expect(ch1).toBeDefined();
+    expect(ch1!.puzzles.length).toBe(8);
   });
 
   ADVENTURE_STAGES.forEach((stage) => {

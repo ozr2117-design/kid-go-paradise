@@ -229,3 +229,9 @@
   1. `src/components/CaptureBattleView.tsx` 补齐 `recordAndUploadBattle`，对局胜负结算时自动保存本地并上传云端 D1（`winRule: 'capture'`），中途退出或切换对手若满 3 手亦自动补传防丢谱；
   2. 修复 `src/engine/cloud-recorder.ts` 在局域网访问（`192.168.*:8765`）时误走相对路径 `/api/record` 的隐患，局域网场景强制直连线上 `https://weiqi-kids.pages.dev/api/record`；
   3. 生产构建 `dist/index.html` 通过（640.54 kB），缓存递增至 `v9.56`。
+
+### 2026-11-25 22:12:00 (UTC+8) - 周六赛前特训题库与平板底边裁切修复 (v9.57 至 v9.58)
+- **核心变更**：
+  1. `v9.57` 修复 [GoBoard.tsx](file:///c:/Users/A/Desktop/others/F/src/components/GoBoard.tsx) 全屏高度计算未扣边框内边距的问题，彻底解决底边 1 路棋子只显示半颗的裁切现象；同时将 `katago_server/server.py` 升级为 `ThreadingHTTPServer`。
+  2. `v9.58` 在 `src/data/stages.ts` 顶部新增 **「周六赛前特训：悬崖边线防送子」**（`id: 0`，默认全解锁），包含 4 道针对性 9 路互动关卡：掉头往大广场跑（不当糖葫芦）、反吃大灰狼尾巴、把对手赶进 1 路关门吃、大龙 2 气接回家延气。
+  3. 同步更新 `src/engine/stages.test.ts` 验证全部 8 章关卡棋盘与解的合法性。

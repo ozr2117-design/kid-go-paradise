@@ -3,6 +3,133 @@ import { AUTHENTIC_101_PUZZLES_BANK } from './puzzles-101-bank';
 
 export const ADVENTURE_STAGES: StageInfo[] = [
   // ==========================================
+  // 赛前特训：悬崖边线防送子（1路别硬爬）
+  // ==========================================
+  {
+    id: 0,
+    title: '周六赛前特训：悬崖边线防送子',
+    subtitle: '1路是墙角死胡同！记住：被压在1路绝不硬爬送糖葫芦，要么掉头往大广场长，要么反吃或赶对手下悬崖！',
+    icon: '🛡️',
+    themeColor: 'from-emerald-500 to-teal-600',
+    puzzles: [
+      {
+        id: '0-1',
+        title: '第1关：掉头往大广场跑（不当糖葫芦）',
+        category: 'tactics',
+        difficulty: 'easy',
+        boardSize: 9,
+        initialTurn: 'black',
+        description: '黑棋两颗小兵被白棋压在1路边线上！千万别顺着底边往左硬爬（那是死胡同），快往上站起来逃向中央大广场！',
+        voicePrompt: '黑棋被压在1路边线了！千万别顺着底边往左爬，快向上站起来逃向大广场！',
+        hint: '不要走底边 (2, 8)，往上面空旷的 (3, 7) 站起来！',
+        initialBoard: {
+          black: [
+            { x: 3, y: 8 },
+            { x: 4, y: 8 },
+          ],
+          white: [
+            { x: 4, y: 7 },
+            { x: 5, y: 7 },
+            { x: 5, y: 8 },
+            { x: 1, y: 7 },
+          ],
+        },
+        solutionTree: {
+          move: { x: 3, y: 7 },
+          isCorrect: true,
+          comment: '太聪明了！不往1路死胡同钻，果断掉头向上站起来，气数一下子变多，成功逃出包围！',
+        },
+      },
+      {
+        id: '0-2',
+        title: '第2关：绝境不钻墙角，反吃大灰狼尾巴',
+        category: 'tactics',
+        difficulty: 'easy',
+        boardSize: 9,
+        initialTurn: 'black',
+        description: '黑棋小兵被逼在1路只剩1口气，前面就是墙角死路！仔细看：旁边压住你的那颗白棋也只剩1口气啦！快反吃它解围！',
+        voicePrompt: '往墙角逃是死路！快看看旁边包抄你的白棋只剩几口气，直接反吃它！',
+        hint: '下在 (4, 8) 直接提吃白棋小尾巴！',
+        initialBoard: {
+          black: [
+            { x: 2, y: 8 },
+            { x: 3, y: 7 },
+          ],
+          white: [
+            { x: 2, y: 7 },
+            { x: 1, y: 7 },
+            { x: 3, y: 8 },
+          ],
+        },
+        solutionTree: {
+          move: { x: 4, y: 8 },
+          isCorrect: true,
+          comment: '漂亮反杀！不钻1路死胡同，反手提掉白棋尾巴，小兵瞬间满血复活！',
+        },
+      },
+      {
+        id: '0-3',
+        title: '第3关：把对手赶进1路关门吃光光',
+        category: 'tactics',
+        difficulty: 'easy',
+        boardSize: 9,
+        initialTurn: 'black',
+        description: '两颗白棋已经被你赶到1路悬崖边上了！现在轮到黑棋，在哪里关门就能把这两颗白棋一口气全部吃光？',
+        voicePrompt: '白棋已经被赶到1路悬崖了！快找准门锁位置，一口气关门吃掉两颗白子！',
+        hint: '下在悬崖门口 (8, 6)，把门彻底锁死！',
+        initialBoard: {
+          black: [
+            { x: 8, y: 3 },
+            { x: 7, y: 4 },
+            { x: 7, y: 5 },
+            { x: 7, y: 6 },
+          ],
+          white: [
+            { x: 8, y: 4 },
+            { x: 8, y: 5 },
+          ],
+        },
+        solutionTree: {
+          move: { x: 8, y: 6 },
+          isCorrect: true,
+          comment: '绝杀！这就是比赛里的拿手好戏：占住2路3路，把对手赶到1路悬崖关门全吃！',
+        },
+      },
+      {
+        id: '0-4',
+        title: '第4关：大龙只剩两口气！快接回家延气',
+        category: 'tactics',
+        difficulty: 'medium',
+        boardSize: 9,
+        initialTurn: 'black',
+        description: '左边这3颗黑棋大龙被白棋围住，只剩最后2口气啦！千万别去别处下棋，赶紧一步接回右边的大部队！',
+        voicePrompt: '警报警报！大龙只剩两口气了，快找连接点，一步接回右边的大部队！',
+        hint: '下在 (5, 5)，把大龙和右边援军连成一片！',
+        initialBoard: {
+          black: [
+            { x: 3, y: 4 },
+            { x: 4, y: 4 },
+            { x: 4, y: 5 },
+            { x: 5, y: 6 },
+            { x: 6, y: 5 },
+          ],
+          white: [
+            { x: 2, y: 4 },
+            { x: 3, y: 3 },
+            { x: 4, y: 3 },
+            { x: 5, y: 4 },
+            { x: 3, y: 5 },
+          ],
+        },
+        solutionTree: {
+          move: { x: 5, y: 5 },
+          isCorrect: true,
+          comment: '太稳了！大龙只剩2口气时第一时间回家连接，一下子多出好多口气，再也不怕被偷袭！',
+        },
+      },
+    ],
+  },
+  // ==========================================
   // 第一章：双打吃绝杀·两头捉小鸡（两头叫吃，必得其一）
   // ==========================================
   {
