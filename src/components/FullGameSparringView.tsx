@@ -112,6 +112,29 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({
   const [timerMode, setTimerMode] = useState<'off' | '30s'>('off');
   const [timeLeft, setTimeLeft] = useState<number>(30);
 
+  // 2.5 秒温柔思考节奏（防秒下）+ 均手思考时长统计
+  const SLOW_PACE_MS = 2500;
+  const [slowPaceEnabled, setSlowPaceEnabled] = useState<boolean>(true);
+  const [cooldownMsLeft, setCooldownMsLeft] = useState<number>(0);
+  const [preAimPoint, setPreAimPoint] = useState<Point | null>(null);
+  const [thinkTimesMs, setThinkTimesMs] = useState<number[]>([]);
+  const turnStartAtRef = useRef<number>(Date.now());
+
+  const avgThinkSec = useMemo(() => {
+    if (thinkTimesMs.length === 0) return 0;
+    const sum = thinkTimesMs.reduce((a, b) => a + b, 0);
+    return Math.round((sum / thinkTimesMs.length / 1000) * 10) / 10;
+  }, [thinkTimesMs]);
+
+  // 100ms 间隔平滑递减 2.5 秒温柔思考冷却
+  useEffect(() => {
+    if (cooldownMsLeft <= 0) return;
+    const interval = setInterval(() => {
+      setCooldownMsLeft((prev) => (prev <= 100 ? 0 : prev - 100));
+    }, 100);
+    return () => clearInterval(interval);
+  }, [cooldownMsLeft > 0]);
+
   // 19路全屏沉浸对弈状态 (针对小米平板 6 Pro 深度定制)
   const [isPlayingFullscreen, setIsPlayingFullscreen] = useState<boolean>(false);
   const [showExitConfirm, setShowExitConfirm] = useState<boolean>(false);
@@ -228,6 +251,10 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({
       }
 
       hasRecordedGameRef.current = false;
+      setCooldownMsLeft(0);
+      setPreAimPoint(null);
+      setThinkTimesMs([]);
+      turnStartAtRef.current = Date.now();
       setBoardSize(sz);
       if (sz !== 19) {
         setIsPlayingFullscreen(false);
@@ -368,8 +395,21 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({
         playerAttemptedPass
       );
 
+      // 补充均手思考时长荣誉反馈
+      const paceNote =
+        thinkTimesMs.length >= 5
+          ? avgThinkSec >= 3.0
+            ? `【沉着小棋手勋章】本局平均每手思考 ${avgThinkSec.toFixed(1)} 秒，节奏非常稳健！`
+            : avgThinkSec >= 2.2
+            ? `本局平均每手思考 ${avgThinkSec.toFixed(1)} 秒，节奏不错，关键打架步再多看 1 秒会更准！`
+            : `本局平均每手思考仅 ${avgThinkSec.toFixed(1)} 秒（偏快），下盘每步多看 1 秒就能抓到对手破绽！`
+          : '';
+
       setSettlementData({
         ...baseSettlement,
+        winReason: paceNote
+          ? `${baseSettlement.winReason} ${paceNote}`
+          : baseSettlement.winReason,
         senseiReview,
       });
       setIsSettlementOpen(true);
@@ -405,6 +445,15 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({
   const handlePlayerMove = (point: Point) => {
     if (boardState.isGameOver || boardState.turn !== playerColor || isAiThinking || isReviewMode) return;
 
+    // 2.5 秒温柔思考冷却：提前点击不报错，先放半透明预瞄圈，倒计时结束再落子
+    if (slowPaceEnabled && cooldownMsLeft > 0) {
+      setPreAimPoint(point);
+      setStatusMessage(
+        `👀 先看对手刚下在哪… 已预瞄 (${point.x + 1}, ${point.y + 1})，等 ${(cooldownMsLeft / 1000).toFixed(1)} 秒后再点落子！`
+      );
+      return;
+    }
+
     // 19 路对弈首手落子时，自动平滑切入全屏大棋盘（纯净视口顶格，无系统黑条）
     if (boardSize === 19 && !isPlayingFullscreen && boardState.moveHistory.length === 0) {
       setIsPlayingFullscreen(true);
@@ -416,6 +465,13 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({
       setStatusMessage(`❌ ${res.error}`);
       return;
     }
+
+    // 记录本手思考时长（忽略超过 60 秒的离屏挂机）
+    const elapsed = Date.now() - turnStartAtRef.current;
+    if (elapsed > 0 && elapsed < 60000) {
+      setThinkTimesMs((prev) => [...prev, elapsed]);
+    }
+    setPreAimPoint(null);
 
     setBoardState(res.nextState);
     setCanUndoTurn(true);
@@ -481,6 +537,13 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({
 
             if (res.nextState.isGameOver) {
               triggerEndGame(res.nextState);
+            } else {
+              // AI 落子完成，开始记录小选手本手思考时长并启动 2.5 秒温柔冷却
+              turnStartAtRef.current = Date.now();
+              setPreAimPoint(null);
+              if (slowPaceEnabled) {
+                setCooldownMsLeft(SLOW_PACE_MS);
+              }
             }
           } else {
             // AI 没有合法的非真眼可下之步：正规点目终局处理
@@ -738,6 +801,14 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({
             </div>
           )}
 
+          {/* 2.5 秒温柔防秒下提示条 (全屏模式) */}
+          {slowPaceEnabled && cooldownMsLeft > 0 && !isReviewMode && !boardState.isGameOver && (
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 bg-amber-950/90 text-yellow-200 px-3 py-1 rounded-full shadow-lg border border-yellow-400/70 text-xs font-black pointer-events-none">
+              <span>👀 先看对手刚下在哪…</span>
+              <span className="font-mono text-yellow-300">{(cooldownMsLeft / 1000).toFixed(1)}秒</span>
+            </div>
+          )}
+
           <GoBoard
             state={isReviewMode ? reviewState : boardState}
             onPlayMove={handlePlayerMove}
@@ -753,6 +824,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({
             showCoordinates={showCoordinates}
             showLibertiesHelper={showLiberties && !isReviewMode}
             showTerritoryHeatmap={showTerritoryHeatmap && !isReviewMode}
+            highlightPoints={preAimPoint && !isReviewMode ? [preAimPoint] : []}
             isImmersiveFullscreen={true}
           />
         </div>
@@ -1061,6 +1133,14 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({
           </button>
         )}
 
+        {/* 2.5 秒温柔防秒下提示条 (窗口模式) */}
+        {slowPaceEnabled && cooldownMsLeft > 0 && !isReviewMode && !boardState.isGameOver && (
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 bg-amber-950/90 text-yellow-200 px-3 py-1 rounded-full shadow-lg border border-yellow-400/70 text-xs font-black pointer-events-none">
+            <span>👀 先看对手刚下在哪…</span>
+            <span className="font-mono text-yellow-300">{(cooldownMsLeft / 1000).toFixed(1)}秒</span>
+          </div>
+        )}
+
         <GoBoard
           state={isReviewMode ? reviewState : boardState}
           onPlayMove={handlePlayerMove}
@@ -1076,6 +1156,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({
           showCoordinates={showCoordinates}
           showLibertiesHelper={showLiberties && !isReviewMode}
           showTerritoryHeatmap={showTerritoryHeatmap && !isReviewMode}
+          highlightPoints={preAimPoint && !isReviewMode ? [preAimPoint] : []}
         />
       </div>
 
@@ -1387,7 +1468,37 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({
               <Hourglass className="w-3 h-3 text-amber-600" />
               <span>思考计时:</span>
             </span>
-            <div className="flex gap-1">
+            <div className="flex items-center gap-1 flex-wrap justify-end">
+              <button
+                onClick={() => {
+                  const next = !slowPaceEnabled;
+                  setSlowPaceEnabled(next);
+                  if (!next) {
+                    setCooldownMsLeft(0);
+                    setPreAimPoint(null);
+                  }
+                }}
+                className={`px-1.5 py-0.5 rounded-md font-black text-[10px] transition ${
+                  slowPaceEnabled
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-white hover:bg-amber-100 text-amber-900 border border-amber-200'
+                }`}
+                title="AI 落子后提供 2.5 秒防秒下预瞄冷却，培养先看棋再落子的好习惯"
+              >
+                🐢 慢棋2.5秒{slowPaceEnabled ? '·开' : ''}
+              </button>
+              {thinkTimesMs.length > 0 && (
+                <span
+                  className={`px-1.5 py-0.5 rounded-md font-black text-[10px] border ${
+                    avgThinkSec >= 3.0
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                      : 'bg-amber-50 text-amber-800 border-amber-200'
+                  }`}
+                  title="本局平均每手思考时长（达到 3 秒可获沉着小棋手勋章）"
+                >
+                  均时 {avgThinkSec.toFixed(1)}秒
+                </span>
+              )}
               <button
                 onClick={() => setTimerMode('off')}
                 className={`px-1.5 py-0.5 rounded-md font-black text-[10px] transition ${
