@@ -126,7 +126,7 @@ export const KidNavbar: React.FC<KidNavbarProps> = ({
                 ? 'bg-yellow-400 text-amber-950 shadow-md scale-105'
                 : 'hover:bg-amber-500/50 text-amber-100'
             }`}
-            title="AI 全盘陪练（20K 至 15K 正规点目对弈，支持 13 路与 19 路）"
+            title="AI 全盘陪练（18K 至 15K 正规点目对弈，支持 13 路与 19 路）"
           >
             <Bot className="w-3.5 h-3.5" />
             <span>全盘陪练</span>

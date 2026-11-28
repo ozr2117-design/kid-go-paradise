@@ -45,18 +45,11 @@ import {
 
 const SPARRING_PROFILES: SparringProfile[] = [
   {
-    id: '23k',
-    name: '20K 启蒙机',
-    avatar: '🐣',
-    rank: '20K 全盘启蒙',
-    description: '寒假全盘过渡专属陪练！PC 端直连 KataGo 20K 真实人类棋风，会占角围空但留足破绽，最适合练两眼做活与收官数子！',
-  },
-  {
     id: 'novice',
     name: '18K 小智机',
     avatar: '🤖',
     rank: '18K 经典对标',
-    description: '对标 101 围棋网 18K 小智！会逃跑会吃子，稳健占角，中盘留有实战断点，是检验吃子战基本功的最佳练手！',
+    description: '对标 101 围棋网 18K 小智！会逃跑会吃子，稳健占角，中盘留有实战断点，是检验全盘基本功的最佳练手！',
   },
   {
     id: 'club',
@@ -94,10 +87,10 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({
   onStep2GameComplete,
   onGoToDaily,
 }) => {
-  // Default to 13x13 + 20K 启蒙机 ('23k') for smooth transition from capture to territory
+  // Default to 13x13 + 18K 小智机 ('novice')
   const [boardSize, setBoardSize] = useState<BoardSize>(13);
   const [playerColor, setPlayerColor] = useState<Color>('black');
-  const [aiLevel, setAiLevel] = useState<AISparringLevel>('23k');
+  const [aiLevel, setAiLevel] = useState<AISparringLevel>('novice');
   const winRule: WinRuleMode = 'territory'; // 纯正 101 公开赛点目制：围地盘数子决胜
   const [handicapCount, setHandicapCount] = useState<number>(0); // 0 = even game (分先), 2, 3, 4, 9 stones
   const [showTerritoryHeatmap, setShowTerritoryHeatmap] = useState<boolean>(false); // 势力地图 / 看地盘视界
@@ -1131,7 +1124,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({
           </div>
         )}
 
-        {/* Top: 5 AI Opponents Quick Switcher (20K 起步至 15K) */}
+        {/* Top: 4 AI Opponents Quick Switcher (18K 起步至 15K) */}
         <div className="bg-white/95 rounded-2xl p-1.5 sm:p-2 border-2 border-amber-300 shadow-xs flex flex-col gap-1 shrink-0">
           <div className="flex items-center justify-between px-0.5">
             <span className="text-xs font-black text-amber-950 font-cartoon flex items-center gap-1">
@@ -1161,7 +1154,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-5 gap-1">
+          <div className="grid grid-cols-4 gap-1">
             {SPARRING_PROFILES.map((p) => {
               const isSelected = p.id === aiLevel;
               return (
