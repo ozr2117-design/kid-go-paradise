@@ -16,6 +16,7 @@ import { SoundEngine } from '../engine/sound-engine';
 import { saveGameRecord, GameRecord } from '../engine/game-recorder';
 import { uploadGameRecord } from '../engine/cloud-recorder';
 import { PcKataGoClient } from '../engine/pc-katago-client';
+import { DailyPipelineState } from '../data/daily-challenges';
 import { GoBoard } from './GoBoard';
 import { SparringSettlementModal } from './SparringSettlementModal';
 import {
@@ -43,6 +44,13 @@ import {
 } from 'lucide-react';
 
 const SPARRING_PROFILES: SparringProfile[] = [
+  {
+    id: '23k',
+    name: '20K 启蒙机',
+    avatar: '🐣',
+    rank: '20K 全盘启蒙',
+    description: '寒假全盘过渡专属陪练！PC 端直连 KataGo 20K 真实人类棋风，会占角围空但留足破绽，最适合练两眼做活与收官数子！',
+  },
   {
     id: 'novice',
     name: '18K 小智机',
@@ -75,13 +83,21 @@ const SPARRING_PROFILES: SparringProfile[] = [
 
 interface FullGameSparringViewProps {
   showCoordinates: boolean;
+  pipelineState?: DailyPipelineState;
+  onStep2GameComplete?: () => void;
+  onGoToDaily?: () => void;
 }
 
-export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ showCoordinates }) => {
-  // Game Configuration State - Default to 'novice' (老鸟 1D: the child's confident sparring partner)
+export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({
+  showCoordinates,
+  pipelineState,
+  onStep2GameComplete,
+  onGoToDaily,
+}) => {
+  // Default to 13x13 + 20K 启蒙机 ('23k') for smooth transition from capture to territory
   const [boardSize, setBoardSize] = useState<BoardSize>(13);
   const [playerColor, setPlayerColor] = useState<Color>('black');
-  const [aiLevel, setAiLevel] = useState<AISparringLevel>('novice');
+  const [aiLevel, setAiLevel] = useState<AISparringLevel>('23k');
   const winRule: WinRuleMode = 'territory'; // 纯正 101 公开赛点目制：围地盘数子决胜
   const [handicapCount, setHandicapCount] = useState<number>(0); // 0 = even game (分先), 2, 3, 4, 9 stones
   const [showTerritoryHeatmap, setShowTerritoryHeatmap] = useState<boolean>(false); // 势力地图 / 看地盘视界
@@ -135,7 +151,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
     };
   }, []);
 
-  const activeProfile = SPARRING_PROFILES.find((p) => p.id === aiLevel) || SPARRING_PROFILES[1];
+  const activeProfile = SPARRING_PROFILES.find((p) => p.id === aiLevel) || SPARRING_PROFILES[0];
   const aiColor: Color = playerColor === 'black' ? 'white' : 'black';
 
   // AI Dialogue updater with automatic speech synthesis (建议 1)
@@ -378,8 +394,10 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
       saveGameRecord(record);
       // ☁️ 同步上传云端，AI 直接读表分析棋路（失败静默降级到本地，不影响对局）
       uploadGameRecord(record);
+      // 标记今日流水线第 2 步完成
+      onStep2GameComplete?.();
     },
-    [boardSize, playerColor, activeProfile.name, playerAttemptedPass]
+    [boardSize, playerColor, activeProfile.name, playerAttemptedPass, onStep2GameComplete]
   );
 
   // Player Move Handler
@@ -1076,7 +1094,36 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
           </button>
         )}
 
-        {/* Top: 4 AI Opponents Quick Switcher (与吃子战完全统一，置顶直观可点) */}
+        {/* 今日训练流水线状态条 */}
+        {pipelineState && (
+          <div
+            className={`rounded-xl px-2.5 py-1.5 border text-xs font-black flex items-center justify-between gap-2 shrink-0 ${
+              pipelineState.step1Completed && pipelineState.step2Completed
+                ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                : pipelineState.step1Completed
+                ? 'bg-yellow-50 border-yellow-400 text-amber-950'
+                : 'bg-amber-50/90 border-amber-200 text-amber-900'
+            }`}
+          >
+            <span className="truncate">
+              {pipelineState.step1Completed && pipelineState.step2Completed
+                ? `🏆 今日流程已全部达成！（已下 ${pipelineState.step2GamesCount} 盘，自由加练）`
+                : pipelineState.step1Completed
+                ? '📍 第 2 步：下完这 1 盘全盘对弈，今日任务就全部完成！'
+                : '💡 第 1 步每日刷题尚未完成（可先打卡，也可先下棋）'}
+            </span>
+            {onGoToDaily && (
+              <button
+                onClick={onGoToDaily}
+                className="px-2 py-0.5 rounded-lg bg-white hover:bg-amber-100 border border-amber-300 text-amber-900 text-[11px] font-black shrink-0 transition active:scale-95"
+              >
+                {pipelineState.step1Completed ? '看打卡总结' : '去第 1 步'}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Top: 5 AI Opponents Quick Switcher (20K 起步至 15K) */}
         <div className="bg-white/95 rounded-2xl p-1.5 sm:p-2 border-2 border-amber-300 shadow-xs flex flex-col gap-1 shrink-0">
           <div className="flex items-center justify-between px-0.5">
             <span className="text-xs font-black text-amber-950 font-cartoon flex items-center gap-1">
@@ -1106,7 +1153,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({ show
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-1">
+          <div className="grid grid-cols-5 gap-1">
             {SPARRING_PROFILES.map((p) => {
               const isSelected = p.id === aiLevel;
               return (

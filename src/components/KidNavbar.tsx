@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { GameMode } from '../types/go';
-import { Volume2, VolumeX, Sparkles, Map, Swords, Grid, Bot, Maximize, Minimize, RefreshCw } from 'lucide-react';
+import { Volume2, VolumeX, Sparkles, Bot, Maximize, Minimize, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { APP_VERSION, APP_VERSION_TITLE } from '../version';
 
 interface KidNavbarProps {
@@ -11,6 +11,7 @@ interface KidNavbarProps {
   onToggleSound: () => void;
   showCoordinates: boolean;
   onToggleCoordinates: () => void;
+  todayAllDone?: boolean;
 }
 
 export const KidNavbar: React.FC<KidNavbarProps> = ({
@@ -21,6 +22,7 @@ export const KidNavbar: React.FC<KidNavbarProps> = ({
   onToggleSound,
   showCoordinates,
   onToggleCoordinates,
+  todayAllDone = false,
 }) => {
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
@@ -98,71 +100,36 @@ export const KidNavbar: React.FC<KidNavbarProps> = ({
           </div>
         </div>
 
-        {/* Mode navigation pills */}
-        <nav className="flex items-center gap-0.5 sm:gap-1 bg-amber-600/40 p-0.5 rounded-xl sm:rounded-2xl border border-amber-400/40 shrink-0 whitespace-nowrap">
+        {/* Mode navigation pills (2 streamlined tabs) */}
+        <nav className="flex items-center gap-1 bg-amber-600/40 p-0.5 rounded-xl sm:rounded-2xl border border-amber-400/40 shrink-0 whitespace-nowrap">
           <button
             onClick={() => onSelectMode('daily')}
-            className={`flex items-center gap-1 px-1.5 sm:px-2.5 py-1 rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap shrink-0 ${
+            className={`flex items-center gap-1 px-2.5 sm:px-3.5 py-1 rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap shrink-0 ${
               currentMode === 'daily'
                 ? 'bg-yellow-400 text-amber-950 shadow-md scale-105'
                 : 'hover:bg-amber-500/50 text-amber-100'
             }`}
-            title="每日15题 趣味特训打卡"
+            title="每日训练流程：第 1 步刷题打卡 → 第 2 步全盘实战"
           >
-            <Sparkles className="w-3.5 h-3.5 text-yellow-300 fill-yellow-300" />
+            {todayAllDone ? (
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+            ) : (
+              <Sparkles className="w-3.5 h-3.5 text-yellow-200 fill-yellow-200" />
+            )}
             <span>每日打卡</span>
           </button>
 
           <button
-            onClick={() => onSelectMode('adventure')}
-            className={`flex items-center gap-1 px-1.5 sm:px-2.5 py-1 rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap shrink-0 ${
-              currentMode === 'adventure' || currentMode === 'puzzle'
-                ? 'bg-yellow-400 text-amber-950 shadow-md scale-105'
-                : 'hover:bg-amber-500/50 text-amber-100'
-            }`}
-            title="围棋大冒险·趣味吃子题库（八大关卡通关摘星星）"
-          >
-            <Map className="w-3.5 h-3.5" />
-            <span>围棋题库</span>
-          </button>
-
-          <button
-            onClick={() => onSelectMode('battle')}
-            className={`flex items-center gap-1 px-1.5 sm:px-2.5 py-1 rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap shrink-0 ${
-              currentMode === 'battle'
-                ? 'bg-yellow-400 text-amber-950 shadow-md scale-105'
-                : 'hover:bg-amber-500/50 text-amber-100'
-            }`}
-            title="棋院比赛同款 19路吃子锦标赛（先吃5子/10子获胜）"
-          >
-            <Swords className="w-3.5 h-3.5" />
-            <span>19路吃子比赛</span>
-          </button>
-
-          <button
             onClick={() => onSelectMode('sparring')}
-            className={`flex items-center gap-1 px-1.5 sm:px-2.5 py-1 rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap shrink-0 ${
+            className={`flex items-center gap-1 px-2.5 sm:px-3.5 py-1 rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap shrink-0 ${
               currentMode === 'sparring'
                 ? 'bg-yellow-400 text-amber-950 shadow-md scale-105'
                 : 'hover:bg-amber-500/50 text-amber-100'
             }`}
-            title="101 围棋网公开赛实战同款（18K至15K正规点目对弈）"
+            title="AI 全盘陪练（20K 至 15K 正规点目对弈，支持 13 路与 19 路）"
           >
             <Bot className="w-3.5 h-3.5" />
-            <span>AI全盘对弈</span>
-          </button>
-
-          <button
-            onClick={() => onSelectMode('sandbox')}
-            className={`flex items-center gap-1 px-1.5 sm:px-2.5 py-1 rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap shrink-0 ${
-              currentMode === 'sandbox'
-                ? 'bg-yellow-400 text-amber-950 shadow-md scale-105'
-                : 'hover:bg-amber-500/50 text-amber-100'
-            }`}
-            title="自由摆盘复盘沙盒"
-          >
-            <Grid className="w-3.5 h-3.5" />
-            <span>自由沙盒</span>
+            <span>全盘陪练</span>
           </button>
         </nav>
 

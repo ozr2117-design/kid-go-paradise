@@ -2,8 +2,15 @@ import { PuzzleData } from '../types/go';
 import { ADVENTURE_STAGES } from './stages';
 import { AUTHENTIC_101_PUZZLES_BANK } from './puzzles-101-bank';
 
-// Flatten all adventure stage puzzles as our primary base pool
-const ALL_STAGE_PUZZLES: PuzzleData[] = ADVENTURE_STAGES.flatMap((stage) => stage.puzzles);
+// Only keep intermediate/advanced stages (Stage 3+: tesuji, liberties, eyes, life-and-death, teacher cuts).
+// Basic capture stages (0: pre-match edge, 1: double atari, 2: basic 5 captures) are retired from daily drills.
+const FOCUSED_STAGE_PUZZLES: PuzzleData[] = ADVENTURE_STAGES
+  .filter((stage) => stage.id >= 3)
+  .flatMap((stage) => stage.puzzles);
+
+const FOCUSED_101_PUZZLES: PuzzleData[] = AUTHENTIC_101_PUZZLES_BANK.filter(
+  (p) => p.category !== 'capture' || p.id.startsWith('101-teacher-')
+);
 
 // Additional classic 10K-5K curated life-and-death & tesuji puzzles
 export const SUPPLEMENTARY_DAILY_PUZZLES: PuzzleData[] = [
@@ -606,12 +613,14 @@ export const SUPPLEMENTARY_DAILY_PUZZLES: PuzzleData[] = [
   },
 ];
 
-// Combine all puzzle sources: authentic 101 exam bank + adventure stages + supplementary
+// Combine focused puzzle sources (basic capture drills retired)
 export const FULL_PUZZLE_BANK: PuzzleData[] = [
-  ...AUTHENTIC_101_PUZZLES_BANK,
-  ...ALL_STAGE_PUZZLES,
+  ...FOCUSED_101_PUZZLES,
+  ...FOCUSED_STAGE_PUZZLES,
   ...SUPPLEMENTARY_DAILY_PUZZLES,
 ];
+
+export const DAILY_TARGET_COUNT = 8;
 
 export interface DayThemeInfo {
   dayName: string;
@@ -622,44 +631,219 @@ export interface DayThemeInfo {
 }
 
 export const WEEKLY_THEMES: Record<number, DayThemeInfo> = {
-  0: { dayName: '周日', themeTitle: '实战综合手筋·大龙突围战', subtitle: '精选全套死活，磨砺大局与算力！', targetCategory: 'mixed', icon: '🐲' },
-  1: { dayName: '周一', themeTitle: '真假眼与眼形要害', subtitle: '练就火眼金睛，两眼活棋绝不马虎！', targetCategory: 'life-and-death', icon: '👁️' },
-  2: { dayName: '周二', themeTitle: '五大吃子绝招·闪电出击', subtitle: '双打、门吃、抱吃、枷吃、征吃大练兵！', targetCategory: 'capture', icon: '⚡' },
-  3: { dayName: '周三', themeTitle: '边角经典死活·一路立与妙手', subtitle: '金角银边，角上一子顶三子！', targetCategory: 'life-and-death', icon: '🏰' },
-  4: { dayName: '周四', themeTitle: '对杀法则·沉着比气与先紧外气', subtitle: '双方包围比气多，不入公气先收外气！', targetCategory: 'liberties', icon: '⚔️' },
-  5: { dayName: '周五', themeTitle: '分断与连接·扎实筑墙', subtitle: '切断对手大龙，连接自家营地！', targetCategory: 'tactics', icon: '🧱' },
-  6: { dayName: '周六', themeTitle: '周末死活极速挑战', subtitle: '快速一眼识别，10分钟限时挑战！', targetCategory: 'mixed', icon: '🎯' },
+  0: { dayName: '周日', themeTitle: '实战综合特训·做活与杀气', subtitle: '真假眼、死活与断点综合演练，稳步冲向 15K！', targetCategory: 'mixed', icon: '🐲' },
+  1: { dayName: '周一', themeTitle: '真假眼与两眼做活', subtitle: '练就火眼金睛，分辨真眼假眼，两眼稳稳做活！', targetCategory: 'life-and-death', icon: '👁️' },
+  2: { dayName: '周二', themeTitle: '常用手筋与真假断点', subtitle: '倒扑、接不归、看清真假断点，以小博大！', targetCategory: 'tactics', icon: '⚡' },
+  3: { dayName: '周三', themeTitle: '边角经典死活·直三弯三丁四', subtitle: '金角银边，一眼看穿死活急所要点！', targetCategory: 'life-and-death', icon: '🏰' },
+  4: { dayName: '周四', themeTitle: '对杀法则·比气与先紧外气', subtitle: '双方包围比气多，不入公气先收外气！', targetCategory: 'liberties', icon: '⚔️' },
+  5: { dayName: '周五', themeTitle: '分断与连接·扎实筑墙', subtitle: '切断对手薄弱断点，守护自家大龙连接！', targetCategory: 'tactics', icon: '🧱' },
+  6: { dayName: '周六', themeTitle: '周末死活与对杀综合关', subtitle: '每日 8 题精准热身，再战一盘 AI 全盘！', targetCategory: 'mixed', icon: '🎯' },
 };
 
-/**
- * Get deterministic 15 puzzles for today based on date string (YYYY-MM-DD)
- */
-export function getDaily15Puzzles(dateStr?: string): { theme: DayThemeInfo; puzzles: PuzzleData[] } {
+export interface DailyCategorySummaryItem {
+  label: string;
+  total: number;
+  cleanCount: number;
+  mistakeCount: number;
+}
+
+export interface DailyPracticeSummary {
+  items: DailyCategorySummaryItem[];
+  headline: string;
+  advice: string;
+}
+
+export function getPuzzleCategoryLabel(puzzle: PuzzleData): string {
+  if (puzzle.id.startsWith('101-teacher-') || puzzle.id.startsWith('daily-cut-')) {
+    return '真假断点与切断';
+  }
+  if (puzzle.category === 'life-and-death') {
+    return '真假眼与做活死活';
+  }
+  if (puzzle.category === 'liberties') {
+    return '对杀与比气';
+  }
+  return '常用手筋与攻防';
+}
+
+export function summarizeDailyPractice(
+  puzzles: PuzzleData[],
+  mistakeIds: string[]
+): DailyPracticeSummary {
+  const mistakeSet = new Set(mistakeIds);
+  const map = new Map<string, DailyCategorySummaryItem>();
+
+  for (const p of puzzles) {
+    const label = getPuzzleCategoryLabel(p);
+    const existing = map.get(label) || { label, total: 0, cleanCount: 0, mistakeCount: 0 };
+    existing.total += 1;
+    if (mistakeSet.has(p.id)) {
+      existing.mistakeCount += 1;
+    } else {
+      existing.cleanCount += 1;
+    }
+    map.set(label, existing);
+  }
+
+  const items = Array.from(map.values()).sort((a, b) => b.total - a.total);
+  const weakItems = items.filter((i) => i.mistakeCount > 0).sort((a, b) => b.mistakeCount - a.mistakeCount);
+
+  if (weakItems.length === 0) {
+    return {
+      items,
+      headline: `今日 ${puzzles.length} 题全部一次过关！`,
+      advice: '手感非常火热，直接进入第 2 步去 AI 全盘实战里检验吧！',
+    };
+  }
+
+  const weakText = weakItems.map((w) => `「${w.label}」`).join('、');
+  return {
+    items,
+    headline: `今日 ${puzzles.length} 题全部拿下！`,
+    advice: `其中 ${weakText} 遇到一点小挑战，明天继续巩固会更稳！`,
+  };
+}
+
+export interface DailyPipelineState {
+  date: string;
+  step1SolvedIds: string[];
+  step1MistakeIds: string[];
+  step1Completed: boolean;
+  step2Completed: boolean;
+  step2GamesCount: number;
+}
+
+const DAILY_PIPELINE_KEY = 'weiqi_daily_pipeline_v1';
+
+export function getTodayDateStr(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+export function loadDailyPipeline(): DailyPipelineState {
+  const today = getTodayDateStr();
+  try {
+    const raw = localStorage.getItem(DAILY_PIPELINE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as DailyPipelineState;
+      if (parsed && parsed.date === today) {
+        return {
+          date: today,
+          step1SolvedIds: Array.isArray(parsed.step1SolvedIds) ? parsed.step1SolvedIds : [],
+          step1MistakeIds: Array.isArray(parsed.step1MistakeIds) ? parsed.step1MistakeIds : [],
+          step1Completed: !!parsed.step1Completed,
+          step2Completed: !!parsed.step2Completed,
+          step2GamesCount: typeof parsed.step2GamesCount === 'number' ? parsed.step2GamesCount : 0,
+        };
+      }
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return {
+    date: today,
+    step1SolvedIds: [],
+    step1MistakeIds: [],
+    step1Completed: false,
+    step2Completed: false,
+    step2GamesCount: 0,
+  };
+}
+
+export function saveDailyPipeline(state: DailyPipelineState): DailyPipelineState {
+  try {
+    localStorage.setItem(DAILY_PIPELINE_KEY, JSON.stringify(state));
+  } catch {
+    // ignore storage errors
+  }
+  return state;
+}
+
+export function recordPipelinePuzzleSolve(
+  puzzleId: string,
+  targetCount: number = DAILY_TARGET_COUNT
+): { state: DailyPipelineState; isNewlyCompletedStep1: boolean } {
+  const cur = loadDailyPipeline();
+  const wasCompleted = cur.step1Completed;
+  if (!cur.step1SolvedIds.includes(puzzleId)) {
+    cur.step1SolvedIds = [...cur.step1SolvedIds, puzzleId];
+  }
+  if (cur.step1SolvedIds.length >= targetCount) {
+    cur.step1Completed = true;
+  }
+  saveDailyPipeline(cur);
+  return {
+    state: cur,
+    isNewlyCompletedStep1: !wasCompleted && cur.step1Completed,
+  };
+}
+
+export function recordPipelinePuzzleMistake(puzzleId: string): DailyPipelineState {
+  const cur = loadDailyPipeline();
+  if (!cur.step1MistakeIds.includes(puzzleId)) {
+    cur.step1MistakeIds = [...cur.step1MistakeIds, puzzleId];
+    saveDailyPipeline(cur);
+  }
+  return cur;
+}
+
+export function recordPipelineStep2GameComplete(): {
+  state: DailyPipelineState;
+  isNewlyCompletedAll: boolean;
+} {
+  const cur = loadDailyPipeline();
+  const wasAllDone = cur.step1Completed && cur.step2Completed;
+  cur.step2GamesCount += 1;
+  cur.step2Completed = true;
+  saveDailyPipeline(cur);
+  return {
+    state: cur,
+    isNewlyCompletedAll: !wasAllDone && cur.step1Completed && cur.step2Completed,
+  };
+}
+
+function selectDailyPuzzles(count: number, dateStr?: string): { theme: DayThemeInfo; puzzles: PuzzleData[] } {
   const date = dateStr ? new Date(dateStr) : new Date();
   const dayOfWeek = date.getDay(); // 0 - 6
   const theme = WEEKLY_THEMES[dayOfWeek];
 
-  // Simple deterministic seed based on year, month, date
-  const dayOfYear = Math.floor((date.getTime() - new Date(date.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24));
-  
-  // Try to prioritize theme matching puzzles first
-  const matching = FULL_PUZZLE_BANK.filter((p) => {
-    if (theme.targetCategory === 'mixed') return true;
-    return p.category === theme.targetCategory;
-  });
+  const dayOfYear = Math.floor(
+    (date.getTime() - new Date(date.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24)
+  );
 
-  const others = FULL_PUZZLE_BANK.filter((p) => !matching.includes(p));
+  // Split into 3 balanced buckets so every day covers eyes/life-and-death, liberties/tesuji, and teacher cuts
+  const lifeAndDeath = FULL_PUZZLE_BANK.filter((p) => p.category === 'life-and-death');
+  const liberties = FULL_PUZZLE_BANK.filter((p) => p.category === 'liberties');
+  const teacherAndTactics = FULL_PUZZLE_BANK.filter(
+    (p) => p.category !== 'life-and-death' && p.category !== 'liberties'
+  );
 
-  // Rotate based on dayOfYear so each week is slightly rotated and fresh
-  const rotatedMatching = rotateArray(matching, dayOfYear % Math.max(1, matching.length));
-  const rotatedOthers = rotateArray(others, (dayOfYear * 3) % Math.max(1, others.length));
+  const rotLD = rotateArray(lifeAndDeath, (dayOfYear * 2) % Math.max(1, lifeAndDeath.length));
+  const rotLib = rotateArray(liberties, dayOfYear % Math.max(1, liberties.length));
+  const rotTac = rotateArray(teacherAndTactics, (dayOfYear * 3) % Math.max(1, teacherAndTactics.length));
 
-  // Prioritize teacher cutting & directional atari puzzles at the top
-  const teacherPuzzles = AUTHENTIC_101_PUZZLES_BANK.filter((p) => p.id.startsWith('101-teacher-'));
-  const cutPuzzles = SUPPLEMENTARY_DAILY_PUZZLES.filter((p) => p.id.startsWith('daily-cut-'));
-  const pool = [...teacherPuzzles, ...cutPuzzles, ...rotatedMatching, ...rotatedOthers];
+  // Interleave according to today's theme for balanced variety
+  const pool: PuzzleData[] = [];
+  const maxLen = Math.max(rotLD.length, rotLib.length, rotTac.length);
+  for (let i = 0; i < maxLen; i++) {
+    if (theme.targetCategory === 'liberties') {
+      if (rotLib[i]) pool.push(rotLib[i]);
+      if (rotLD[i]) pool.push(rotLD[i]);
+      if (rotTac[i]) pool.push(rotTac[i]);
+    } else if (theme.targetCategory === 'tactics') {
+      if (rotTac[i]) pool.push(rotTac[i]);
+      if (rotLD[i]) pool.push(rotLD[i]);
+      if (rotLib[i]) pool.push(rotLib[i]);
+    } else {
+      if (rotLD[i]) pool.push(rotLD[i]);
+      if (rotTac[i]) pool.push(rotTac[i]);
+      if (rotLib[i]) pool.push(rotLib[i]);
+    }
+  }
 
-  // Return exactly 15 unique puzzles
   const selected: PuzzleData[] = [];
   const seenIds = new Set<string>();
 
@@ -667,17 +851,30 @@ export function getDaily15Puzzles(dateStr?: string): { theme: DayThemeInfo; puzz
     if (!seenIds.has(p.id)) {
       seenIds.add(p.id);
       selected.push(p);
-      if (selected.length === 15) break;
+      if (selected.length === count) break;
     }
   }
 
-  // Fallback in case pool is small
-  while (selected.length < 15 && pool.length > 0) {
+  while (selected.length < count && pool.length > 0) {
     const nextP = pool[selected.length % pool.length];
     selected.push({ ...nextP, id: `${nextP.id}_${selected.length}` });
   }
 
-  return { theme, puzzles: selected.slice(0, 15) };
+  return { theme, puzzles: selected.slice(0, count) };
+}
+
+/**
+ * Get deterministic daily training puzzles (default 8 focused puzzles)
+ */
+export function getDailyTrainingPuzzles(dateStr?: string): { theme: DayThemeInfo; puzzles: PuzzleData[] } {
+  return selectDailyPuzzles(DAILY_TARGET_COUNT, dateStr);
+}
+
+/**
+ * Backward-compatible 15-puzzle selector (from the focused bank)
+ */
+export function getDaily15Puzzles(dateStr?: string): { theme: DayThemeInfo; puzzles: PuzzleData[] } {
+  return selectDailyPuzzles(15, dateStr);
 }
 
 function rotateArray<T>(arr: T[], steps: number): T[] {

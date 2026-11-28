@@ -3,50 +3,60 @@ import { BoardState, Point, PuzzleData } from '../types/go';
 import { GoCore } from '../engine/go-core';
 import { SoundEngine } from '../engine/sound-engine';
 import { ProgressStore, DailyChallengeRecord } from '../store/storage';
-import { getDaily15Puzzles, DayThemeInfo } from '../data/daily-challenges';
+import {
+  DAILY_TARGET_COUNT,
+  DailyPipelineState,
+  getDailyTrainingPuzzles,
+  getPuzzleCategoryLabel,
+  recordPipelinePuzzleMistake,
+  recordPipelinePuzzleSolve,
+  summarizeDailyPractice,
+} from '../data/daily-challenges';
 import { GoBoard } from './GoBoard';
 import {
   Sparkles,
-  Trophy,
   Flame,
   Volume2,
   Lightbulb,
   RotateCcw,
   ChevronLeft,
   ChevronRight,
-  CheckCircle,
-  Award,
-  Swords,
+  CheckCircle2,
   Bot,
-  Zap,
   BookOpen,
-  HelpCircle,
-  Play,
+  ArrowRight,
+  Trophy,
+  ClipboardCheck,
 } from 'lucide-react';
 
 interface DailyChallengeViewProps {
   showCoordinates: boolean;
+  pipelineState: DailyPipelineState;
+  onPipelineChange: (next: DailyPipelineState) => void;
   onGoToSparring?: () => void;
   onBackToAdventure?: () => void;
 }
 
 export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
   showCoordinates,
+  pipelineState,
+  onPipelineChange,
   onGoToSparring,
-  onBackToAdventure,
 }) => {
-  const { theme, puzzles } = useMemo(() => getDaily15Puzzles(), []);
+  const { theme, puzzles } = useMemo(() => getDailyTrainingPuzzles(), []);
   const [dailyRecord, setDailyRecord] = useState<DailyChallengeRecord>(() => ProgressStore.getDailyRecord());
-  const [currentIndex, setCurrentIndex] = useState<number>(0);
+  const [currentIndex, setCurrentIndex] = useState<number>(() => {
+    const firstUnsolved = puzzles.findIndex((p) => !pipelineState.step1SolvedIds.includes(p.id));
+    return firstUnsolved !== -1 ? firstUnsolved : 0;
+  });
   const [hintVisible, setHintVisible] = useState<boolean>(false);
   const [solutionVisible, setSolutionVisible] = useState<boolean>(false);
   const [demoActive, setDemoActive] = useState<boolean>(false);
   const [feedback, setFeedback] = useState<string>('');
-  const [isCompletedModalOpen, setIsCompletedModalOpen] = useState<boolean>(false);
+  const [isSummaryModalOpen, setIsSummaryModalOpen] = useState<boolean>(false);
 
   const currentPuzzle: PuzzleData = puzzles[currentIndex] || puzzles[0];
 
-  // Initialize board for current puzzle
   const [boardState, setBoardState] = useState<BoardState>(() => {
     const b = GoCore.createEmptyBoard(currentPuzzle.boardSize);
     for (const pt of currentPuzzle.initialBoard.black) {
@@ -75,6 +85,12 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
     setFeedback('');
   }, []);
 
+  useEffect(() => {
+    if (currentPuzzle) {
+      resetCurrentBoard(currentPuzzle);
+    }
+  }, [currentIndex, currentPuzzle, resetCurrentBoard]);
+
   const handleShowAnswerAndDemo = () => {
     const sol = currentPuzzle.solutionTree.move;
     if (!sol) return;
@@ -82,6 +98,11 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
     if (solutionVisible) {
       setSolutionVisible(false);
       return;
+    }
+
+    if (!pipelineState.step1SolvedIds.includes(currentPuzzle.id)) {
+      const updated = recordPipelinePuzzleMistake(currentPuzzle.id);
+      onPipelineChange(updated);
     }
 
     if (!demoActive) {
@@ -95,8 +116,11 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
       setDemoActive(true);
     }
     setSolutionVisible(true);
-    setFeedback('👨‍🏫 答案已展示：棋盘上已高亮标出正解落子！');
-    const speech = currentPuzzle.explanation || currentPuzzle.solutionTree.comment || '这就是正解下法！看懂了吗？点击重新挑战自己试一次吧！';
+    setFeedback('答案已展示：棋盘上已高亮标出正解落子！');
+    const speech =
+      currentPuzzle.explanation ||
+      currentPuzzle.solutionTree.comment ||
+      '这就是正解下法！看懂了吗？点击重新挑战自己试一次吧！';
     SoundEngine.speakText(speech);
   };
 
@@ -105,23 +129,21 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
     SoundEngine.speakText('现在换你来下这一步！加油！');
   };
 
-  // When currentIndex changes, reset board
-  useEffect(() => {
-    if (currentPuzzle) {
-      resetCurrentBoard(currentPuzzle);
-    }
-  }, [currentIndex, currentPuzzle, resetCurrentBoard]);
-
-  // Read voice prompt
   const handleSpeakPrompt = () => {
     const text = currentPuzzle.voicePrompt || currentPuzzle.description;
     SoundEngine.speakText(text);
   };
 
-  const solvedCount = dailyRecord.todaySolvedIds.length;
-  const isAllSolved = solvedCount >= 15;
+  const solvedCount = puzzles.filter((p) => pipelineState.step1SolvedIds.includes(p.id)).length;
+  const isStep1Done = pipelineState.step1Completed || solvedCount >= DAILY_TARGET_COUNT;
+  const isStep2Done = pipelineState.step2Completed;
+  const isAllDone = isStep1Done && isStep2Done;
 
-  // Handle player move
+  const summary = useMemo(
+    () => summarizeDailyPractice(puzzles, pipelineState.step1MistakeIds),
+    [puzzles, pipelineState.step1MistakeIds]
+  );
+
   const handlePlayMove = (pt: Point) => {
     if (boardState.isGameOver) return;
 
@@ -129,99 +151,183 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
     if (!sol) return;
 
     if (pt.x === sol.x && pt.y === sol.y) {
-      // Correct!
       const res = GoCore.playMove(boardState, pt, currentPuzzle.initialTurn);
       setBoardState(res.nextState);
       SoundEngine.playSuccessSound();
       setFeedback(currentPuzzle.solutionTree.comment || '太棒了！完全正确！');
 
-      const { record, isNewlyCompletedAll } = ProgressStore.recordDailySolve(currentPuzzle.id);
+      const { record } = ProgressStore.recordDailySolve(currentPuzzle.id);
       setDailyRecord({ ...record });
 
-      if (isNewlyCompletedAll) {
+      const { state: nextPipeline, isNewlyCompletedStep1 } = recordPipelinePuzzleSolve(
+        currentPuzzle.id,
+        DAILY_TARGET_COUNT
+      );
+      onPipelineChange(nextPipeline);
+
+      if (isNewlyCompletedStep1) {
         SoundEngine.playFanfareSound();
-        setIsCompletedModalOpen(true);
+        setTimeout(() => {
+          setIsSummaryModalOpen(true);
+        }, 600);
       } else {
-        // Auto advance to next unsolved puzzle after 1.2s
         setTimeout(() => {
           const nextUnsolved = puzzles.findIndex(
-            (p, idx) => idx > currentIndex && !record.todaySolvedIds.includes(p.id)
+            (p, idx) => idx > currentIndex && !nextPipeline.step1SolvedIds.includes(p.id)
           );
           if (nextUnsolved !== -1) {
             setCurrentIndex(nextUnsolved);
           } else {
-            const firstUnsolved = puzzles.findIndex((p) => !record.todaySolvedIds.includes(p.id));
+            const firstUnsolved = puzzles.findIndex((p) => !nextPipeline.step1SolvedIds.includes(p.id));
             if (firstUnsolved !== -1) {
               setCurrentIndex(firstUnsolved);
             }
           }
-        }, 1200);
+        }, 1100);
       }
     } else {
-      // Wrong move
       SoundEngine.playErrorSound();
-      setFeedback('哎呀，这里好像被白棋反击了！再仔细算算～');
+      setFeedback('哎呀，这一步被白棋防住了！再仔细看看气数和眼形！');
+      const updated = recordPipelinePuzzleMistake(currentPuzzle.id);
+      onPipelineChange(updated);
     }
   };
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-between p-1 sm:p-2 max-w-5xl mx-auto overflow-hidden">
-      {/* 1. TOP HEADER BANNER */}
-      <div className="w-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white rounded-2xl px-3 py-2 shadow-md border-2 border-amber-400 flex flex-wrap items-center justify-between gap-2 shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center text-xl shadow-inner">
-            {theme.icon}
+      {/* 1. GUIDED DAILY PIPELINE STEPPER */}
+      <div className="w-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white rounded-2xl px-3 py-1.5 shadow-md border-2 border-amber-400 flex flex-wrap items-center justify-between gap-2 shrink-0">
+        {/* Left: Step 1 -> Step 2 -> Done */}
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+          <div
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-black border transition ${
+              isStep1Done
+                ? 'bg-emerald-500 text-white border-emerald-300 shadow-xs'
+                : 'bg-yellow-300 text-amber-950 border-yellow-200 shadow-sm'
+            }`}
+          >
+            {isStep1Done ? (
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+            ) : (
+              <span className="w-4 h-4 rounded-full bg-amber-950 text-yellow-300 text-[10px] flex items-center justify-center shrink-0">
+                1
+              </span>
+            )}
+            <span>第 1 步 · 刷题 ({solvedCount}/{DAILY_TARGET_COUNT})</span>
           </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-black text-sm sm:text-base font-cartoon tracking-wide">
-                {theme.dayName} · {theme.themeTitle}
+
+          <ArrowRight className="w-3.5 h-3.5 text-amber-200 shrink-0" />
+
+          <button
+            onClick={() => onGoToSparring?.()}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-black border transition active:scale-95 ${
+              isStep2Done
+                ? 'bg-emerald-500 text-white border-emerald-300 shadow-xs'
+                : isStep1Done
+                ? 'bg-yellow-300 hover:bg-yellow-200 text-amber-950 border-yellow-100 shadow-md animate-pulse'
+                : 'bg-white/15 hover:bg-white/25 text-amber-100 border-white/25'
+            }`}
+            title="点击直接进入第 2 步：AI 全盘实战"
+          >
+            {isStep2Done ? (
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+            ) : (
+              <span className="w-4 h-4 rounded-full bg-amber-900/70 text-yellow-200 text-[10px] flex items-center justify-center shrink-0">
+                2
               </span>
-              <span className="text-[10px] bg-yellow-300 text-amber-950 font-black px-1.5 py-0.5 rounded-full shadow-xs">
-                每日15题
-              </span>
-            </div>
-            <p className="text-[11px] text-amber-100 hidden sm:block">{theme.subtitle}</p>
+            )}
+            <span>第 2 步 · 全盘实战 ({isStep2Done ? '已完成' : '1 盘'})</span>
+          </button>
+
+          <ArrowRight className="w-3.5 h-3.5 text-amber-200 shrink-0 hidden sm:block" />
+
+          <div
+            className={`hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-black border ${
+              isAllDone
+                ? 'bg-yellow-300 text-amber-950 border-white shadow-md'
+                : 'bg-amber-700/40 text-amber-200 border-amber-400/30'
+            }`}
+          >
+            <Trophy className="w-3.5 h-3.5 shrink-0" />
+            <span>{isAllDone ? '今日全部达成' : '今日完成'}</span>
           </div>
         </div>
 
-        {/* Badges: Solved count & Streak */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 bg-amber-700/60 border border-amber-400/40 px-2.5 py-1 rounded-xl text-xs font-black text-yellow-300 shadow-inner">
-            <Flame className="w-4 h-4 text-orange-400 fill-orange-400" />
-            <span>连续打卡 {dailyRecord.streak} 天</span>
+        {/* Right: Theme + Streak + Summary Button */}
+        <div className="flex items-center gap-1.5">
+          <div className="hidden md:flex items-center gap-1 bg-amber-700/50 border border-amber-400/40 px-2 py-1 rounded-xl text-[11px] font-bold text-amber-100">
+            <span>{theme.dayName} · {theme.themeTitle}</span>
           </div>
-
-          <div className="flex items-center gap-1 bg-yellow-400 border border-yellow-300 px-3 py-1 rounded-xl text-xs font-black text-amber-950 shadow-md">
-            <Sparkles className="w-4 h-4 text-amber-800" />
-            <span>{solvedCount} / 15 完成</span>
-          </div>
+          {dailyRecord.streak > 0 && (
+            <div className="flex items-center gap-1 bg-amber-700/60 border border-amber-400/40 px-2 py-1 rounded-xl text-xs font-black text-yellow-300">
+              <Flame className="w-3.5 h-3.5 text-orange-300 fill-orange-300" />
+              <span>{dailyRecord.streak}天</span>
+            </div>
+          )}
+          {isStep1Done && (
+            <button
+              onClick={() => setIsSummaryModalOpen(true)}
+              className="flex items-center gap-1 bg-white/95 hover:bg-white text-amber-950 px-2.5 py-1 rounded-xl text-xs font-black shadow-xs transition active:scale-95"
+            >
+              <ClipboardCheck className="w-3.5 h-3.5 text-emerald-600" />
+              <span>今日总结</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* 2. STAR TRACKER (15 DOTS / BUTTONS) */}
-      <div className="w-full bg-amber-50/90 rounded-2xl p-2 border border-amber-200 shadow-xs flex items-center justify-between gap-1 overflow-x-auto my-1.5 shrink-0">
+      {/* 1.5 NEXT-STEP ACTION STRIP WHEN STEP 1 IS ALREADY COMPLETED */}
+      {isStep1Done && (
+        <div
+          className={`w-full mt-1 px-3 py-1.5 rounded-xl border flex flex-wrap items-center justify-between gap-2 shrink-0 ${
+            isAllDone
+              ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
+              : 'bg-yellow-50 border-yellow-400 text-amber-950'
+          }`}
+        >
+          <div className="text-xs font-black flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>
+              {isAllDone
+                ? `今日全部任务已圆满达成（刷题 ${DAILY_TARGET_COUNT} 题 + 全盘 ${pipelineState.step2GamesCount} 盘）！可自由复习或再下一局。`
+                : '第 1 步今日刷题已完成！下一步去打 1 盘 AI 全盘实战，今天就收工啦！'}
+            </span>
+          </div>
+          {onGoToSparring && (
+            <button
+              onClick={onGoToSparring}
+              className="px-3 py-1 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-xs font-black shadow-sm flex items-center gap-1 transition active:scale-95 shrink-0"
+            >
+              <Bot className="w-3.5 h-3.5" />
+              <span>{isAllDone ? '自由再战一盘' : '进入第 2 步：AI 全盘实战 →'}</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* 2. PROGRESS TRACKER (8 DOTS / BUTTONS) */}
+      <div className="w-full bg-amber-50/90 rounded-2xl p-1.5 border border-amber-200 shadow-xs flex items-center justify-between gap-1.5 overflow-x-auto my-1 shrink-0">
         {puzzles.map((p, idx) => {
-          const isSolved = dailyRecord.todaySolvedIds.includes(p.id);
+          const isSolved = pipelineState.step1SolvedIds.includes(p.id);
           const isCurrent = idx === currentIndex;
           return (
             <button
               key={p.id}
               onClick={() => setCurrentIndex(idx)}
-              className={`flex-1 min-w-[28px] max-w-[42px] h-8 sm:h-9 rounded-xl font-black text-xs transition-all flex flex-col items-center justify-center relative ${
+              className={`flex-1 min-w-[36px] h-8 sm:h-9 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-1 relative ${
                 isCurrent
-                  ? 'bg-amber-500 text-white shadow-md scale-105 border-2 border-yellow-300'
+                  ? 'bg-amber-500 text-white shadow-md scale-[1.03] border-2 border-yellow-300'
                   : isSolved
                   ? 'bg-emerald-500 text-white shadow-xs'
                   : 'bg-white hover:bg-amber-100 text-amber-900 border border-amber-200'
               }`}
-              title={`第 ${idx + 1} 题${isSolved ? '（已解决）' : ''}`}
+              title={`第 ${idx + 1} 题 · ${getPuzzleCategoryLabel(p)}${isSolved ? '（已通过）' : ''}`}
             >
-              <span className="text-[10px] leading-none">{idx + 1}</span>
+              <span>第{idx + 1}题</span>
               {isSolved ? (
-                <span className="text-[11px] leading-none text-yellow-200">★</span>
+                <span className="text-yellow-200">★</span>
               ) : (
-                <span className="text-[10px] leading-none opacity-40">○</span>
+                <span className="opacity-40">○</span>
               )}
             </button>
           );
@@ -249,18 +355,17 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
 
         {/* Right: Question prompt & Helper controls */}
         <div className="w-full md:w-80 flex flex-col justify-between gap-2 bg-white/95 rounded-2xl p-3 border-2 border-amber-300 shadow-xs h-full overflow-y-auto">
-          {/* Title & Category */}
           <div>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-1">
               <span className="text-xs font-black text-amber-700 bg-amber-100 px-2 py-0.5 rounded-lg">
-                第 {currentIndex + 1} / 15 题
+                第 {currentIndex + 1} / {DAILY_TARGET_COUNT} 题
               </span>
-              <span className="text-xs font-bold text-gray-500">
-                {currentPuzzle.difficulty === 'easy' ? '🟢 基础手筋' : currentPuzzle.difficulty === 'medium' ? '🟡 进阶死活' : '🔴 破眼绝杀'}
+              <span className="text-[11px] font-bold text-orange-800 bg-orange-100 px-2 py-0.5 rounded-lg">
+                {getPuzzleCategoryLabel(currentPuzzle)}
               </span>
             </div>
 
-            <h3 className="text-base font-black text-amber-950 mt-1 font-cartoon">
+            <h3 className="text-base font-black text-amber-950 mt-1.5 font-cartoon">
               {currentPuzzle.title}
             </h3>
 
@@ -281,8 +386,11 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
             {/* Feedback / hint display */}
             {feedback && (
               <div
-                className={`p-2 rounded-xl text-xs font-bold mt-2 animate-bounce flex items-center gap-1 ${
-                  feedback.includes('太棒') || feedback.includes('正确') || feedback.includes('命中')
+                className={`p-2 rounded-xl text-xs font-bold mt-2 flex items-center gap-1 ${
+                  feedback.includes('太棒') ||
+                  feedback.includes('正确') ||
+                  feedback.includes('命中') ||
+                  feedback.includes('答案已展示')
                     ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                     : 'bg-red-100 text-red-800 border border-red-300'
                 }`}
@@ -298,9 +406,9 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
               </div>
             )}
 
-            {/* 👨‍🏫 Teacher Answer & Full Analysis Card */}
+            {/* Teacher Answer & Full Analysis Card */}
             {solutionVisible && (
-              <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-orange-400 rounded-2xl p-2.5 text-xs text-amber-950 mt-2 shadow-md animate-in fade-in slide-in-from-top-2">
+              <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-orange-400 rounded-2xl p-2.5 text-xs text-amber-950 mt-2 shadow-md">
                 <div className="flex items-center justify-between pb-1.5 border-b border-orange-200">
                   <span className="font-black flex items-center gap-1 text-orange-700">
                     <BookOpen className="w-4 h-4 text-orange-600" />
@@ -321,7 +429,7 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
 
                 <div className="mt-2 space-y-1.5 leading-relaxed font-medium">
                   <div className="bg-white/80 p-2 rounded-xl border border-orange-200">
-                    <div className="text-[11px] font-black text-amber-800">🎯 正解落子：</div>
+                    <div className="text-[11px] font-black text-amber-800">正解落子：</div>
                     <div className="text-xs font-bold text-emerald-700">
                       落子在坐标 (
                       {currentPuzzle.solutionTree.move
@@ -334,13 +442,13 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
                   </div>
 
                   <div className="bg-white/80 p-2 rounded-xl border border-orange-200 text-amber-900">
-                    <div className="text-[11px] font-black text-amber-800">👨‍🏫 棋理精析：</div>
+                    <div className="text-[11px] font-black text-amber-800">棋理精析：</div>
                     <div>{currentPuzzle.explanation || currentPuzzle.description}</div>
                   </div>
 
                   {currentPuzzle.hint && (
                     <div className="text-[11px] text-amber-700 bg-amber-100/60 p-1.5 rounded-lg">
-                      💡 核心要诀：{currentPuzzle.hint}
+                      核心要诀：{currentPuzzle.hint}
                     </div>
                   )}
                 </div>
@@ -376,7 +484,7 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
                 }`}
               >
                 <BookOpen className="w-3.5 h-3.5 text-orange-700" />
-                <span>{solutionVisible ? '收起答案' : '💡 看答案解答'}</span>
+                <span>{solutionVisible ? '收起答案' : '看答案解答'}</span>
               </button>
 
               <button
@@ -413,46 +521,72 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
         </div>
       </div>
 
-      {/* 4. GRAND CELEBRATION MODAL WHEN 15 PUZZLES ARE COMPLETED */}
-      {isCompletedModalOpen && (
+      {/* 4. STEP 1 SUMMARY & NEXT-STEP MODAL */}
+      {isSummaryModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-gradient-to-b from-amber-50 to-orange-50 rounded-3xl border-4 border-yellow-400 shadow-2xl p-6 max-w-md w-full flex flex-col items-center text-center animate-in zoom-in-95 duration-200">
-            <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-yellow-400 to-amber-500 flex items-center justify-center text-4xl shadow-lg border-4 border-white mb-3">
-              🏆
+          <div className="bg-gradient-to-b from-amber-50 to-orange-50 rounded-3xl border-4 border-yellow-400 shadow-2xl p-5 max-w-md w-full flex flex-col items-center text-center">
+            <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-yellow-400 to-amber-500 flex items-center justify-center text-3xl shadow-lg border-4 border-white mb-2">
+              <Sparkles className="w-8 h-8 text-white" />
             </div>
 
-            <span className="text-xs font-black text-amber-700 bg-yellow-200 px-3 py-1 rounded-full uppercase tracking-wider">
-              今日死活特训大圆满
+            <span className="text-xs font-black text-emerald-800 bg-emerald-100 border border-emerald-300 px-3 py-0.5 rounded-full">
+              第 1 步 · 今日刷题打卡完成
             </span>
 
-            <h2 className="text-2xl font-black text-amber-950 mt-2 font-cartoon">
-              太棒了！今日15题全部通关！
+            <h2 className="text-xl font-black text-amber-950 mt-2 font-cartoon">
+              {summary.headline}
             </h2>
 
-            <p className="text-sm text-amber-900 mt-2 leading-relaxed">
-              你已经连续坚持打卡 <span className="font-black text-orange-600 text-base">{dailyRecord.streak}</span> 天！
-              眼形与杀气算力又获得了巨大提升，向业余有段位大步迈进！
-            </p>
+            {/* Category Breakdown Card */}
+            <div className="w-full bg-white/90 rounded-2xl border border-amber-200 p-3 mt-3 text-left space-y-2 shadow-xs">
+              <div className="text-xs font-black text-amber-800 border-b border-amber-100 pb-1">
+                今天练了什么（按专项汇总）：
+              </div>
+              {summary.items.map((item) => (
+                <div
+                  key={item.label}
+                  className="flex items-center justify-between text-xs font-bold text-amber-950"
+                >
+                  <span>{item.label}（{item.total} 题）</span>
+                  {item.mistakeCount === 0 ? (
+                    <span className="text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-lg">
+                      全部一次过
+                    </span>
+                  ) : (
+                    <span className="text-orange-700 bg-orange-100 px-2 py-0.5 rounded-lg">
+                      {item.mistakeCount} 题需巩固
+                    </span>
+                  )}
+                </div>
+              ))}
+              <p className="text-xs text-amber-800 bg-amber-50 p-2 rounded-xl leading-relaxed pt-1.5 border border-amber-100">
+                {summary.advice}
+              </p>
+            </div>
 
-            <div className="flex flex-col gap-2 w-full mt-5">
+            <div className="flex flex-col gap-2 w-full mt-4">
               {onGoToSparring && (
                 <button
                   onClick={() => {
-                    setIsCompletedModalOpen(false);
+                    setIsSummaryModalOpen(false);
                     onGoToSparring();
                   }}
-                  className="w-full py-3 bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-500 hover:to-amber-600 text-amber-950 font-black rounded-2xl shadow-md border-2 border-yellow-300 text-sm flex items-center justify-center gap-1.5 transition active:scale-95"
+                  className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black rounded-2xl shadow-md border-2 border-emerald-300 text-sm flex items-center justify-center gap-1.5 transition active:scale-95"
                 >
-                  <Bot className="w-4 h-4 text-amber-800" />
-                  <span>带着火热手感，去 AI 全盘对弈战一局！🔥</span>
+                  <Bot className="w-4 h-4" />
+                  <span>
+                    {isStep2Done
+                      ? '去 AI 全盘陪练再下一盘 →'
+                      : '进入第 2 步：AI 全盘实战（1 盘）→'}
+                  </span>
                 </button>
               )}
 
               <button
-                onClick={() => setIsCompletedModalOpen(false)}
+                onClick={() => setIsSummaryModalOpen(false)}
                 className="w-full py-2.5 bg-white hover:bg-amber-100 text-amber-900 font-bold rounded-2xl border border-amber-300 text-xs transition"
               >
-                留在本页继续复盘
+                留在本页复习今日题目
               </button>
             </div>
           </div>

@@ -1,23 +1,22 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { GameMode, PuzzleData, StageInfo } from './types/go';
-import { ADVENTURE_STAGES } from './data/stages';
+import { GameMode } from './types/go';
 import { ProgressStore, UserProgress } from './store/storage';
 import { SoundEngine } from './engine/sound-engine';
 import { syncPendingLocalRecords } from './engine/cloud-recorder';
+import {
+  DailyPipelineState,
+  loadDailyPipeline,
+  recordPipelineStep2GameComplete,
+} from './data/daily-challenges';
 import { KidNavbar } from './components/KidNavbar';
-import { AdventureMap } from './components/AdventureMap';
 import { FullGameSparringView } from './components/FullGameSparringView';
-import { CaptureBattleView } from './components/CaptureBattleView';
-import { PuzzleView } from './components/PuzzleView';
-import { FreePlayView } from './components/FreePlayView';
 import { DailyChallengeView } from './components/DailyChallengeView';
 
 export const App: React.FC = () => {
-  // 周六 19 路吃子大赛冲刺期：打开应用默认直达「吃子大战」主战大厅
-  const [currentMode, setCurrentMode] = useState<GameMode>('battle');
+  // 默认打开平板直达「每日打卡」训练流程：第 1 步刷题打卡 → 第 2 步全盘实战
+  const [currentMode, setCurrentMode] = useState<GameMode>('daily');
   const [progress, setProgress] = useState<UserProgress>(() => ProgressStore.load());
-  const [activeStage, setActiveStage] = useState<StageInfo>(ADVENTURE_STAGES[0]);
-  const [activePuzzle, setActivePuzzle] = useState<PuzzleData>(ADVENTURE_STAGES[0].puzzles[0]);
+  const [pipelineState, setPipelineState] = useState<DailyPipelineState>(() => loadDailyPipeline());
 
   // Sync initial sound state
   useEffect(() => {
@@ -51,115 +50,45 @@ export const App: React.FC = () => {
     ProgressStore.save(updated);
   };
 
-  // Handle selecting a puzzle from adventure map
-  const handleSelectPuzzle = (puzzle: PuzzleData, stage: StageInfo) => {
-    setActivePuzzle(puzzle);
-    setActiveStage(stage);
-    setCurrentMode('puzzle');
+  const handleStep2GameComplete = () => {
+    const { state } = recordPipelineStep2GameComplete();
+    setPipelineState({ ...state });
   };
 
-  // Handle puzzle completion
-  const handlePuzzleComplete = (puzzleId: string, stageId: number, starsEarned: number) => {
-    const updated = ProgressStore.recordPuzzleSuccess(puzzleId, stageId, starsEarned);
-    setProgress(updated);
-  };
-
-  // Handle battle victory
-  const handleBattleWin = (animalId: string) => {
-    const updated = ProgressStore.recordBattleWin(animalId);
-    setProgress(updated);
-  };
-
-  // Puzzle navigation helpers
-  const currentPuzzleIndex = activeStage.puzzles.findIndex((p) => p.id === activePuzzle.id);
-  const hasNextPuzzle = currentPuzzleIndex < activeStage.puzzles.length - 1;
-  const hasPrevPuzzle = currentPuzzleIndex > 0;
-
-  const handleNextPuzzle = () => {
-    if (hasNextPuzzle) {
-      setActivePuzzle(activeStage.puzzles[currentPuzzleIndex + 1]);
-    }
-  };
-
-  const handlePrevPuzzle = () => {
-    if (hasPrevPuzzle) {
-      setActivePuzzle(activeStage.puzzles[currentPuzzleIndex - 1]);
-    }
-  };
+  const todayAllDone = pipelineState.step1Completed && pipelineState.step2Completed;
 
   return (
     <div className="h-screen max-h-screen bg-[#fdfaf5] flex flex-col select-none overflow-hidden">
-      {/* Top Navbar */}
+      {/* Top Navbar (2 Streamlined Tabs: 每日打卡 + 全盘陪练) */}
       <KidNavbar
         currentMode={currentMode}
-        onSelectMode={(mode) => {
-          if (mode === 'adventure' && currentMode === 'puzzle') {
-            setCurrentMode('adventure');
-          } else {
-            setCurrentMode(mode);
-          }
-        }}
+        onSelectMode={(mode) => setCurrentMode(mode)}
         totalStars={totalStars}
         soundMuted={progress.soundMuted}
         onToggleSound={handleToggleSound}
         showCoordinates={progress.showCoordinates}
         onToggleCoordinates={handleToggleCoordinates}
+        todayAllDone={todayAllDone}
       />
 
       {/* Main Content Area */}
-      <main className={`flex-1 w-full min-h-0 ${currentMode === 'adventure' ? 'overflow-y-auto py-2 px-2 sm:px-4' : 'p-1 overflow-hidden flex flex-col items-center justify-center'}`}>
-        {currentMode === 'adventure' && (
-          <div className="flex flex-col items-center w-full">
-            <AdventureMap
-              unlockedStageId={progress.unlockedStageId}
-              completedPuzzles={progress.completedPuzzles}
-              starsMap={progress.stars}
-              mistakePuzzles={progress.mistakePuzzles}
-              onSelectPuzzle={handleSelectPuzzle}
-            />
-            {/* Footer Encouragement Note */}
-            <footer className="text-center py-4 text-xs font-bold text-amber-800/60 border-t border-amber-200 bg-amber-50/50 w-full mt-4">
-              棋虽小道，品德最尊 · 森森围棋基地
-            </footer>
-          </div>
-        )}
-
+      <main className="flex-1 w-full min-h-0 p-1 overflow-hidden flex flex-col items-center justify-center">
         {currentMode === 'daily' && (
           <DailyChallengeView
             showCoordinates={progress.showCoordinates}
+            pipelineState={pipelineState}
+            onPipelineChange={setPipelineState}
             onGoToSparring={() => setCurrentMode('sparring')}
-            onBackToAdventure={() => setCurrentMode('adventure')}
-          />
-        )}
-
-        {currentMode === 'battle' && (
-          <CaptureBattleView
-            onWinRecord={handleBattleWin}
-            showCoordinates={progress.showCoordinates}
           />
         )}
 
         {currentMode === 'sparring' && (
-          <FullGameSparringView showCoordinates={progress.showCoordinates} />
-        )}
-
-        {currentMode === 'puzzle' && (
-          <PuzzleView
-            puzzle={activePuzzle}
-            stage={activeStage}
-            onPuzzleComplete={handlePuzzleComplete}
-            onPuzzleMistake={() => setProgress(ProgressStore.load())}
-            onNextPuzzle={handleNextPuzzle}
-            onPrevPuzzle={handlePrevPuzzle}
-            onBackToMap={() => setCurrentMode('adventure')}
+          <FullGameSparringView
             showCoordinates={progress.showCoordinates}
-            hasNext={hasNextPuzzle}
-            hasPrev={hasPrevPuzzle}
+            pipelineState={pipelineState}
+            onStep2GameComplete={handleStep2GameComplete}
+            onGoToDaily={() => setCurrentMode('daily')}
           />
-        )}
-
-        {currentMode === 'sandbox' && (
-          <FreePlayView showCoordinates={progress.showCoordinates} />
         )}
       </main>
     </div>
