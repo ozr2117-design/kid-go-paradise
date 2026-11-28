@@ -708,12 +708,21 @@ export interface DailyPipelineState {
   date: string;
   step1SolvedIds: string[];
   step1MistakeIds: string[];
+  step1ReviewClearedIds: string[];
   step1Completed: boolean;
   step2Completed: boolean;
   step2GamesCount: number;
 }
 
+interface MistakeQueueEntry {
+  puzzleId: string;
+  addedDate: string; // YYYY-MM-DD
+  missCount: number;
+}
+
 const DAILY_PIPELINE_KEY = 'weiqi_daily_pipeline_v1';
+const MISTAKE_QUEUE_KEY = 'weiqi_mistake_queue_v1';
+const MAX_REVENGE_PER_DAY = 3;
 
 export function getTodayDateStr(): string {
   const d = new Date();
@@ -721,6 +730,61 @@ export function getTodayDateStr(): string {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+function loadMistakeQueue(): MistakeQueueEntry[] {
+  try {
+    const raw = localStorage.getItem(MISTAKE_QUEUE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return [];
+}
+
+function saveMistakeQueue(entries: MistakeQueueEntry[]): void {
+  try {
+    localStorage.setItem(MISTAKE_QUEUE_KEY, JSON.stringify(entries.slice(0, 40)));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+export function enqueueMistakeForNextDay(puzzleId: string, today: string = getTodayDateStr()): void {
+  const queue = loadMistakeQueue();
+  const idx = queue.findIndex((e) => e.puzzleId === puzzleId);
+  if (idx !== -1) {
+    queue[idx] = {
+      ...queue[idx],
+      addedDate: today,
+      missCount: queue[idx].missCount + 1,
+    };
+  } else {
+    queue.unshift({ puzzleId, addedDate: today, missCount: 1 });
+  }
+  saveMistakeQueue(queue);
+}
+
+export function graduateMistakeFromQueue(puzzleId: string): void {
+  const queue = loadMistakeQueue();
+  const next = queue.filter((e) => e.puzzleId !== puzzleId);
+  if (next.length !== queue.length) {
+    saveMistakeQueue(next);
+  }
+}
+
+export function getDueRevengePuzzleIds(
+  today: string = getTodayDateStr(),
+  maxCount: number = MAX_REVENGE_PER_DAY
+): string[] {
+  const queue = loadMistakeQueue();
+  return queue
+    .filter((e) => e.addedDate < today)
+    .slice(0, maxCount)
+    .map((e) => e.puzzleId);
 }
 
 export function loadDailyPipeline(): DailyPipelineState {
@@ -734,6 +798,9 @@ export function loadDailyPipeline(): DailyPipelineState {
           date: today,
           step1SolvedIds: Array.isArray(parsed.step1SolvedIds) ? parsed.step1SolvedIds : [],
           step1MistakeIds: Array.isArray(parsed.step1MistakeIds) ? parsed.step1MistakeIds : [],
+          step1ReviewClearedIds: Array.isArray(parsed.step1ReviewClearedIds)
+            ? parsed.step1ReviewClearedIds
+            : [],
           step1Completed: !!parsed.step1Completed,
           step2Completed: !!parsed.step2Completed,
           step2GamesCount: typeof parsed.step2GamesCount === 'number' ? parsed.step2GamesCount : 0,
@@ -747,6 +814,7 @@ export function loadDailyPipeline(): DailyPipelineState {
     date: today,
     step1SolvedIds: [],
     step1MistakeIds: [],
+    step1ReviewClearedIds: [],
     step1Completed: false,
     step2Completed: false,
     step2GamesCount: 0,
@@ -765,13 +833,52 @@ export function saveDailyPipeline(state: DailyPipelineState): DailyPipelineState
 export function recordPipelinePuzzleSolve(
   puzzleId: string,
   targetCount: number = DAILY_TARGET_COUNT
-): { state: DailyPipelineState; isNewlyCompletedStep1: boolean } {
+): {
+  state: DailyPipelineState;
+  isNewlyCompletedStep1: boolean;
+  enteringImmediateReview: boolean;
+} {
   const cur = loadDailyPipeline();
   const wasCompleted = cur.step1Completed;
   if (!cur.step1SolvedIds.includes(puzzleId)) {
     cur.step1SolvedIds = [...cur.step1SolvedIds, puzzleId];
   }
+
+  let enteringImmediateReview = false;
   if (cur.step1SolvedIds.length >= targetCount) {
+    const pendingReview = cur.step1MistakeIds.filter(
+      (id) => !cur.step1ReviewClearedIds.includes(id)
+    );
+    if (pendingReview.length === 0) {
+      cur.step1Completed = true;
+    } else {
+      enteringImmediateReview = true;
+    }
+  }
+  saveDailyPipeline(cur);
+  return {
+    state: cur,
+    isNewlyCompletedStep1: !wasCompleted && cur.step1Completed,
+    enteringImmediateReview,
+  };
+}
+
+export function recordPipelineReviewSolve(
+  puzzleId: string,
+  targetCount: number = DAILY_TARGET_COUNT
+): {
+  state: DailyPipelineState;
+  isNewlyCompletedStep1: boolean;
+} {
+  const cur = loadDailyPipeline();
+  const wasCompleted = cur.step1Completed;
+  if (!cur.step1ReviewClearedIds.includes(puzzleId)) {
+    cur.step1ReviewClearedIds = [...cur.step1ReviewClearedIds, puzzleId];
+  }
+  const pendingReview = cur.step1MistakeIds.filter(
+    (id) => !cur.step1ReviewClearedIds.includes(id)
+  );
+  if (cur.step1SolvedIds.length >= targetCount && pendingReview.length === 0) {
     cur.step1Completed = true;
   }
   saveDailyPipeline(cur);
@@ -787,6 +894,8 @@ export function recordPipelinePuzzleMistake(puzzleId: string): DailyPipelineStat
     cur.step1MistakeIds = [...cur.step1MistakeIds, puzzleId];
     saveDailyPipeline(cur);
   }
+  // Also persist into cross-day mistake queue so tomorrow's drill mixes it in
+  enqueueMistakeForNextDay(puzzleId, cur.date);
   return cur;
 }
 
@@ -805,10 +914,15 @@ export function recordPipelineStep2GameComplete(): {
   };
 }
 
-function selectDailyPuzzles(count: number, dateStr?: string): { theme: DayThemeInfo; puzzles: PuzzleData[] } {
+function selectDailyPuzzles(
+  count: number,
+  dateStr?: string,
+  includeRevenge: boolean = false
+): { theme: DayThemeInfo; puzzles: PuzzleData[]; revengeIds: string[] } {
   const date = dateStr ? new Date(dateStr) : new Date();
   const dayOfWeek = date.getDay(); // 0 - 6
   const theme = WEEKLY_THEMES[dayOfWeek];
+  const todayStr = dateStr || getTodayDateStr();
 
   const dayOfYear = Math.floor(
     (date.getTime() - new Date(date.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24)
@@ -844,14 +958,46 @@ function selectDailyPuzzles(count: number, dateStr?: string): { theme: DayThemeI
     }
   }
 
-  const selected: PuzzleData[] = [];
+  // Mix up to 3 cross-day revenge puzzles from previous days' mistakes
+  const revengePuzzles: PuzzleData[] = [];
+  const revengeIds: string[] = [];
   const seenIds = new Set<string>();
 
+  if (includeRevenge) {
+    const dueIds = getDueRevengePuzzleIds(todayStr, MAX_REVENGE_PER_DAY);
+    for (const rid of dueIds) {
+      const found = FULL_PUZZLE_BANK.find((p) => p.id === rid);
+      if (found && !seenIds.has(found.id)) {
+        seenIds.add(found.id);
+        revengePuzzles.push(found);
+        revengeIds.push(found.id);
+      }
+    }
+  }
+
+  const freshNeeded = Math.max(0, count - revengePuzzles.length);
+  const freshPuzzles: PuzzleData[] = [];
   for (const p of pool) {
     if (!seenIds.has(p.id)) {
       seenIds.add(p.id);
-      selected.push(p);
-      if (selected.length === count) break;
+      freshPuzzles.push(p);
+      if (freshPuzzles.length === freshNeeded) break;
+    }
+  }
+
+  // Interleave revenge puzzles among fresh puzzles (so they feel naturally mixed in)
+  const selected: PuzzleData[] = [];
+  let rIdx = 0;
+  let fIdx = 0;
+  for (let slot = 0; slot < count; slot++) {
+    // Place revenge puzzles at slots 1, 4, 6 (0-indexed) when available
+    const shouldPlaceRevenge = (slot === 1 || slot === 4 || slot === 6) && rIdx < revengePuzzles.length;
+    if (shouldPlaceRevenge) {
+      selected.push(revengePuzzles[rIdx++]);
+    } else if (fIdx < freshPuzzles.length) {
+      selected.push(freshPuzzles[fIdx++]);
+    } else if (rIdx < revengePuzzles.length) {
+      selected.push(revengePuzzles[rIdx++]);
     }
   }
 
@@ -860,21 +1006,24 @@ function selectDailyPuzzles(count: number, dateStr?: string): { theme: DayThemeI
     selected.push({ ...nextP, id: `${nextP.id}_${selected.length}` });
   }
 
-  return { theme, puzzles: selected.slice(0, count) };
+  return { theme, puzzles: selected.slice(0, count), revengeIds };
 }
 
 /**
- * Get deterministic daily training puzzles (default 8 focused puzzles)
+ * Get deterministic daily training puzzles (8 focused puzzles, mixing in up to 3 cross-day revenge puzzles)
  */
-export function getDailyTrainingPuzzles(dateStr?: string): { theme: DayThemeInfo; puzzles: PuzzleData[] } {
-  return selectDailyPuzzles(DAILY_TARGET_COUNT, dateStr);
+export function getDailyTrainingPuzzles(
+  dateStr?: string
+): { theme: DayThemeInfo; puzzles: PuzzleData[]; revengeIds: string[] } {
+  return selectDailyPuzzles(DAILY_TARGET_COUNT, dateStr, true);
 }
 
 /**
  * Backward-compatible 15-puzzle selector (from the focused bank)
  */
 export function getDaily15Puzzles(dateStr?: string): { theme: DayThemeInfo; puzzles: PuzzleData[] } {
-  return selectDailyPuzzles(15, dateStr);
+  const { theme, puzzles } = selectDailyPuzzles(15, dateStr, false);
+  return { theme, puzzles };
 }
 
 function rotateArray<T>(arr: T[], steps: number): T[] {

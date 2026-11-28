@@ -8,8 +8,10 @@ import {
   DailyPipelineState,
   getDailyTrainingPuzzles,
   getPuzzleCategoryLabel,
+  graduateMistakeFromQueue,
   recordPipelinePuzzleMistake,
   recordPipelinePuzzleSolve,
+  recordPipelineReviewSolve,
   summarizeDailyPractice,
 } from '../data/daily-challenges';
 import { GoBoard } from './GoBoard';
@@ -27,6 +29,7 @@ import {
   ArrowRight,
   Trophy,
   ClipboardCheck,
+  RefreshCcw,
 } from 'lucide-react';
 
 interface DailyChallengeViewProps {
@@ -43,8 +46,25 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
   onPipelineChange,
   onGoToSparring,
 }) => {
-  const { theme, puzzles } = useMemo(() => getDailyTrainingPuzzles(), []);
+  const { theme, puzzles, revengeIds } = useMemo(() => getDailyTrainingPuzzles(), []);
+  const revengeIdSet = useMemo(() => new Set(revengeIds), [revengeIds]);
   const [dailyRecord, setDailyRecord] = useState<DailyChallengeRecord>(() => ProgressStore.getDailyRecord());
+
+  // Determine whether we are currently in the immediate "错题闪电二刷" phase
+  const solvedCount = puzzles.filter((p) => pipelineState.step1SolvedIds.includes(p.id)).length;
+  const reviewPuzzles = useMemo(
+    () => puzzles.filter((p) => pipelineState.step1MistakeIds.includes(p.id)),
+    [puzzles, pipelineState.step1MistakeIds]
+  );
+  const pendingReviewPuzzles = useMemo(
+    () => reviewPuzzles.filter((p) => !pipelineState.step1ReviewClearedIds.includes(p.id)),
+    [reviewPuzzles, pipelineState.step1ReviewClearedIds]
+  );
+  const isImmediateReviewPhase =
+    solvedCount >= DAILY_TARGET_COUNT && !pipelineState.step1Completed && pendingReviewPuzzles.length > 0;
+
+  const activeList = isImmediateReviewPhase ? reviewPuzzles : puzzles;
+
   const [currentIndex, setCurrentIndex] = useState<number>(() => {
     const firstUnsolved = puzzles.findIndex((p) => !pipelineState.step1SolvedIds.includes(p.id));
     return firstUnsolved !== -1 ? firstUnsolved : 0;
@@ -55,7 +75,8 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
   const [feedback, setFeedback] = useState<string>('');
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState<boolean>(false);
 
-  const currentPuzzle: PuzzleData = puzzles[currentIndex] || puzzles[0];
+  const safeIndex = Math.min(currentIndex, Math.max(0, activeList.length - 1));
+  const currentPuzzle: PuzzleData = activeList[safeIndex] || puzzles[0];
 
   const [boardState, setBoardState] = useState<BoardState>(() => {
     const b = GoCore.createEmptyBoard(currentPuzzle.boardSize);
@@ -89,7 +110,7 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
     if (currentPuzzle) {
       resetCurrentBoard(currentPuzzle);
     }
-  }, [currentIndex, currentPuzzle, resetCurrentBoard]);
+  }, [safeIndex, isImmediateReviewPhase, currentPuzzle, resetCurrentBoard]);
 
   const handleShowAnswerAndDemo = () => {
     const sol = currentPuzzle.solutionTree.move;
@@ -100,7 +121,7 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
       return;
     }
 
-    if (!pipelineState.step1SolvedIds.includes(currentPuzzle.id)) {
+    if (!isImmediateReviewPhase && !pipelineState.step1SolvedIds.includes(currentPuzzle.id)) {
       const updated = recordPipelinePuzzleMistake(currentPuzzle.id);
       onPipelineChange(updated);
     }
@@ -134,10 +155,10 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
     SoundEngine.speakText(text);
   };
 
-  const solvedCount = puzzles.filter((p) => pipelineState.step1SolvedIds.includes(p.id)).length;
-  const isStep1Done = pipelineState.step1Completed || solvedCount >= DAILY_TARGET_COUNT;
+  const isStep1Done = pipelineState.step1Completed;
   const isStep2Done = pipelineState.step2Completed;
   const isAllDone = isStep1Done && isStep2Done;
+  const isCurrentRevenge = !isImmediateReviewPhase && revengeIdSet.has(currentPuzzle.id);
 
   const summary = useMemo(
     () => summarizeDailyPractice(puzzles, pipelineState.step1MistakeIds),
@@ -154,15 +175,57 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
       const res = GoCore.playMove(boardState, pt, currentPuzzle.initialTurn);
       setBoardState(res.nextState);
       SoundEngine.playSuccessSound();
-      setFeedback(currentPuzzle.solutionTree.comment || '太棒了！完全正确！');
+
+      // A. Immediate Round-2 Mistake Review Mode (错题闪电二刷)
+      if (isImmediateReviewPhase) {
+        setFeedback('太棒了！这道错题二刷拿下！');
+        const { state: nextPipeline, isNewlyCompletedStep1 } = recordPipelineReviewSolve(
+          currentPuzzle.id,
+          DAILY_TARGET_COUNT
+        );
+        onPipelineChange(nextPipeline);
+
+        if (isNewlyCompletedStep1) {
+          SoundEngine.playFanfareSound();
+          setTimeout(() => {
+            setIsSummaryModalOpen(true);
+          }, 600);
+        } else {
+          setTimeout(() => {
+            const nextPendingIdx = reviewPuzzles.findIndex(
+              (p, idx) => idx > safeIndex && !nextPipeline.step1ReviewClearedIds.includes(p.id)
+            );
+            if (nextPendingIdx !== -1) {
+              setCurrentIndex(nextPendingIdx);
+            } else {
+              const firstPending = reviewPuzzles.findIndex(
+                (p) => !nextPipeline.step1ReviewClearedIds.includes(p.id)
+              );
+              if (firstPending !== -1) setCurrentIndex(firstPending);
+            }
+          }, 950);
+        }
+        return;
+      }
+
+      // B. Normal 8-Puzzle Daily Drill Mode
+      const hadMistakeToday = pipelineState.step1MistakeIds.includes(currentPuzzle.id);
+      if (isCurrentRevenge && !hadMistakeToday) {
+        // Cross-day revenge puzzle solved cleanly on first try -> graduate!
+        graduateMistakeFromQueue(currentPuzzle.id);
+        setFeedback('太神勇了！昨日错题复仇一次过关，正式毕业！');
+      } else {
+        setFeedback(currentPuzzle.solutionTree.comment || '太棒了！完全正确！');
+      }
 
       const { record } = ProgressStore.recordDailySolve(currentPuzzle.id);
       setDailyRecord({ ...record });
 
-      const { state: nextPipeline, isNewlyCompletedStep1 } = recordPipelinePuzzleSolve(
-        currentPuzzle.id,
-        DAILY_TARGET_COUNT
-      );
+      const {
+        state: nextPipeline,
+        isNewlyCompletedStep1,
+        enteringImmediateReview,
+      } = recordPipelinePuzzleSolve(currentPuzzle.id, DAILY_TARGET_COUNT);
       onPipelineChange(nextPipeline);
 
       if (isNewlyCompletedStep1) {
@@ -170,10 +233,15 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
         setTimeout(() => {
           setIsSummaryModalOpen(true);
         }, 600);
+      } else if (enteringImmediateReview) {
+        SoundEngine.speakText('8道题打完啦！现在进入错题闪电二刷，把刚才错的题再亲手走对一遍就通关！');
+        setTimeout(() => {
+          setCurrentIndex(0);
+        }, 1000);
       } else {
         setTimeout(() => {
           const nextUnsolved = puzzles.findIndex(
-            (p, idx) => idx > currentIndex && !nextPipeline.step1SolvedIds.includes(p.id)
+            (p, idx) => idx > safeIndex && !nextPipeline.step1SolvedIds.includes(p.id)
           );
           if (nextUnsolved !== -1) {
             setCurrentIndex(nextUnsolved);
@@ -183,13 +251,17 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
               setCurrentIndex(firstUnsolved);
             }
           }
-        }, 1100);
+        }, 1050);
       }
     } else {
       SoundEngine.playErrorSound();
-      setFeedback('哎呀，这一步被白棋防住了！再仔细看看气数和眼形！');
-      const updated = recordPipelinePuzzleMistake(currentPuzzle.id);
-      onPipelineChange(updated);
+      if (isImmediateReviewPhase) {
+        setFeedback('二刷差一点点！再回想一下刚才的正解位置，不急着点！');
+      } else {
+        setFeedback('哎呀，这一步被白棋防住了！再仔细看看气数和眼形！');
+        const updated = recordPipelinePuzzleMistake(currentPuzzle.id);
+        onPipelineChange(updated);
+      }
     }
   };
 
@@ -203,17 +275,25 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
             className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-black border transition ${
               isStep1Done
                 ? 'bg-emerald-500 text-white border-emerald-300 shadow-xs'
+                : isImmediateReviewPhase
+                ? 'bg-purple-600 text-white border-purple-300 shadow-sm'
                 : 'bg-yellow-300 text-amber-950 border-yellow-200 shadow-sm'
             }`}
           >
             {isStep1Done ? (
               <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+            ) : isImmediateReviewPhase ? (
+              <RefreshCcw className="w-3.5 h-3.5 shrink-0" />
             ) : (
               <span className="w-4 h-4 rounded-full bg-amber-950 text-yellow-300 text-[10px] flex items-center justify-center shrink-0">
                 1
               </span>
             )}
-            <span>第 1 步 · 刷题 ({solvedCount}/{DAILY_TARGET_COUNT})</span>
+            <span>
+              {isImmediateReviewPhase
+                ? `第 1 步 · 错题二刷 (剩 ${pendingReviewPuzzles.length} 题)`
+                : `第 1 步 · 刷题 (${solvedCount}/${DAILY_TARGET_COUNT})`}
+            </span>
           </div>
 
           <ArrowRight className="w-3.5 h-3.5 text-amber-200 shrink-0" />
@@ -276,7 +356,18 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
         </div>
       </div>
 
-      {/* 1.5 NEXT-STEP ACTION STRIP WHEN STEP 1 IS ALREADY COMPLETED */}
+      {/* 1.5 IMMEDIATE REVIEW BANNER OR NEXT-STEP ACTION STRIP */}
+      {isImmediateReviewPhase && (
+        <div className="w-full mt-1 px-3 py-1.5 rounded-xl border-2 border-purple-400 bg-purple-50 text-purple-950 flex flex-wrap items-center justify-between gap-2 shrink-0">
+          <div className="text-xs font-black flex items-center gap-1.5">
+            <RefreshCcw className="w-4 h-4 text-purple-600 shrink-0" />
+            <span>
+              错题闪电二刷：刚才有 {reviewPuzzles.length} 道题遇到小卡顿，现在亲手再走对一遍（还剩 {pendingReviewPuzzles.length} 题），清零后就进入全盘实战！
+            </span>
+          </div>
+        </div>
+      )}
+
       {isStep1Done && (
         <div
           className={`w-full mt-1 px-3 py-1.5 rounded-xl border flex flex-wrap items-center justify-between gap-2 shrink-0 ${
@@ -305,27 +396,42 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
         </div>
       )}
 
-      {/* 2. PROGRESS TRACKER (8 DOTS / BUTTONS) */}
-      <div className="w-full bg-amber-50/90 rounded-2xl p-1.5 border border-amber-200 shadow-xs flex items-center justify-between gap-1.5 overflow-x-auto my-1 shrink-0">
-        {puzzles.map((p, idx) => {
-          const isSolved = pipelineState.step1SolvedIds.includes(p.id);
-          const isCurrent = idx === currentIndex;
+      {/* 2. PROGRESS TRACKER (8 DOTS OR REVIEW DOTS) */}
+      <div
+        className={`w-full rounded-2xl p-1.5 border shadow-xs flex items-center justify-between gap-1.5 overflow-x-auto my-1 shrink-0 ${
+          isImmediateReviewPhase
+            ? 'bg-purple-50/90 border-purple-200'
+            : 'bg-amber-50/90 border-amber-200'
+        }`}
+      >
+        {activeList.map((p, idx) => {
+          const isCleared = isImmediateReviewPhase
+            ? pipelineState.step1ReviewClearedIds.includes(p.id)
+            : pipelineState.step1SolvedIds.includes(p.id);
+          const isCurrent = idx === safeIndex;
+          const isRevenge = !isImmediateReviewPhase && revengeIdSet.has(p.id);
           return (
             <button
               key={p.id}
               onClick={() => setCurrentIndex(idx)}
-              className={`flex-1 min-w-[36px] h-8 sm:h-9 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-1 relative ${
+              className={`flex-1 min-w-[44px] h-8 sm:h-9 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-1 relative ${
                 isCurrent
-                  ? 'bg-amber-500 text-white shadow-md scale-[1.03] border-2 border-yellow-300'
-                  : isSolved
+                  ? isImmediateReviewPhase
+                    ? 'bg-purple-600 text-white shadow-md scale-[1.03] border-2 border-purple-300'
+                    : 'bg-amber-500 text-white shadow-md scale-[1.03] border-2 border-yellow-300'
+                  : isCleared
                   ? 'bg-emerald-500 text-white shadow-xs'
+                  : isRevenge
+                  ? 'bg-orange-50 hover:bg-orange-100 text-orange-900 border border-orange-300'
                   : 'bg-white hover:bg-amber-100 text-amber-900 border border-amber-200'
               }`}
-              title={`第 ${idx + 1} 题 · ${getPuzzleCategoryLabel(p)}${isSolved ? '（已通过）' : ''}`}
+              title={`${isImmediateReviewPhase ? '二刷第 ' : '第 '}${idx + 1} 题 · ${getPuzzleCategoryLabel(p)}${isRevenge ? '（昨日错题复仇）' : ''}`}
             >
-              <span>第{idx + 1}题</span>
-              {isSolved ? (
+              <span>{isImmediateReviewPhase ? `二刷${idx + 1}` : `第${idx + 1}题`}</span>
+              {isCleared ? (
                 <span className="text-yellow-200">★</span>
+              ) : isRevenge ? (
+                <span className="text-[10px] text-orange-600">复</span>
               ) : (
                 <span className="opacity-40">○</span>
               )}
@@ -356,13 +462,28 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
         {/* Right: Question prompt & Helper controls */}
         <div className="w-full md:w-80 flex flex-col justify-between gap-2 bg-white/95 rounded-2xl p-3 border-2 border-amber-300 shadow-xs h-full overflow-y-auto">
           <div>
-            <div className="flex items-center justify-between gap-1">
-              <span className="text-xs font-black text-amber-700 bg-amber-100 px-2 py-0.5 rounded-lg">
-                第 {currentIndex + 1} / {DAILY_TARGET_COUNT} 题
+            <div className="flex items-center justify-between gap-1 flex-wrap">
+              <span
+                className={`text-xs font-black px-2 py-0.5 rounded-lg ${
+                  isImmediateReviewPhase
+                    ? 'text-purple-800 bg-purple-100'
+                    : 'text-amber-700 bg-amber-100'
+                }`}
+              >
+                {isImmediateReviewPhase
+                  ? `错题二刷 ${safeIndex + 1} / ${activeList.length}`
+                  : `第 ${safeIndex + 1} / ${DAILY_TARGET_COUNT} 题`}
               </span>
-              <span className="text-[11px] font-bold text-orange-800 bg-orange-100 px-2 py-0.5 rounded-lg">
-                {getPuzzleCategoryLabel(currentPuzzle)}
-              </span>
+              <div className="flex items-center gap-1">
+                {isCurrentRevenge && (
+                  <span className="text-[10px] font-black text-white bg-orange-500 px-1.5 py-0.5 rounded-md">
+                    错题复仇
+                  </span>
+                )}
+                <span className="text-[11px] font-bold text-orange-800 bg-orange-100 px-2 py-0.5 rounded-lg">
+                  {getPuzzleCategoryLabel(currentPuzzle)}
+                </span>
+              </div>
             </div>
 
             <h3 className="text-base font-black text-amber-950 mt-1.5 font-cartoon">
@@ -390,6 +511,7 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
                   feedback.includes('太棒') ||
                   feedback.includes('正确') ||
                   feedback.includes('命中') ||
+                  feedback.includes('神勇') ||
                   feedback.includes('答案已展示')
                     ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                     : 'bg-red-100 text-red-800 border border-red-300'
@@ -501,7 +623,7 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
-                disabled={currentIndex === 0}
+                disabled={safeIndex === 0}
                 className="flex-1 flex items-center justify-center gap-1 py-2 px-2 bg-white hover:bg-amber-50 disabled:opacity-40 text-amber-900 font-bold rounded-xl text-xs transition border border-amber-300"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
@@ -509,8 +631,8 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
               </button>
 
               <button
-                onClick={() => setCurrentIndex((prev) => Math.min(puzzles.length - 1, prev + 1))}
-                disabled={currentIndex === puzzles.length - 1}
+                onClick={() => setCurrentIndex((prev) => Math.min(activeList.length - 1, prev + 1))}
+                disabled={safeIndex === activeList.length - 1}
                 className="flex-1 flex items-center justify-center gap-1 py-2 px-2 bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-500 hover:to-amber-600 disabled:opacity-40 text-amber-950 font-black rounded-xl text-xs transition shadow-xs border border-amber-500"
               >
                 <span>下一题</span>
@@ -530,7 +652,7 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
             </div>
 
             <span className="text-xs font-black text-emerald-800 bg-emerald-100 border border-emerald-300 px-3 py-0.5 rounded-full">
-              第 1 步 · 今日刷题打卡完成
+              第 1 步 · 今日刷题与错题复习全部通关
             </span>
 
             <h2 className="text-xl font-black text-amber-950 mt-2 font-cartoon">
@@ -553,14 +675,17 @@ export const DailyChallengeView: React.FC<DailyChallengeViewProps> = ({
                       全部一次过
                     </span>
                   ) : (
-                    <span className="text-orange-700 bg-orange-100 px-2 py-0.5 rounded-lg">
-                      {item.mistakeCount} 题需巩固
+                    <span className="text-purple-700 bg-purple-100 px-2 py-0.5 rounded-lg">
+                      {item.mistakeCount} 题已二刷清零
                     </span>
                   )}
                 </div>
               ))}
               <p className="text-xs text-amber-800 bg-amber-50 p-2 rounded-xl leading-relaxed pt-1.5 border border-amber-100">
                 {summary.advice}
+                {reviewPuzzles.length > 0
+                  ? ' 今天的错题明天还会自动混进打卡里复仇，直到一次做对才毕业！'
+                  : ''}
               </p>
             </div>
 

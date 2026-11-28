@@ -134,6 +134,9 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({
   // 记录小选手是否在对局中使用了停一手（用于名师复盘与投机诊断）
   const [playerAttemptedPass, setPlayerAttemptedPass] = useState<boolean>(false);
 
+  // 防重复上传标记（每局至多保存并上传 D1 一次）
+  const hasRecordedGameRef = useRef<boolean>(false);
+
   // 局域网 PC 满血 KataGo 算力连接状态
   const [isPcConnected, setIsPcConnected] = useState<boolean>(false);
 
@@ -208,8 +211,9 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({
       handicap: number = handicapCount
     ) => {
       // 📝 中途退出也上传棋谱：孩子没下完就重开/换对手，棋谱同样要记录，方便 AI 分析棋路。
-      // 已结算（isGameOver）的不重复上传；刚开局（<3 手）无分析价值，跳过。
-      if (boardState.moveHistory.length >= 3 && !boardState.isGameOver) {
+      // 已结算（isGameOver 或已记录）的不重复上传；刚开局（<3 手）无分析价值，跳过。
+      if (boardState.moveHistory.length >= 3 && !boardState.isGameOver && !hasRecordedGameRef.current) {
+        hasRecordedGameRef.current = true;
         const myCaps = playerColor === 'black' ? boardState.captures.black : boardState.captures.white;
         const aiCaps = playerColor === 'black' ? boardState.captures.white : boardState.captures.black;
         const rec: GameRecord = {
@@ -230,6 +234,7 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({
         uploadGameRecord(rec);
       }
 
+      hasRecordedGameRef.current = false;
       setBoardSize(sz);
       if (sz !== 19) {
         setIsPlayingFullscreen(false);
@@ -376,24 +381,27 @@ export const FullGameSparringView: React.FC<FullGameSparringViewProps> = ({
       });
       setIsSettlementOpen(true);
 
-      // 📝 保存棋谱（供家长导出、AI 分析孩子棋路）
-      const record: GameRecord = {
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        timestamp: Date.now(),
-        boardSize,
-        winRule,
-        opponent: activeProfile.name,
-        aiLevel,
-        playerColor,
-        winner,
-        playerCaptures,
-        aiCaptures,
-        totalMoves: finalState.moveHistory.length,
-        moves: finalState.moveHistory.map((m) => ({ ...m })),
-      };
-      saveGameRecord(record);
-      // ☁️ 同步上传云端，AI 直接读表分析棋路（失败静默降级到本地，不影响对局）
-      uploadGameRecord(record);
+      // 📝 保存棋谱（供家长导出、AI 分析孩子棋路；防重复上传）
+      if (!hasRecordedGameRef.current) {
+        hasRecordedGameRef.current = true;
+        const record: GameRecord = {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          timestamp: Date.now(),
+          boardSize,
+          winRule,
+          opponent: activeProfile.name,
+          aiLevel,
+          playerColor,
+          winner,
+          playerCaptures,
+          aiCaptures,
+          totalMoves: finalState.moveHistory.length,
+          moves: finalState.moveHistory.map((m) => ({ ...m })),
+        };
+        saveGameRecord(record);
+        // ☁️ 同步上传云端，AI 直接读表分析棋路（失败静默降级到本地，不影响对局）
+        uploadGameRecord(record);
+      }
       // 标记今日流水线第 2 步完成
       onStep2GameComplete?.();
     },
