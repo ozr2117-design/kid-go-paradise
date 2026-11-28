@@ -13,7 +13,7 @@ import socket
 import logging
 import threading
 import subprocess
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse
 
 # Configure logging
@@ -374,7 +374,7 @@ def run():
     server_address = ("0.0.0.0", port)
     lan_ip = get_lan_ip()
 
-    httpd = HTTPServer(server_address, AppRequestHandler)
+    httpd = ThreadingHTTPServer(server_address, AppRequestHandler)
     print("=" * 65)
     print("KataGo Human-SL Daemon running successfully!")
     print(f"LAN API & Web Portal: http://{lan_ip}:{port}")
